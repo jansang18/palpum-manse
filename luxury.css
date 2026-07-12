@@ -1,0 +1,437 @@
+/* ============================================================
+   신의 음성 만세력 — 흑요석 천문관 UI
+   기존 기능 CSS 뒤에서 시각 규격만 일관되게 재정의한다.
+   ============================================================ */
+
+:root {
+  --obsidian-bg: #07080d;
+  --obsidian-bg-2: #0b0d14;
+  --obsidian-card: #10131c;
+  --obsidian-card-strong: #151925;
+  --obsidian-line: rgba(216, 181, 106, .16);
+  --obsidian-line-soft: rgba(255, 255, 255, .075);
+  --mystic-gold: #d8b56a;
+  --mystic-gold-bright: #f0d69a;
+  --mystic-gold-deep: #a97732;
+  --lux-text: #f4f1e8;
+  --lux-sub: #a6a9b4;
+  --lux-muted: #6f7380;
+  --lux-radius: 18px;
+  --lux-radius-sm: 12px;
+  --lux-gap: 14px;
+  --lux-shadow: 0 18px 42px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+/* ---------- 전체 셸 ---------- */
+body.dark {
+  --bg: var(--obsidian-bg);
+  --bg-soft: var(--obsidian-card);
+  --bg-elev: var(--obsidian-card-strong);
+  --line: var(--obsidian-line);
+  --text: var(--lux-text);
+  --text-sub: var(--lux-sub);
+  --text-light: var(--lux-muted);
+  background:
+    radial-gradient(70% 34% at 50% -8%, rgba(216, 181, 106, .09), transparent 68%),
+    radial-gradient(55% 40% at 100% 5%, rgba(50, 70, 125, .08), transparent 70%),
+    var(--obsidian-bg);
+  color: var(--lux-text);
+}
+
+body.dark .top-bar,
+body.dark .tabs {
+  background: rgba(7, 8, 13, .88);
+  border-bottom: 1px solid rgba(216, 181, 106, .10);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.top-bar .title { letter-spacing: -.02em; }
+.brand-main,
+.brand-main-big {
+  background: linear-gradient(118deg, #fff2c8 0%, var(--mystic-gold-bright) 44%, #b78538 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 2px 12px rgba(216, 181, 106, .12));
+}
+
+.tab {
+  min-height: 52px;
+  letter-spacing: -.02em;
+}
+.tab.active { color: var(--mystic-gold-bright) !important; }
+.tab.active::after {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--mystic-gold-bright), transparent);
+  box-shadow: 0 0 10px rgba(216, 181, 106, .32);
+}
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  border-color: rgba(216, 181, 106, .14) !important;
+}
+
+.view { padding-inline: 12px; }
+
+/* ---------- 카드 시스템 ---------- */
+body.dark .input-card,
+body.dark .oguk-card,
+body.dark .result-right .luck-section,
+body.dark .overall-card,
+body.dark .match-total-card,
+body.dark .f-card,
+body.dark .match-slot,
+body.dark .cal-grid,
+body.dark #calDayDetail,
+body.dark .saved-card,
+body.dark .note-text {
+  background: linear-gradient(145deg, rgba(21, 25, 37, .96), rgba(12, 14, 22, .96)) !important;
+  border: 1px solid var(--obsidian-line) !important;
+  border-radius: var(--lux-radius) !important;
+  box-shadow: var(--lux-shadow);
+}
+
+.card-title,
+.result-right .luck-title,
+.sub-luck-label {
+  color: var(--mystic-gold-bright) !important;
+  letter-spacing: -.02em;
+}
+
+.card-title,
+.result-right .luck-title {
+  border-bottom-color: rgba(216, 181, 106, .13) !important;
+}
+
+/* ---------- 입력 ---------- */
+.input-intro img {
+  width: min(210px, 56vw) !important;
+  height: auto !important;
+  filter: drop-shadow(0 16px 30px rgba(0, 0, 0, .42)) drop-shadow(0 0 18px rgba(216, 181, 106, .10));
+}
+
+.person-search-btn,
+.input,
+.segmented { min-height: 48px; }
+
+body.dark .person-search-btn {
+  background: rgba(216, 181, 106, .035) !important;
+  border-color: rgba(216, 181, 106, .36) !important;
+  box-shadow: 0 0 18px rgba(216, 181, 106, .08), inset 0 0 16px rgba(216, 181, 106, .025);
+}
+body.dark .person-search-btn svg { color: var(--mystic-gold); }
+
+body.dark .input {
+  background: rgba(255, 255, 255, .035);
+  border-color: rgba(216, 181, 106, .15);
+  color: var(--lux-text);
+}
+body.dark .input::placeholder { color: rgba(166, 169, 180, .52); }
+body.dark .input:focus {
+  background: rgba(255, 255, 255, .05);
+  border-color: rgba(216, 181, 106, .65);
+  box-shadow: 0 0 0 3px rgba(216, 181, 106, .12);
+}
+
+body.dark .segmented {
+  background: rgba(255, 255, 255, .03);
+  border-color: rgba(216, 181, 106, .12);
+}
+
+.segmented button.active,
+.primary-btn,
+.bottom-bar .bb.primary {
+  background: linear-gradient(135deg, var(--mystic-gold-deep) 0%, var(--mystic-gold) 48%, var(--mystic-gold-bright) 100%) !important;
+  color: #161109 !important;
+  text-shadow: 0 1px rgba(255, 255, 255, .20);
+  box-shadow: 0 10px 28px rgba(185, 135, 58, .24) !important;
+}
+
+.primary-btn {
+  min-height: 56px;
+  border-radius: 14px !important;
+}
+.primary-btn::after {
+  content: "✦";
+  color: rgba(22, 17, 9, .72);
+}
+
+body.dark .note-text {
+  color: var(--lux-sub);
+  line-height: 1.65;
+}
+
+/* ---------- 원국 ---------- */
+.oguk-card { padding: 18px 14px !important; }
+.oguk-card::before {
+  opacity: .42;
+  filter: saturate(.72) sepia(.12);
+}
+.oguk-card .result-head .name { color: var(--lux-text) !important; }
+.oguk-card .result-head .info { color: var(--lux-sub); }
+
+.pillars-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.pillar-col { min-width: 0; }
+
+.pillar-block,
+.pillar-col.calli-mode .pillar-block.empty {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.pillar-block .han,
+.pillar-block.empty .han {
+  font-family: 'Noto Serif KR', 'Batang', '바탕', serif;
+  font-size: clamp(34px, 11vw, 54px) !important;
+  font-weight: 900;
+  line-height: 1 !important;
+  transform: translateY(-.045em) !important;
+  font-variant-east-asian: traditional;
+}
+
+.pillar-title,
+.pillar-sipsin-top,
+.pillar-sipsin-bot,
+.calli-kor { letter-spacing: -.03em; }
+
+.jijanggan {
+  min-height: 18px;
+  gap: 3px;
+}
+.jj {
+  min-width: 16px;
+  height: 17px;
+  padding: 0 2px;
+  background: #fff;
+  color: #111;
+  border-color: #d7d7d7;
+  font-size: 11px;
+}
+
+/* ---------- 대운·세운·월운 ---------- */
+#daeunScroll,
+#seunScroll {
+  display: grid !important;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px !important;
+  width: 100%;
+  justify-content: stretch !important;
+}
+
+#daeunScroll .luck-item,
+#seunScroll .luck-item {
+  width: 100% !important;
+  max-width: 60px !important;
+  min-width: 0 !important;
+  padding: 2px 0 !important;
+}
+
+.luck-block {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1 !important;
+  padding: 0 !important;
+  display: grid;
+  place-items: center;
+  border-radius: 8px !important;
+}
+
+.luck-block .han,
+#daeunScroll .luck-block .han,
+#seunScroll .luck-block .han {
+  font-family: 'Noto Serif KR', 'Batang', '바탕', serif;
+  font-size: clamp(11px, 3.15vw, 22px) !important;
+  font-weight: 900;
+  line-height: 1 !important;
+  transform: translateY(-.035em);
+}
+
+#woonScroll.woon-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 3px !important;
+  margin-inline: -6px !important;
+}
+#woonScroll .luck-item { min-width: 0; width: auto; }
+#woonScroll .luck-block .han { font-size: clamp(13px, 3.65vw, 21px) !important; }
+
+.luck-item.selected {
+  background: rgba(216, 181, 106, .055) !important;
+  outline: 2px solid var(--mystic-gold-bright) !important;
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 1px rgba(216, 181, 106, .48), 0 0 12px rgba(216, 181, 106, .10) !important;
+}
+.luck-item.selected .luck-block {
+  box-shadow: 0 0 0 1px rgba(240, 214, 154, .72), 0 0 10px rgba(216, 181, 106, .18);
+}
+
+.sub-luck,
+.sub-luck.inner {
+  border-top-color: rgba(216, 181, 106, .13) !important;
+}
+
+/* ---------- 풀이 ---------- */
+body.dark .overall-card,
+body.dark .match-total-card {
+  background: linear-gradient(145deg, rgba(44, 35, 23, .78), rgba(16, 19, 28, .98)) !important;
+}
+
+.f-card { padding: 18px !important; }
+.f-card-title {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+}
+.f-score-num { color: var(--mystic-gold-bright) !important; }
+body.dark .f-bar,
+body.dark .mb-bar { background: rgba(255, 255, 255, .065) !important; }
+.fortune-head .year-tag {
+  background: var(--mystic-gold) !important;
+  color: #171108 !important;
+}
+.overall-card .ov-label,
+.overall-card .ov-grade { color: var(--mystic-gold-bright) !important; }
+
+/* ---------- 궁합 ---------- */
+.match-slot .plus,
+.match-slot svg,
+.match-slot .slot-ico::before { color: var(--mystic-gold) !important; }
+.match-intro em,
+.match-vs { color: var(--mystic-gold-bright) !important; }
+body.dark .match-slot.filled { border-color: rgba(216, 181, 106, .40) !important; }
+body.dark .match-reset {
+  background: rgba(216, 181, 106, .045) !important;
+  border-color: rgba(216, 181, 106, .16) !important;
+}
+
+/* ---------- 만세력 ---------- */
+body.dark .cal-grid { padding: 8px; }
+body.dark .cal-day {
+  border-color: rgba(255, 255, 255, .08) !important;
+  background: rgba(255, 255, 255, .018);
+}
+body.dark .cal-day.today {
+  outline: 1.5px solid var(--mystic-gold-bright) !important;
+  box-shadow: 0 0 14px rgba(216, 181, 106, .24);
+}
+body.dark .cal-day.selected {
+  background: rgba(216, 181, 106, .11) !important;
+  box-shadow: inset 0 0 0 1px rgba(216, 181, 106, .55);
+}
+#calDayDetail {
+  min-height: 0 !important;
+  padding: 18px !important;
+}
+
+body.dark .day-item .el-water,
+body.dark .cal-day .el-water,
+body.dark .siju-item .el-water { color: #78adff !important; }
+
+body.dark .day-item .el-metal,
+body.dark .cal-day .el-metal,
+body.dark .siju-item .el-metal { color: #fff8e8 !important; }
+
+.today-chip {
+  color: #171108;
+  background: linear-gradient(135deg, var(--mystic-gold), var(--mystic-gold-bright));
+  box-shadow: 0 2px 8px rgba(216, 181, 106, .22);
+}
+
+/* ---------- 저장 ---------- */
+.saved-toolbar .bb {
+  min-height: 48px;
+  border-color: rgba(216, 181, 106, .14) !important;
+}
+.sfav.on {
+  color: var(--mystic-gold-bright);
+  text-shadow: 0 0 10px rgba(216, 181, 106, .36);
+}
+
+.saved-empty {
+  margin-top: 22px;
+  padding: 46px 22px;
+  border: 1px solid var(--obsidian-line);
+  border-radius: var(--lux-radius);
+  background: linear-gradient(145deg, rgba(21, 25, 37, .85), rgba(10, 12, 19, .92));
+  box-shadow: var(--lux-shadow);
+}
+.empty-mark {
+  width: 68px;
+  aspect-ratio: 1;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #171108;
+  background: radial-gradient(circle at 35% 25%, #fff0b8, var(--mystic-gold) 62%, #80581f);
+  font: 900 34px/1 'Batang', '바탕', serif;
+  box-shadow: 0 0 28px rgba(216, 181, 106, .18);
+}
+.saved-empty h3 {
+  margin: 0 0 10px;
+  color: var(--lux-text);
+  font-size: 18px;
+}
+.saved-empty p {
+  margin: 0;
+  color: var(--lux-sub);
+}
+.empty-cta {
+  min-height: 46px;
+  margin-top: 22px;
+  padding: 0 20px;
+  border: 1px solid rgba(216, 181, 106, .45);
+  border-radius: 12px;
+  background: rgba(216, 181, 106, .08);
+  color: var(--mystic-gold-bright);
+  font-weight: 800;
+  cursor: pointer;
+}
+.empty-cta:active { transform: scale(.98); }
+
+body.dark .bottom-bar {
+  background: rgba(7, 8, 13, .96) !important;
+  border-top: 1px solid rgba(216, 181, 106, .12);
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, .30);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* ---------- 반응형 ---------- */
+@media (max-width: 600px) {
+  .view { padding-inline: 8px; }
+  #view-result { padding-inline: 5px !important; }
+  .oguk-card,
+  .result-right .luck-section,
+  body.dark .result-right .luck-section { padding-inline: 9px !important; }
+  .input-card { padding-inline: 16px; }
+}
+
+@media (max-width: 370px) {
+  .pillars-4 { gap: 6px; }
+  .oguk-card { padding-inline: 7px !important; }
+  #woonScroll.woon-grid { gap: 2px !important; margin-inline: -5px !important; }
+  .luck-item .label,
+  .luck-item .sipsin-t,
+  .luck-item .sipsin-b { letter-spacing: -.07em; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

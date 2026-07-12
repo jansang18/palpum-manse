@@ -8,6 +8,16 @@
     { bg: '#e9e3d2', fg: '#2a2a2a' }, // 금
     { bg: '#3f51c4', fg: '#ffffff' }  // 수
   ];
+  var THEME = {
+    bg: '#07080d',
+    card: '#10131c',
+    text: '#f4f1e8',
+    sub: '#a6a9b4',
+    gold: '#d8b56a',
+    goldBright: '#f0d69a',
+    goldDeep: '#a97732',
+    line: 'rgba(216,181,106,0.22)'
+  };
 
   function rr(ctx, x, y, w, h, r) {
     ctx.beginPath();
@@ -26,28 +36,28 @@
     var c = cv.getContext('2d');
 
     // 배경
-    c.fillStyle = '#0a0a0f'; c.fillRect(0, 0, W, H);
+    c.fillStyle = THEME.bg; c.fillRect(0, 0, W, H);
     var g = c.createRadialGradient(W / 2, 120, 60, W / 2, 120, 760);
-    g.addColorStop(0, 'rgba(255,130,80,0.22)');
-    g.addColorStop(0.5, 'rgba(255,90,120,0.07)');
-    g.addColorStop(1, 'rgba(10,10,15,0)');
+    g.addColorStop(0, 'rgba(216,181,106,0.22)');
+    g.addColorStop(0.5, 'rgba(92,74,45,0.08)');
+    g.addColorStop(1, 'rgba(7,8,13,0)');
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     // 별
     for (var i = 0; i < 60; i++) {
       var sx = (i * 167.3) % W, sy = (i * 311.7) % H, sr = ((i % 3) + 1) * 0.8;
       c.globalAlpha = 0.18 + (i % 5) * 0.07;
-      c.fillStyle = '#ffd97a'; c.beginPath(); c.arc(sx, sy, sr, 0, 7); c.fill();
+      c.fillStyle = THEME.goldBright; c.beginPath(); c.arc(sx, sy, sr, 0, 7); c.fill();
     }
     c.globalAlpha = 1;
     // 테두리
-    c.strokeStyle = 'rgba(255,200,150,0.18)'; c.lineWidth = 2;
+    c.strokeStyle = THEME.line; c.lineWidth = 2;
     rr(c, 24, 24, W - 48, H - 48, 36); c.stroke();
 
     c.textAlign = 'center';
 
     // 타이틀
     var tg = c.createLinearGradient(W / 2 - 240, 0, W / 2 + 240, 0);
-    tg.addColorStop(0, '#ffd6ad'); tg.addColorStop(0.5, '#ff8f5c'); tg.addColorStop(1, '#ff6f7e');
+    tg.addColorStop(0, '#fff2c8'); tg.addColorStop(0.5, THEME.goldBright); tg.addColorStop(1, THEME.goldDeep);
     c.fillStyle = tg;
     c.font = '700 60px "Batang","바탕",serif';
     c.fillText('신의 음성 만세력', W / 2, 130);
@@ -57,7 +67,7 @@
 
     // 이름 + 정보
     var age = (new Date().getFullYear()) - s.year;
-    c.fillStyle = '#ffffff';
+    c.fillStyle = THEME.text;
     c.font = '800 56px sans-serif';
     c.fillText(s.name || '이름 없음', W / 2, 300);
     c.fillStyle = 'rgba(255,255,255,0.6)';
@@ -85,7 +95,7 @@
       c.fillStyle = 'rgba(255,255,255,0.55)'; c.font = '700 26px sans-serif';
       c.fillText(sips[k] || '', cx, topY);
       // 라벨
-      c.fillStyle = 'rgba(255,210,160,0.85)'; c.font = '700 24px sans-serif';
+      c.fillStyle = THEME.goldBright; c.font = '700 24px sans-serif';
       c.fillText(labels[k], cx, topY + 38);
 
       var unknown = (k === 0 && s.unknown);
@@ -140,10 +150,11 @@
     m.id = 'shareCardModal';
     m.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:16px;backdrop-filter:blur(4px)';
     m.innerHTML =
-      '<img src="' + url + '" alt="사주 카드" style="max-width:88%;max-height:70vh;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,0.6)">' +
+      '<div style="font-size:12px;font-weight:800;letter-spacing:2px;color:#f0d69a">✧ 공유 카드 미리보기</div>' +
+      '<img src="' + url + '" alt="사주 카드" style="max-width:88%;max-height:66vh;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,0.6)">' +
       '<div style="font-size:13px;color:rgba(255,255,255,0.7)">이미지를 길게 눌러 저장하거나 아래 버튼으로 공유하세요</div>' +
       '<div style="display:flex;gap:10px;width:100%;max-width:420px">' +
-      '<button id="shareCardDo" style="flex:1;padding:15px;border:none;border-radius:14px;font-size:15px;font-weight:800;color:#fff;background:linear-gradient(135deg,#ff5e62,#ff8a4c);box-shadow:0 8px 24px rgba(255,95,75,0.4)">공유 / 저장</button>' +
+      '<button id="shareCardDo" style="flex:1;padding:15px;border:none;border-radius:14px;font-size:15px;font-weight:800;color:#161109;background:linear-gradient(135deg,#a97732,#d8b56a,#f0d69a);box-shadow:0 8px 24px rgba(185,135,58,0.28)">공유 / 저장</button>' +
       '<button id="shareCardClose" style="padding:15px 20px;border:1px solid rgba(255,255,255,0.2);border-radius:14px;font-size:15px;font-weight:700;color:#fff;background:rgba(255,255,255,0.06)">닫기</button>' +
       '</div>';
     document.body.appendChild(m);

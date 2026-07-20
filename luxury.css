@@ -438,7 +438,11 @@ body.dark .bottom-bar {
   }
 }
 
-/* Final whole-screen refinement: quieter surfaces, clearer information hierarchy. */
+/* ============================================================
+   전체 화면 정돈 v3.1 — 금색은 강조에만, 정보 영역은 차분하게
+   ============================================================ */
+
+/* 공통 밀도와 글자 계층 */
 .view { max-width: 720px; margin-inline: auto; }
 .field-label,
 .pillar-title,
@@ -456,6 +460,7 @@ body.dark .note-text {
   border-color: rgba(255, 255, 255, .08) !important;
 }
 
+/* 입력 화면: 첫 입력 항목이 더 빨리 보이도록 압축 */
 #view-input { max-width: 680px; }
 .input-intro { padding: 20px 0 24px !important; }
 .input-intro img {
@@ -483,6 +488,7 @@ body.dark .input-card {
   box-shadow: none !important;
 }
 
+/* 원국: 명식과 보조 정보를 더 명확히 분리 */
 .oguk-card .result-head { padding-bottom: 18px; }
 .oguk-card .result-head .name { letter-spacing: -.035em; }
 .pillar-title { margin-bottom: 4px; }
@@ -497,18 +503,21 @@ body.dark .input-card {
 .result-right .luck-section { overflow: visible; }
 .result-right .luck-title,
 .sub-luck-label { padding-bottom: 10px; }
+
 .luck-item {
   border-radius: 9px;
   transition: background-color .16s ease, outline-color .16s ease, transform .08s ease;
 }
 .luck-item:not(.selected) { outline: 1px solid transparent; }
 .luck-block { box-shadow: 0 3px 8px rgba(0, 0, 0, .14); }
+
 body.dark .bottom-bar .bb {
   min-height: 48px;
   border-color: rgba(255, 255, 255, .10);
   background: #11141d;
 }
 
+/* 풀이: 중첩 박스를 줄이고 점수 계층을 선명하게 */
 #view-fortune { max-width: 680px; }
 .fortune-head { padding-top: 10px; border-bottom-color: rgba(216, 181, 106, .12); }
 .overall-card { padding: 22px 18px !important; }
@@ -527,6 +536,7 @@ body.dark .f-text {
   border-color: rgba(255, 255, 255, .09) !important;
 }
 
+/* 궁합: 비어 있는 화면도 하나의 완성된 카드처럼 */
 #view-match { max-width: 680px; }
 .match-intro { padding: 16px 0 22px; }
 .match-intro .big { font-size: 24px; }
@@ -536,12 +546,16 @@ body.dark .match-slot {
   background: linear-gradient(150deg, rgba(21, 25, 37, .90), rgba(12, 14, 22, .96)) !important;
 }
 .match-slot .slot-ico::before { opacity: .78; }
-.match-go-btn { min-height: 52px; border: 1px solid rgba(216, 181, 106, .12); }
+.match-go-btn {
+  min-height: 52px;
+  border: 1px solid rgba(216, 181, 106, .12);
+}
 body.dark .match-go-btn:disabled {
   background: rgba(216, 181, 106, .07);
   color: rgba(166, 169, 180, .66);
 }
 
+/* 달력: 기본 테두리를 낮추고 오늘/선택일에만 초점 */
 #view-calendar { max-width: 720px; }
 body.dark .cal-grid { padding: 7px; }
 body.dark .cal-day {
@@ -554,6 +568,7 @@ body.dark .cal-day {
 body.dark .cal-day.today,
 body.dark .cal-day.selected { border-color: rgba(240, 214, 154, .70) !important; }
 
+/* 저장: 도구 버튼은 보조 기능으로, 저장 명반은 정보 중심으로 */
 #view-saved { max-width: 680px; }
 .saved-toolbar { gap: 10px; }
 body.dark .saved-toolbar .bb {
@@ -565,6 +580,7 @@ body.dark .saved-toolbar .bb {
 .empty-cta { transition: background-color .16s ease, transform .08s ease; }
 .empty-cta:hover { background: rgba(216, 181, 106, .13); }
 
+/* 모달도 본 화면과 같은 표면 규칙 사용 */
 body.dark .modal {
   background: #0d1018;
   border: 1px solid rgba(216, 181, 106, .14);

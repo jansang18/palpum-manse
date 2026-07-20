@@ -2042,6 +2042,8 @@
   <button type="button" class="bb primary" id="saveBtn">저장하기</button>
 </div>
 
+<div id="appToast" class="app-toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
 <div class="modal-bg" id="saveModal">
   <div class="modal">
     <h3>명반 저장</h3>
@@ -13168,6 +13170,35 @@ function reducedMotion() {
   return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 }
 
+let appToastTimer = 0;
+let appToastAnimation = null;
+window.showAppToast = function showAppToast(message) {
+  const toast = document.getElementById('appToast');
+  if (!toast) return;
+  clearTimeout(appToastTimer);
+  if (appToastAnimation) { appToastAnimation.cancel(); appToastAnimation = null; }
+  toast.textContent = String(message || '');
+  toast.classList.add('show');
+  const reduce = reducedMotion();
+  if (toast.animate) appToastAnimation = toast.animate([
+    { opacity: 0, transform: reduce ? 'translate(-50%, 0)' : 'translate(-50%, 12px)' },
+    { opacity: 1, transform: 'translate(-50%, 0)' }
+  ], { duration: reduce ? 100 : 180, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+  appToastTimer = setTimeout(() => {
+    const out = toast.animate ? toast.animate([
+      { opacity: 1, transform: 'translate(-50%, 0)' },
+      { opacity: 0, transform: reduce ? 'translate(-50%, 0)' : 'translate(-50%, 6px)' }
+    ], { duration: reduce ? 100 : 140, easing: 'ease-in', fill: 'both' }) : null;
+    appToastAnimation = out;
+    Promise.resolve(out ? out.finished : null).catch(() => {}).then(() => {
+      if (out && appToastAnimation !== out) return;
+      appToastAnimation = null;
+      toast.classList.remove('show');
+      toast.textContent = '';
+    });
+  }, 1800);
+};
+
 function stopElementAnimation(el) {
   const animation = appModalMotion.get(el);
   if (!animation) return;
@@ -13259,7 +13290,7 @@ onTap($('#saveConfirm'), async () => {
     localStorage.setItem('saju_list', JSON.stringify(list));
   }
   window.closeAppModal($('#saveModal'));
-  alert('저장되었습니다');
+  window.showAppToast('명반이 저장되었습니다');
 });
 
 onTap($('#shareBtn'), () => {

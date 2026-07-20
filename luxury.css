@@ -580,6 +580,28 @@ body.dark .saved-toolbar .bb {
 .empty-cta { transition: background-color .16s ease, transform .08s ease; }
 .empty-cta:hover { background: rgba(216, 181, 106, .13); }
 
+/* 저장 완료 피드백 */
+.app-toast {
+  position: fixed;
+  z-index: 120;
+  left: 50%;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 12px 18px;
+  border: 1px solid rgba(240, 214, 154, .34);
+  border-radius: 999px;
+  color: #171108;
+  background: rgba(240, 214, 154, .96);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .38);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 12px);
+}
+.app-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
 /* 모달도 본 화면과 같은 표면 규칙 사용 */
 body.dark .modal {
   background: #0d1018;

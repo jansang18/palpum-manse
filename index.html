@@ -13164,15 +13164,92 @@ function renderInteractions(it) {
 function pad(n) { return String(n).padStart(2, '0'); }
 function escapeHtml(s) { return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
 
+const appModalMotion = new WeakMap();
+
+function reducedMotion() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+function stopElementAnimation(el) {
+  const animation = appModalMotion.get(el);
+  if (!animation) return;
+  try { animation.commitStyles(); } catch (e) {}
+  animation.cancel();
+  appModalMotion.delete(el);
+}
+
+function runElementAnimation(el, keyframes, options) {
+  stopElementAnimation(el);
+  if (!el || typeof el.animate !== 'function') return null;
+  const animation = el.animate(keyframes, options);
+  appModalMotion.set(el, animation);
+  animation.finished.catch(() => {}).finally(() => {
+    if (appModalMotion.get(el) === animation) appModalMotion.delete(el);
+  });
+  return animation;
+}
+
+window.openAppModal = function openAppModal(modal) {
+  if (!modal) return false;
+  const panel = modal.querySelector('.modal');
+  modal.classList.add('active');
+  modal.classList.remove('is-closing');
+  const reduce = reducedMotion();
+  const centered = window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
+  runElementAnimation(modal, [{ opacity: 0 }, { opacity: 1 }], {
+    duration: reduce ? 100 : 180,
+    easing: 'linear',
+    fill: 'both'
+  });
+  if (panel) runElementAnimation(panel, [
+    { opacity: 0, transform: reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)' },
+    { opacity: 1, transform: 'translateY(0)' }
+  ], {
+    duration: reduce ? 120 : 240,
+    easing: 'cubic-bezier(.2,.7,.2,1)',
+    fill: 'both'
+  });
+  return true;
+};
+
+window.closeAppModal = function closeAppModal(modal) {
+  if (!modal || !modal.classList.contains('active')) return false;
+  const panel = modal.querySelector('.modal');
+  const reduce = reducedMotion();
+  const centered = window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
+  modal.classList.add('is-closing');
+  const bg = runElementAnimation(modal, [
+    { opacity: parseFloat(getComputedStyle(modal).opacity) || 1 },
+    { opacity: 0 }
+  ], { duration: reduce ? 100 : 180, easing: 'linear', fill: 'both' });
+  const sheet = panel && runElementAnimation(panel, [
+    { opacity: parseFloat(getComputedStyle(panel).opacity) || 1, transform: getComputedStyle(panel).transform === 'none' ? 'translateY(0)' : getComputedStyle(panel).transform },
+    { opacity: reduce ? 0 : .9, transform: reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)' }
+  ], { duration: reduce ? 120 : 220, easing: 'cubic-bezier(.4,0,1,1)', fill: 'both' });
+  const token = sheet || bg;
+  Promise.resolve(token ? token.finished : null).catch(() => {}).then(() => {
+    if (!modal.classList.contains('is-closing')) return;
+    modal.classList.remove('active', 'is-closing');
+    modal.style.opacity = '';
+    if (panel) { panel.style.opacity = ''; panel.style.transform = ''; }
+  });
+  return true;
+};
+
+window.closeTopAppModal = function closeTopAppModal() {
+  const modals = document.querySelectorAll('.modal-bg.active');
+  return modals.length ? window.closeAppModal(modals[modals.length - 1]) : false;
+};
+
 /* 저장 */
 onTap($('#saveBtn'), () => {
   if (!currentSaju) return;
   $('#saveName').value = currentSaju.name !== '이름 없음' ? currentSaju.name : '';
   $('#saveMemo').value = '';
-  $('#saveModal').classList.add('active');
+  window.openAppModal($('#saveModal'));
 });
-onTap($('#saveCancel'), () => $('#saveModal').classList.remove('active'));
-onTap($('#similarClose'), () => $('#similarModal').classList.remove('active'));
+onTap($('#saveCancel'), () => window.closeAppModal($('#saveModal')));
+onTap($('#similarClose'), () => window.closeAppModal($('#similarModal')));
 onTap($('#saveConfirm'), async () => {
   const name = $('#saveName').value.trim() || '이름 없음';
   const memo = $('#saveMemo').value.trim();
@@ -13183,7 +13260,7 @@ onTap($('#saveConfirm'), async () => {
     list.push(record);
     localStorage.setItem('saju_list', JSON.stringify(list));
   }
-  $('#saveModal').classList.remove('active');
+  window.closeAppModal($('#saveModal'));
   alert('저장되었습니다');
 });
 
@@ -13366,7 +13443,7 @@ async function findSimilarSaju() {
 
   if (list.length === 0) {
     $('#similarModal .similar-body').innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text-sub);font-size:14px;font-weight:600;line-height:1.7;">저장된 명반이 없습니다.<br>저장 탭에서 사주를 모아두면<br>여기서 비교할 수 있어요.</div>`;
-    $('#similarModal').classList.add('active');
+    window.openAppModal($('#similarModal'));
     return;
   }
 
@@ -13378,7 +13455,7 @@ async function findSimilarSaju() {
 
   if (scored.length === 0) {
     $('#similarModal .similar-body').innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text-sub);font-size:14px;font-weight:600;line-height:1.7;">비슷한 사주가 없습니다.<br>최소 2글자 이상 일치하는<br>명반이 저장 목록에 없어요.</div>`;
-    $('#similarModal').classList.add('active');
+    window.openAppModal($('#similarModal'));
     return;
   }
 
@@ -13408,7 +13485,7 @@ async function findSimilarSaju() {
       }).join('')}
     </div>`;
   $('#similarModal .similar-body').innerHTML = html;
-  $('#similarModal').classList.add('active');
+  window.openAppModal($('#similarModal'));
 
   // 카드 클릭 시 해당 사주 불러오기
   $$('#similarModal .similar-card').forEach(c => {
@@ -13418,7 +13495,7 @@ async function findSimilarSaju() {
       if (item) {
         currentSaju = item.rec;
         renderResult(item.rec);
-        $('#similarModal').classList.remove('active');
+        window.closeAppModal($('#similarModal'));
         // 원국 탭으로
         $$('.tab').forEach(t => t.classList.remove('active'));
         document.querySelector('.tab[data-tab="result"]').classList.add('active');
@@ -13603,10 +13680,10 @@ function renderCalDayDetail() {
 onTap($('#calPrev'), () => { calM--; if (calM < 1) { calM = 12; calY--; } selectedCalDay = null; selectedSijuBranch = null; renderCalendar(); });
 onTap($('#calNext'), () => { calM++; if (calM > 12) { calM = 1; calY++; } selectedCalDay = null; selectedSijuBranch = null; renderCalendar(); });
 
-onTap($('#aboutBtn'), () => $('#aboutModal').classList.add('active'));
-onTap($('#aboutClose'), () => $('#aboutModal').classList.remove('active'));
+onTap($('#aboutBtn'), () => window.openAppModal($('#aboutModal')));
+onTap($('#aboutClose'), () => window.closeAppModal($('#aboutModal')));
 [$('#saveModal'), $('#aboutModal'), $('#matchPickerModal'), $('#matchNewModal')].forEach(m => {
-  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
+  m.addEventListener('click', e => { if (e.target === m) window.closeAppModal(m); });
 });
 
 // 궁합 모달 이벤트
@@ -14206,11 +14283,11 @@ async function openMatchPicker() {
     openMatchNewForm();
   });
 
-  $('#matchPickerModal').classList.add('active');
+  window.openAppModal($('#matchPickerModal'));
 }
 
 function closeMatchPicker() {
-  $('#matchPickerModal').classList.remove('active');
+  window.closeAppModal($('#matchPickerModal'));
 }
 
 function setMatchSlot(target, person) {
@@ -14220,7 +14297,7 @@ function setMatchSlot(target, person) {
 }
 
 function openMatchNewForm() {
-  $('#matchNewModal').classList.add('active');
+  window.openAppModal($('#matchNewModal'));
   // 폼 초기화
   $('#mnfName').value = '';
   $('#mnfBirth').value = '';
@@ -14230,7 +14307,7 @@ function openMatchNewForm() {
   $$('#mnfCal button').forEach(b => b.classList.toggle('active', b.dataset.val === 'solar'));
 }
 function closeMatchNewForm() {
-  $('#matchNewModal').classList.remove('active');
+  window.closeAppModal($('#matchNewModal'));
 }
 
 // 궁합 점수 산출
@@ -14530,11 +14607,11 @@ let psLastQuery = '';
 let psJsonpCounter = 0;
 
 function openPersonSearch() {
-  $('#personSearchModal').classList.add('active');
+  window.openAppModal($('#personSearchModal'));
   setTimeout(() => { const q = $('#psQuery'); if (q) q.focus(); }, 100);
 }
 function closePersonSearch() {
-  $('#personSearchModal').classList.remove('active');
+  window.closeAppModal($('#personSearchModal'));
   $('#psQuery').value = '';
   $('#psResults').innerHTML = '';
   $('#psClearBtn').style.display = 'none';

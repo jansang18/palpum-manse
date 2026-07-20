@@ -1,6 +1,7 @@
 /* 뒤로가기 처리: 모달 닫기 → 입력탭 이동 → 홈에서 앱 종료 (웹은 History 폴백) */
 (function () {
   function closeTopModal() {
+    if (typeof window.closeTopAppModal === 'function') return window.closeTopAppModal();
     var modals = document.querySelectorAll('.modal-bg.active');
     if (modals.length) { modals[modals.length - 1].classList.remove('active'); return true; }
     return false;

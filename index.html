@@ -13706,8 +13706,73 @@ function renderCalDayDetail() {
   `;
 }
 
-onTap($('#calPrev'), () => { calM--; if (calM < 1) { calM = 12; calY--; } selectedCalDay = null; selectedSijuBranch = null; renderCalendar(); });
-onTap($('#calNext'), () => { calM++; if (calM > 12) { calM = 1; calY++; } selectedCalDay = null; selectedSijuBranch = null; renderCalendar(); });
+let calendarAnimation = null;
+let calendarMotionToken = 0;
+
+function shiftCalendarValue(delta) {
+  calM += delta;
+  if (calM < 1) { calM = 12; calY--; }
+  if (calM > 12) { calM = 1; calY++; }
+  selectedCalDay = null;
+  selectedSijuBranch = null;
+}
+
+function clearCalendarMotionStyles(grid) {
+  grid.style.opacity = '';
+  grid.style.transform = '';
+}
+
+function changeCalendarMonth(delta) {
+  const grid = document.getElementById('calGrid');
+  const direction = delta > 0 ? 'next' : 'prev';
+  const token = ++calendarMotionToken;
+  shiftCalendarValue(delta);
+
+  if (calendarAnimation) {
+    try { calendarAnimation.commitStyles(); } catch (e) {}
+    calendarAnimation.cancel();
+    calendarAnimation = null;
+  }
+
+  if (!grid || typeof grid.animate !== 'function' || reducedMotion()) {
+    if (grid) clearCalendarMotionStyles(grid);
+    renderCalendar();
+    if (grid) grid.dataset.motionDirection = direction;
+    return;
+  }
+
+  grid.dataset.motionDirection = direction;
+  const style = getComputedStyle(grid);
+  const outgoing = grid.animate([
+    {
+      opacity: parseFloat(style.opacity) || 1,
+      transform: style.transform === 'none' ? 'translateX(0)' : style.transform
+    },
+    { opacity: .62, transform: `translateX(${delta > 0 ? -8 : 8}px)` }
+  ], { duration: 90, easing: 'ease-in', fill: 'both' });
+  calendarAnimation = outgoing;
+
+  outgoing.finished.then(() => {
+    if (token !== calendarMotionToken || calendarAnimation !== outgoing) return;
+    outgoing.cancel();
+    renderCalendar();
+    grid.dataset.motionDirection = direction;
+    const incoming = grid.animate([
+      { opacity: .62, transform: `translateX(${delta > 0 ? 8 : -8}px)` },
+      { opacity: 1, transform: 'translateX(0)' }
+    ], { duration: 160, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+    calendarAnimation = incoming;
+    incoming.finished.then(() => {
+      if (token !== calendarMotionToken || calendarAnimation !== incoming) return;
+      calendarAnimation = null;
+      incoming.cancel();
+      clearCalendarMotionStyles(grid);
+    }, () => {});
+  }, () => {});
+}
+
+onTap($('#calPrev'), () => changeCalendarMonth(-1));
+onTap($('#calNext'), () => changeCalendarMonth(1));
 
 onTap($('#aboutBtn'), () => window.openAppModal($('#aboutModal')));
 onTap($('#aboutClose'), () => window.closeAppModal($('#aboutModal')));

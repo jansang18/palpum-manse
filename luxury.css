@@ -447,7 +447,7 @@ body.dark .bottom-bar {
 .field-label,
 .pillar-title,
 .luck-item .label { letter-spacing: -.025em; }
-.field-label { color: var(--lux-text); }
+body.dark .field-label { color: var(--lux-text); }
 
 body.dark .input-card,
 body.dark .f-card,
@@ -563,7 +563,7 @@ body.dark .cal-day {
   background: rgba(255, 255, 255, .012);
   box-shadow: none;
 }
-.cal-day .d { color: var(--lux-text); }
+body.dark .cal-day .d { color: var(--lux-text); }
 .cal-day.other { opacity: .28; }
 body.dark .cal-day.today,
 body.dark .cal-day.selected { border-color: rgba(240, 214, 154, .70) !important; }
@@ -634,6 +634,7 @@ body.dark .modal-actions button {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: #11141d !important;
+    color: #fff8e7 !important;
   }
 }
 

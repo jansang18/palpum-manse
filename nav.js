@@ -1,6 +1,13 @@
 /* 뒤로가기 처리: 모달 닫기 → 입력탭 이동 → 홈에서 앱 종료 (웹은 History 폴백) */
 (function () {
-  function closeTopModal() {
+  function closeTopOverlay() {
+    if (typeof window.closeTopAppOverlay === 'function') return window.closeTopAppOverlay();
+    var share = document.getElementById('shareCardModal');
+    if (share) {
+      if (typeof window.closeShareCardModal === 'function') return window.closeShareCardModal();
+      share.remove();
+      return true;
+    }
     if (typeof window.closeTopAppModal === 'function') return window.closeTopAppModal();
     var modals = document.querySelectorAll('.modal-bg.active');
     if (modals.length) { modals[modals.length - 1].classList.remove('active'); return true; }
@@ -15,10 +22,11 @@
     return false;
   }
   function handleBack() {
-    if (closeTopModal()) return true;
+    if (closeTopOverlay()) return true;
     if (goHomeIfNeeded()) return true;
     return false;
   }
+  window.handleAppBack = handleBack;
 
   function setupNative(App) {
     App.addListener('backButton', function () {

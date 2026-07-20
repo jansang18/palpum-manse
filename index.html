@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>신의 음성 만세력</title>
 <meta name="description" content="신의 음성 만세력 · 자평명리학 1000년 만세력 · 운세풀이 · 궁합">
 <meta name="theme-color" content="#e8421e" media="(prefers-color-scheme: light)">
@@ -2044,9 +2044,9 @@
 
 <div id="appToast" class="app-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-<div class="modal-bg" id="saveModal">
-  <div class="modal">
-    <h3>명반 저장</h3>
+<div class="modal-bg" id="saveModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="saveModalTitle" tabindex="-1">
+    <h3 id="saveModalTitle">명반 저장</h3>
     <div class="field">
       <label class="field-label">이름</label>
       <input class="input" id="saveName" placeholder="이름을 입력하세요" />
@@ -2062,9 +2062,9 @@
   </div>
 </div>
 
-<div class="modal-bg" id="similarModal">
-  <div class="modal">
-    <h3>비슷한 사주</h3>
+<div class="modal-bg" id="similarModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="similarModalTitle" tabindex="-1">
+    <h3 id="similarModalTitle">비슷한 사주</h3>
     <div class="similar-body"></div>
     <div class="modal-actions">
       <button type="button" class="primary" id="similarClose">닫기</button>
@@ -2072,9 +2072,9 @@
   </div>
 </div>
 
-<div class="modal-bg match-picker-modal" id="matchPickerModal">
-  <div class="modal">
-    <h3>사주 선택</h3>
+<div class="modal-bg match-picker-modal" id="matchPickerModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="matchPickerModalTitle" tabindex="-1">
+    <h3 id="matchPickerModalTitle">사주 선택</h3>
     <div id="matchPickerBody"></div>
     <div class="modal-actions">
       <button type="button" id="matchPickerCancel">취소</button>
@@ -2082,9 +2082,9 @@
   </div>
 </div>
 
-<div class="modal-bg" id="personSearchModal">
-  <div class="modal">
-    <h3>인물 검색</h3>
+<div class="modal-bg" id="personSearchModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="personSearchModalTitle" tabindex="-1">
+    <h3 id="personSearchModalTitle">인물 검색</h3>
     <div style="font-size:12px; font-weight:500; color:var(--text-sub); line-height:1.6; margin-bottom:10px;">
       국내 유명인은 <b>앱에 내장된 정보로 즉시</b> 자동 입력되고, 그 밖의 인물은 위키백과에서 찾습니다. 각 결과의 <b>네이버 🔍</b>로 인물정보·상세를 열 수 있어요.
     </div>
@@ -12119,9 +12119,9 @@ Sigrid Niehaus|19641229|F|
 헨드리|19990928|M|K-pop 아이돌
 </script>
 
-<div class="modal-bg" id="matchNewModal">
-  <div class="modal">
-    <h3>새 사주 입력</h3>
+<div class="modal-bg" id="matchNewModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="matchNewModalTitle" tabindex="-1">
+    <h3 id="matchNewModalTitle">새 사주 입력</h3>
     <div class="match-new-form">
       <div class="field">
         <label class="field-label">이름</label>
@@ -12161,9 +12161,9 @@ Sigrid Niehaus|19641229|F|
   </div>
 </div>
 
-<div class="modal-bg" id="aboutModal">
-  <div class="modal">
-    <h3>신의 음성 만세력</h3>
+<div class="modal-bg" id="aboutModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="aboutModalTitle" tabindex="-1">
+    <h3 id="aboutModalTitle">신의 음성 만세력</h3>
     <div style="font-size:14px; line-height:1.8; color:var(--text); font-weight:500;">
       전통 자평명리학에 따라 사주를 세우고<br>대운·세운·월운·일운을 펼쳐볼 수 있는<br>만세력 앱입니다.
     </div>
@@ -13165,9 +13165,38 @@ function pad(n) { return String(n).padStart(2, '0'); }
 function escapeHtml(s) { return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
 
 const appModalMotion = new WeakMap();
+const appModalState = new WeakMap();
+let appOverlayOrder = 0;
+const appOverlayFocusableSelector = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])'
+].join(',');
 
 function reducedMotion() {
   return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+function getAppModalState(modal) {
+  let state = appModalState.get(modal);
+  if (!state) {
+    state = { generation: 0, opener: null };
+    appModalState.set(modal, state);
+  }
+  return state;
+}
+
+function readPresentation(element, fallbackOpacity, fallbackTransform) {
+  if (!element) return { opacity: fallbackOpacity, transform: fallbackTransform };
+  const style = getComputedStyle(element);
+  const parsedOpacity = Number.parseFloat(style.opacity);
+  return {
+    opacity: Number.isFinite(parsedOpacity) ? parsedOpacity : fallbackOpacity,
+    transform: style.transform && style.transform !== 'none' ? style.transform : fallbackTransform
+  };
 }
 
 let appToastTimer = 0;
@@ -13188,7 +13217,7 @@ window.showAppToast = function showAppToast(message) {
     const out = toast.animate ? toast.animate([
       { opacity: 1, transform: 'translate(-50%, 0)' },
       { opacity: 0, transform: reduce ? 'translate(-50%, 0)' : 'translate(-50%, 6px)' }
-    ], { duration: reduce ? 100 : 140, easing: 'ease-in', fill: 'both' }) : null;
+    ], { duration: reduce ? 100 : 140, easing: 'cubic-bezier(.4,0,.8,.2)', fill: 'both' }) : null;
     appToastAnimation = out;
     Promise.resolve(out ? out.finished : null).catch(() => {}).then(() => {
       if (out && appToastAnimation !== out) return;
@@ -13204,39 +13233,119 @@ function stopElementAnimation(el) {
   if (!animation) return;
   try { animation.commitStyles(); } catch (e) {}
   animation.cancel();
-  appModalMotion.delete(el);
+  if (appModalMotion.get(el) === animation) appModalMotion.delete(el);
 }
 
 function runElementAnimation(el, keyframes, options) {
-  stopElementAnimation(el);
   if (!el || typeof el.animate !== 'function') return null;
+  stopElementAnimation(el);
   const animation = el.animate(keyframes, options);
   appModalMotion.set(el, animation);
-  animation.finished.catch(() => {}).finally(() => {
-    if (appModalMotion.get(el) === animation) appModalMotion.delete(el);
-  });
   return animation;
 }
+
+function animationSettled(animation) {
+  return animation ? animation.finished.catch(() => {}) : Promise.resolve();
+}
+
+function releaseElementAnimation(element, animation, properties) {
+  if (animation) {
+    if (appModalMotion.get(element) === animation) appModalMotion.delete(element);
+    try { animation.cancel(); } catch (e) {}
+  }
+  properties.forEach(property => { element.style[property] = ''; });
+}
+
+function topActiveAppModal() {
+  const active = [...document.querySelectorAll('.modal-bg.active')];
+  active.sort((a, b) => Number(a.dataset.overlayOrder || 0) - Number(b.dataset.overlayOrder || 0));
+  return active[active.length - 1] || null;
+}
+
+function topAppOverlay() {
+  return document.getElementById('shareCardModal') || topActiveAppModal();
+}
+
+function appBackgroundTargets() {
+  return [document.querySelector('.app'), document.getElementById('bottomBar')].filter(Boolean);
+}
+
+window.refreshAppOverlayAccessibility = function refreshAppOverlayAccessibility() {
+  const shouldInert = !!topAppOverlay();
+  appBackgroundTargets().forEach(element => {
+    element.inert = shouldInert;
+    if (shouldInert) element.setAttribute('aria-hidden', 'true');
+    else element.removeAttribute('aria-hidden');
+  });
+};
+
+function focusableElements(overlay) {
+  return [...overlay.querySelectorAll(appOverlayFocusableSelector)].filter(element => {
+    const style = getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden';
+  });
+}
+
+function focusAppOverlay(overlay) {
+  if (!overlay) return false;
+  const focusables = focusableElements(overlay);
+  const fallback = overlay.matches('.modal-bg') ? overlay.querySelector('[role="dialog"]') : overlay;
+  const target = focusables[0] || fallback;
+  if (!target || typeof target.focus !== 'function') return false;
+  try { target.focus({ preventScroll: true }); }
+  catch (e) { target.focus(); }
+  return true;
+}
+
+window.focusTopAppOverlay = function focusTopAppOverlay() {
+  return focusAppOverlay(topAppOverlay());
+};
 
 window.openAppModal = function openAppModal(modal) {
   if (!modal) return false;
   const panel = modal.querySelector('.modal');
-  modal.classList.add('active');
-  modal.classList.remove('is-closing');
+  const wasActive = modal.classList.contains('active');
+  if (wasActive && !modal.classList.contains('is-closing')) return true;
   const reduce = reducedMotion();
   const centered = window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
-  runElementAnimation(modal, [{ opacity: 0 }, { opacity: 1 }], {
+  const closedTransform = reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)';
+  const backdropStart = wasActive ? readPresentation(modal, 1, 'none') : { opacity: 0, transform: 'none' };
+  const panelStart = wasActive ? readPresentation(panel, 1, 'translateY(0)') : { opacity: 0, transform: closedTransform };
+  const state = getAppModalState(modal);
+  const operation = ++state.generation;
+  const activeElement = document.activeElement;
+  if (!wasActive && activeElement instanceof HTMLElement && activeElement !== document.body) state.opener = activeElement;
+
+  modal.classList.add('active');
+  modal.classList.remove('is-closing');
+  modal.setAttribute('aria-hidden', 'false');
+  modal.dataset.overlayOrder = String(++appOverlayOrder);
+  window.refreshAppOverlayAccessibility();
+
+  const backdrop = runElementAnimation(modal, [
+    { opacity: backdropStart.opacity },
+    { opacity: 1 }
+  ], {
     duration: reduce ? 100 : 180,
     easing: 'linear',
     fill: 'both'
   });
-  if (panel) runElementAnimation(panel, [
-    { opacity: 0, transform: reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)' },
+  const sheet = panel && runElementAnimation(panel, [
+    { opacity: panelStart.opacity, transform: panelStart.transform },
     { opacity: 1, transform: 'translateY(0)' }
   ], {
     duration: reduce ? 120 : 240,
     easing: 'cubic-bezier(.2,.7,.2,1)',
     fill: 'both'
+  });
+
+  Promise.all([animationSettled(backdrop), animationSettled(sheet)]).then(() => {
+    if (state.generation !== operation || modal.classList.contains('is-closing')) return;
+    releaseElementAnimation(modal, backdrop, ['opacity']);
+    if (panel) releaseElementAnimation(panel, sheet, ['opacity', 'transform']);
+  });
+  requestAnimationFrame(() => {
+    if (state.generation === operation && modal.classList.contains('active')) focusAppOverlay(modal);
   });
   return true;
 };
@@ -13246,29 +13355,77 @@ window.closeAppModal = function closeAppModal(modal) {
   const panel = modal.querySelector('.modal');
   const reduce = reducedMotion();
   const centered = window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
+  const backdropStart = readPresentation(modal, 1, 'none');
+  const panelStart = readPresentation(panel, 1, 'translateY(0)');
+  const state = getAppModalState(modal);
+  const operation = ++state.generation;
   modal.classList.add('is-closing');
   const bg = runElementAnimation(modal, [
-    { opacity: parseFloat(getComputedStyle(modal).opacity) || 1 },
+    { opacity: backdropStart.opacity },
     { opacity: 0 }
   ], { duration: reduce ? 100 : 180, easing: 'linear', fill: 'both' });
   const sheet = panel && runElementAnimation(panel, [
-    { opacity: parseFloat(getComputedStyle(panel).opacity) || 1, transform: getComputedStyle(panel).transform === 'none' ? 'translateY(0)' : getComputedStyle(panel).transform },
+    { opacity: panelStart.opacity, transform: panelStart.transform },
     { opacity: reduce ? 0 : .9, transform: reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)' }
   ], { duration: reduce ? 120 : 220, easing: 'cubic-bezier(.4,0,1,1)', fill: 'both' });
-  const token = sheet || bg;
-  Promise.resolve(token ? token.finished : null).catch(() => {}).then(() => {
-    if (!modal.classList.contains('is-closing')) return;
+
+  Promise.all([animationSettled(bg), animationSettled(sheet)]).then(() => {
+    if (state.generation !== operation || !modal.classList.contains('is-closing')) return;
     modal.classList.remove('active', 'is-closing');
-    modal.style.opacity = '';
-    if (panel) { panel.style.opacity = ''; panel.style.transform = ''; }
+    modal.setAttribute('aria-hidden', 'true');
+    delete modal.dataset.overlayOrder;
+    releaseElementAnimation(modal, bg, ['opacity']);
+    if (panel) releaseElementAnimation(panel, sheet, ['opacity', 'transform']);
+    window.refreshAppOverlayAccessibility();
+    const nextOverlay = topAppOverlay();
+    if (nextOverlay) focusAppOverlay(nextOverlay);
+    else if (state.opener && state.opener.isConnected && typeof state.opener.focus === 'function') {
+      try { state.opener.focus({ preventScroll: true }); }
+      catch (e) { state.opener.focus(); }
+    }
+    state.opener = null;
   });
   return true;
 };
 
 window.closeTopAppModal = function closeTopAppModal() {
-  const modals = document.querySelectorAll('.modal-bg.active');
-  return modals.length ? window.closeAppModal(modals[modals.length - 1]) : false;
+  const modal = topActiveAppModal();
+  return modal ? window.closeAppModal(modal) : false;
 };
+
+window.closeTopAppOverlay = function closeTopAppOverlay() {
+  const share = document.getElementById('shareCardModal');
+  if (share) {
+    if (typeof window.closeShareCardModal === 'function') return window.closeShareCardModal();
+    share.remove();
+    window.refreshAppOverlayAccessibility();
+    return true;
+  }
+  return window.closeTopAppModal();
+};
+
+document.addEventListener('keydown', event => {
+  const overlay = topAppOverlay();
+  if (!overlay) return;
+  if (event.key === 'Escape') {
+    if (window.closeTopAppOverlay()) event.preventDefault();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const focusables = focusableElements(overlay);
+  if (!focusables.length) {
+    event.preventDefault();
+    focusAppOverlay(overlay);
+    return;
+  }
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  const active = document.activeElement;
+  if (!overlay.contains(active) || (event.shiftKey && active === first) || (!event.shiftKey && active === last)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+  }
+});
 
 /* 저장 */
 onTap($('#saveBtn'), () => {
@@ -13634,7 +13791,7 @@ function renderCalendar() {
     const py = calM === 1 ? calY - 1 : calY, pm = calM === 1 ? 12 : calM - 1;
     const g = dayGanji(toJD(py, pm, d));
     const sE = STEM_EL[g.stem], bE = BRANCH_EL[g.branch];
-    html += `<div class="cal-day other"><div class="d">${d}</div><div class="gj"><span class="c-s ${EL_CLASS[sE]}">${STEM[g.stem]}</span><span class="c-b ${EL_CLASS[bE]}">${BRANCH[g.branch]}</span></div></div>`;
+    html += `<div class="cal-day other" data-year="${py}" data-month="${pm}" data-day="${d}"><div class="d">${d}</div><div class="gj"><span class="c-s ${EL_CLASS[sE]}">${STEM[g.stem]}</span><span class="c-b ${EL_CLASS[bE]}">${BRANCH[g.branch]}</span></div></div>`;
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const g = dayGanji(toJD(calY, calM, d));
@@ -13650,7 +13807,7 @@ function renderCalendar() {
       ssTopHtml = `<div class="cal-ss-t">${ssTop}</div>`;
       ssBotHtml = `<div class="cal-ss-b">${ssBot}</div>`;
     }
-    html += `<div class="cal-day clickable ${isToday?'today':''} ${isSelected?'selected':''}" data-day="${d}">
+    html += `<div class="cal-day clickable ${isToday?'today':''} ${isSelected?'selected':''}" data-year="${calY}" data-month="${calM}" data-day="${d}">
       <div class="d">${d}</div>
       ${ssTopHtml}
       <div class="gj"><span class="c-s ${EL_CLASS[sE]}">${STEM[g.stem]}</span><span class="c-b ${EL_CLASS[bE]}">${BRANCH[g.branch]}</span></div>
@@ -13664,18 +13821,14 @@ function renderCalendar() {
     const ny = calM === 12 ? calY + 1 : calY, nm = calM === 12 ? 1 : calM + 1;
     const g = dayGanji(toJD(ny, nm, d));
     const sE = STEM_EL[g.stem], bE = BRANCH_EL[g.branch];
-    html += `<div class="cal-day other"><div class="d">${d}</div><div class="gj"><span class="c-s ${EL_CLASS[sE]}">${STEM[g.stem]}</span><span class="c-b ${EL_CLASS[bE]}">${BRANCH[g.branch]}</span></div></div>`;
+    html += `<div class="cal-day other" data-year="${ny}" data-month="${nm}" data-day="${d}"><div class="d">${d}</div><div class="gj"><span class="c-s ${EL_CLASS[sE]}">${STEM[g.stem]}</span><span class="c-b ${EL_CLASS[bE]}">${BRANCH[g.branch]}</span></div></div>`;
   }
   $('#calGrid').innerHTML = html;
 
   // 날짜 클릭 이벤트
   $$('#calGrid .cal-day.clickable').forEach(el => {
     el.addEventListener('click', () => {
-      const d = +el.dataset.day;
-      selectedCalDay = d;
-      selectedSijuBranch = null;
-      renderCalendar();
-      renderCalDayDetail();
+      selectRenderedCalendarDay(+el.dataset.year, +el.dataset.month, +el.dataset.day);
     });
   });
 
@@ -13722,6 +13875,21 @@ function clearCalendarMotionStyles(grid) {
   grid.style.transform = '';
 }
 
+function selectRenderedCalendarDay(year, month, day) {
+  calendarMotionToken++;
+  if (calendarAnimation) {
+    calendarAnimation.cancel();
+    calendarAnimation = null;
+  }
+  const grid = document.getElementById('calGrid');
+  if (grid) clearCalendarMotionStyles(grid);
+  calY = year;
+  calM = month;
+  selectedCalDay = day;
+  selectedSijuBranch = null;
+  renderCalendar();
+}
+
 function changeCalendarMonth(delta) {
   const grid = document.getElementById('calGrid');
   const direction = delta > 0 ? 'next' : 'prev';
@@ -13749,7 +13917,7 @@ function changeCalendarMonth(delta) {
       transform: style.transform === 'none' ? 'translateX(0)' : style.transform
     },
     { opacity: .62, transform: `translateX(${delta > 0 ? -8 : 8}px)` }
-  ], { duration: 100, easing: 'ease-in', fill: 'both' });
+  ], { duration: 100, easing: 'cubic-bezier(.4,0,.8,.2)', fill: 'both' });
   calendarAnimation = outgoing;
 
   outgoing.finished.then(() => {
@@ -13776,7 +13944,7 @@ onTap($('#calNext'), () => changeCalendarMonth(1));
 
 onTap($('#aboutBtn'), () => window.openAppModal($('#aboutModal')));
 onTap($('#aboutClose'), () => window.closeAppModal($('#aboutModal')));
-[$('#saveModal'), $('#aboutModal'), $('#matchPickerModal'), $('#matchNewModal')].forEach(m => {
+$$('.modal-bg').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) window.closeAppModal(m); });
 });
 
@@ -14304,7 +14472,7 @@ function animateNewMatchSlot(key) {
   if (!slot.animate) return;
   const reduce = reducedMotion();
   slot.animate([
-    { opacity: 0, transform: reduce ? 'scale(.99)' : 'scale(.97)' },
+    { opacity: 0, transform: reduce ? 'scale(1)' : 'scale(.97)' },
     { opacity: 1, transform: 'scale(1)' }
   ], { duration: reduce ? 100 : 180, easing: 'cubic-bezier(.2,.7,.2,1)' });
 }

@@ -18,6 +18,7 @@
     goldDeep: '#a97732',
     line: 'rgba(216,181,106,0.22)'
   };
+  var shareCardOpener = null;
 
   function rr(ctx, x, y, w, h, r) {
     ctx.beginPath();
@@ -141,16 +142,39 @@
   function p2(n) { return ('0' + n).slice(-2); }
   function sip(i) { return (typeof i === 'number' && i >= 0 && typeof SIPSIN_KOR !== 'undefined') ? SIPSIN_KOR[i] : ''; }
 
+  function closeShareCardModal() {
+    var modal = document.getElementById('shareCardModal');
+    if (!modal) return false;
+    modal.remove();
+    if (typeof window.refreshAppOverlayAccessibility === 'function') window.refreshAppOverlayAccessibility();
+    if (document.querySelector('.modal-bg.active')) {
+      if (typeof window.focusTopAppOverlay === 'function') window.focusTopAppOverlay();
+    } else if (shareCardOpener && shareCardOpener.isConnected && typeof shareCardOpener.focus === 'function') {
+      try { shareCardOpener.focus({ preventScroll: true }); }
+      catch (e) { shareCardOpener.focus(); }
+    }
+    shareCardOpener = null;
+    return true;
+  }
+
+  window.closeShareCardModal = closeShareCardModal;
+
   // 모달
   function showModal(cv, s) {
     var old = document.getElementById('shareCardModal');
+    var opener = old ? shareCardOpener : document.activeElement;
     if (old) old.remove();
+    shareCardOpener = opener;
     var url = cv.toDataURL('image/png');
     var m = document.createElement('div');
     m.id = 'shareCardModal';
+    m.setAttribute('role', 'dialog');
+    m.setAttribute('aria-modal', 'true');
+    m.setAttribute('aria-labelledby', 'shareCardTitle');
+    m.setAttribute('tabindex', '-1');
     m.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:16px;backdrop-filter:blur(4px)';
     m.innerHTML =
-      '<div style="font-size:12px;font-weight:800;letter-spacing:2px;color:#f0d69a">✧ 공유 카드 미리보기</div>' +
+      '<div id="shareCardTitle" style="font-size:12px;font-weight:800;letter-spacing:2px;color:#f0d69a">✧ 공유 카드 미리보기</div>' +
       '<img src="' + url + '" alt="사주 카드" style="max-width:88%;max-height:66vh;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,0.6)">' +
       '<div style="font-size:13px;color:rgba(255,255,255,0.7)">이미지를 길게 눌러 저장하거나 아래 버튼으로 공유하세요</div>' +
       '<div style="display:flex;gap:10px;width:100%;max-width:420px">' +
@@ -158,8 +182,10 @@
       '<button id="shareCardClose" style="padding:15px 20px;border:1px solid rgba(255,255,255,0.2);border-radius:14px;font-size:15px;font-weight:700;color:#fff;background:rgba(255,255,255,0.06)">닫기</button>' +
       '</div>';
     document.body.appendChild(m);
-    document.getElementById('shareCardClose').onclick = function () { m.remove(); };
-    m.onclick = function (e) { if (e.target === m) m.remove(); };
+    if (typeof window.refreshAppOverlayAccessibility === 'function') window.refreshAppOverlayAccessibility();
+    if (typeof window.focusTopAppOverlay === 'function') requestAnimationFrame(window.focusTopAppOverlay);
+    document.getElementById('shareCardClose').onclick = closeShareCardModal;
+    m.onclick = function (e) { if (e.target === m) closeShareCardModal(); };
     document.getElementById('shareCardDo').onclick = function () {
       cv.toBlob(async function (blob) {
         var file = new File([blob], (s.name || 'saju') + '_사주.png', { type: 'image/png' });

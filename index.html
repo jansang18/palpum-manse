@@ -14227,6 +14227,7 @@ let matchSlotA = null;  // { name, saju data... } 또는 null
 let matchSlotB = null;
 let matchPickerTarget = null; // 'A' or 'B'
 let pendingMatchSlotMotion = null;
+let matchSlotMotionToken = 0;
 
 function renderMatch() {
   try {
@@ -14280,12 +14281,19 @@ function renderMatchPicker() {
   if (canGo) $('#matchGoBtn').addEventListener('click', renderMatchResult);
   const resetBtn = $('#matchResetBtn');
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    matchSlotA = null; matchSlotB = null; renderMatch();
+    matchSlotA = null; matchSlotB = null;
+    pendingMatchSlotMotion = null;
+    matchSlotMotionToken++;
+    renderMatch();
   });
   if (pendingMatchSlotMotion) {
     const key = pendingMatchSlotMotion;
     pendingMatchSlotMotion = null;
-    requestAnimationFrame(() => animateNewMatchSlot(key));
+    const token = matchSlotMotionToken;
+    requestAnimationFrame(() => {
+      if (token !== matchSlotMotionToken) return;
+      animateNewMatchSlot(key);
+    });
   }
 }
 
@@ -14406,6 +14414,7 @@ function setMatchSlot(target, person) {
   const wasEmpty = target === 'A' ? !matchSlotA : !matchSlotB;
   if (target === 'A') matchSlotA = person;
   else matchSlotB = person;
+  matchSlotMotionToken++;
   pendingMatchSlotMotion = wasEmpty ? target.toLowerCase() : null;
   renderMatch();
 }
@@ -14616,6 +14625,8 @@ function genSubText(key, sub, a, b) {
 }
 
 function renderMatchResult() {
+  matchSlotMotionToken++;
+  pendingMatchSlotMotion = null;
   const compat = calcCompatibility(matchSlotA, matchSlotB);
   const grade = compatGrade(compat.total);
 
@@ -14663,6 +14674,8 @@ function renderMatchResult() {
 
   $('#matchResetBtn2').addEventListener('click', () => {
     matchSlotA = null; matchSlotB = null;
+    pendingMatchSlotMotion = null;
+    matchSlotMotionToken++;
     renderMatch();
     window.scrollTo({top: 0, behavior: 'smooth'});
   });

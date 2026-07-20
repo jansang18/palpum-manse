@@ -13749,7 +13749,7 @@ function changeCalendarMonth(delta) {
       transform: style.transform === 'none' ? 'translateX(0)' : style.transform
     },
     { opacity: .62, transform: `translateX(${delta > 0 ? -8 : 8}px)` }
-  ], { duration: 90, easing: 'ease-in', fill: 'both' });
+  ], { duration: 100, easing: 'ease-in', fill: 'both' });
   calendarAnimation = outgoing;
 
   outgoing.finished.then(() => {
@@ -13760,7 +13760,7 @@ function changeCalendarMonth(delta) {
     const incoming = grid.animate([
       { opacity: .62, transform: `translateX(${delta > 0 ? 8 : -8}px)` },
       { opacity: 1, transform: 'translateX(0)' }
-    ], { duration: 160, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+    ], { duration: 140, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
     calendarAnimation = incoming;
     incoming.finished.then(() => {
       if (token !== calendarMotionToken || calendarAnimation !== incoming) return;

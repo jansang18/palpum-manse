@@ -366,7 +366,7 @@ function changeCalendarMonth(delta) {
   calendarAnimation = grid.animate([
     { opacity: parseFloat(getComputedStyle(grid).opacity) || 1, transform: getComputedStyle(grid).transform === 'none' ? 'translateX(0)' : getComputedStyle(grid).transform },
     { opacity: .62, transform: `translateX(${outX}px)` }
-  ], { duration: 90, easing: 'ease-in', fill: 'both' });
+  ], { duration: 100, easing: 'ease-in', fill: 'both' });
   calendarAnimation.finished.catch(() => {}).then(() => {
     if (token !== calendarMotionToken) return;
     renderCalendar();
@@ -375,7 +375,7 @@ function changeCalendarMonth(delta) {
     calendarAnimation = grid.animate([
       { opacity: .62, transform: `translateX(${inX}px)` },
       { opacity: 1, transform: 'translateX(0)' }
-    ], { duration: 160, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+    ], { duration: 140, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
     calendarAnimation.finished.catch(() => {}).finally(() => {
       if (token === calendarMotionToken) {
         calendarAnimation = null;
@@ -638,4 +638,3 @@ git -C web diff --check
 ```
 
 Expected: all commands pass with no syntax errors or layout regressions.
-

@@ -176,9 +176,21 @@ function inspectReleaseContract() {
     assert.ok(fs.existsSync(path.join(APP_ROOT, 'www', relativePath)), `release source inventory points outside app/www ownership: ${relativePath}`);
     assert.ok(fs.existsSync(path.join(WEB_ROOT, relativePath)), `release mirror is missing: ${relativePath}`);
   }
+  const webOnlyFilesBlock = script.match(/\$WebOnlyFiles\s*=\s*@\(([\s\S]*?)\)/);
+  assert.ok(webOnlyFilesBlock, 'web-only release inventory must be declared separately from Android-owned files');
+  const webOnlyFiles = [...webOnlyFilesBlock[1].matchAll(/'([^']+)'/g)].map(match => match[1]);
+  assert.deepEqual(
+    webOnlyFiles.sort(),
+    ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest', 'sw.js'].sort(),
+    'web-only PWA assets must be complete and explicit'
+  );
+  for (const relativePath of webOnlyFiles) {
+    assert.ok(fs.existsSync(path.join(WEB_ROOT, relativePath)), `web-only release asset is missing: ${relativePath}`);
+  }
   for (const [pattern, message] of [
     [/\$ErrorActionPreference\s*=\s*['"]Stop['"]/, 'PowerShell errors must fail the release'],
     [/Assert-SigningConfiguration/, 'signing configuration must be preflighted'],
+    [/Assert-WebOnlyAssets/, 'web-only PWA assets must be preflighted'],
     [/Sync-CleanAssets/, 'clean Capacitor sync must be explicit'],
     [/obfuscate_assets\.js/, 'Android assets must be obfuscated'],
     [/tests[\\/]ui-regression\.js/, 'the versioned protected regression must run'],

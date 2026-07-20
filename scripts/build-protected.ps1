@@ -25,6 +25,13 @@ $ReleaseWebFiles = @(
     'main-logo.png',
     'cosmos.jpg'
 )
+$WebOnlyFiles = @(
+    'sw.js',
+    'manifest.webmanifest',
+    'icon-192.png',
+    'icon-512.png',
+    'apple-touch-icon.png'
+)
 $ProtectedFiles = @('index.html', 'nav.js', 'share.js')
 
 function Resolve-AbsolutePath {
@@ -177,6 +184,34 @@ function Assert-WebMirror {
         if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne
             (Get-FileHash -LiteralPath $mirror -Algorithm SHA256).Hash) {
             throw "Authoritative and mirrored web files differ: $relativePath"
+        }
+    }
+}
+
+function Assert-WebOnlyAssets {
+    param([string]$WebRoot)
+    foreach ($relativePath in $WebOnlyFiles) {
+        $asset = Join-Path $WebRoot $relativePath
+        if (-not (Test-Path -LiteralPath $asset -PathType Leaf)) {
+            throw "Web-only release asset missing: $asset"
+        }
+        if ((Get-Item -LiteralPath $asset).Length -le 0) {
+            throw "Web-only release asset is empty: $asset"
+        }
+    }
+
+    $manifestPath = Join-Path $WebRoot 'manifest.webmanifest'
+    try { $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch { throw "Invalid PWA manifest: $manifestPath`n$($_.Exception.Message)" }
+    $manifestIcons = @($manifest.icons | ForEach-Object { $_.src })
+    foreach ($icon in @('icon-192.png', 'icon-512.png')) {
+        if ($manifestIcons -notcontains $icon) { throw "PWA manifest does not reference required icon: $icon" }
+    }
+
+    $serviceWorker = Get-Content -LiteralPath (Join-Path $WebRoot 'sw.js') -Raw -Encoding UTF8
+    foreach ($relativePath in @('manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png')) {
+        if ($serviceWorker -notmatch [regex]::Escape("./$relativePath")) {
+            throw "Service worker precache is missing web-only asset: $relativePath"
         }
     }
 }
@@ -349,6 +384,8 @@ $toolchain = Resolve-Toolchain -ResolvedAppRoot $ResolvedAppRoot
 $null = Assert-SigningConfiguration -AndroidRoot $AndroidRoot -PropertiesPath $SigningPropertiesPath -Toolchain $toolchain
 
 if ($PreflightOnly) {
+    Assert-WebMirror -ResolvedAppRoot $ResolvedAppRoot -WebRoot $WebRoot
+    Assert-WebOnlyAssets -WebRoot $WebRoot
     Write-Host '[release] PREFLIGHT=true'
     return
 }
@@ -364,6 +401,7 @@ if ($VerifyOnly) {
 }
 
 Assert-WebMirror -ResolvedAppRoot $ResolvedAppRoot -WebRoot $WebRoot
+Assert-WebOnlyAssets -WebRoot $WebRoot
 if (-not (Test-Path -LiteralPath $OutputDir -PathType Container)) {
     New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }

@@ -191,6 +191,7 @@ function inspectReleaseContract() {
     [/\$ErrorActionPreference\s*=\s*['"]Stop['"]/, 'PowerShell errors must fail the release'],
     [/Assert-SigningConfiguration/, 'signing configuration must be preflighted'],
     [/Assert-WebOnlyAssets/, 'web-only PWA assets must be preflighted'],
+    [/const\\s\+PRECACHE\\s\*\=\\s\*\\\[\(\?<entries>/, 'service-worker validation must inspect the active PRECACHE array body'],
     [/Sync-CleanAssets/, 'clean Capacitor sync must be explicit'],
     [/obfuscate_assets\.js/, 'Android assets must be obfuscated'],
     [/tests[\\/]ui-regression\.js/, 'the versioned protected regression must run'],

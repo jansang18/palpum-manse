@@ -209,8 +209,19 @@ function Assert-WebOnlyAssets {
     }
 
     $serviceWorker = Get-Content -LiteralPath (Join-Path $WebRoot 'sw.js') -Raw -Encoding UTF8
+    $precacheMatch = [regex]::Match(
+        $serviceWorker,
+        'const\s+PRECACHE\s*=\s*\[(?<entries>[\s\S]*?)\]\s*;'
+    )
+    if (-not $precacheMatch.Success) { throw 'Service worker PRECACHE inventory missing or malformed.' }
+    $precacheEntries = @(
+        [regex]::Matches(
+            $precacheMatch.Groups['entries'].Value,
+            "['`"](?<path>\./[^'`"]+)['`"]"
+        ) | ForEach-Object { $_.Groups['path'].Value }
+    )
     foreach ($relativePath in @('manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png')) {
-        if ($serviceWorker -notmatch [regex]::Escape("./$relativePath")) {
+        if ($precacheEntries -notcontains "./$relativePath") {
             throw "Service worker precache is missing web-only asset: $relativePath"
         }
     }

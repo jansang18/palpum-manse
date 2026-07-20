@@ -621,3 +621,27 @@ body.dark .modal-actions button {
   .match-picker-row { gap: 7px; }
   .match-vs { padding-inline: 1px; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-bg,
+  .modal,
+  .app-toast { transition-duration: 100ms !important; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body.dark .modal,
+  .app-toast {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #11141d !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  body.dark .modal,
+  .app-toast {
+    border-color: #f0d69a !important;
+    background: #08090e !important;
+    color: #fff8e7 !important;
+  }
+}

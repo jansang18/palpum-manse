@@ -14226,6 +14226,7 @@ function _renderFortuneInner() {
 let matchSlotA = null;  // { name, saju data... } 또는 null
 let matchSlotB = null;
 let matchPickerTarget = null; // 'A' or 'B'
+let pendingMatchSlotMotion = null;
 
 function renderMatch() {
   try {
@@ -14281,6 +14282,23 @@ function renderMatchPicker() {
   if (resetBtn) resetBtn.addEventListener('click', () => {
     matchSlotA = null; matchSlotB = null; renderMatch();
   });
+  if (pendingMatchSlotMotion) {
+    const key = pendingMatchSlotMotion;
+    pendingMatchSlotMotion = null;
+    requestAnimationFrame(() => animateNewMatchSlot(key));
+  }
+}
+
+function animateNewMatchSlot(key) {
+  const slot = document.querySelector(`.match-slot.${key}.filled`);
+  if (!slot) return;
+  slot.dataset.motionCount = String((parseInt(slot.dataset.motionCount || '0', 10)) + 1);
+  if (!slot.animate) return;
+  const reduce = reducedMotion();
+  slot.animate([
+    { opacity: 0, transform: reduce ? 'scale(.99)' : 'scale(.97)' },
+    { opacity: 1, transform: 'scale(1)' }
+  ], { duration: reduce ? 100 : 180, easing: 'cubic-bezier(.2,.7,.2,1)' });
 }
 
 function renderSlotEmpty(key, label) {
@@ -14385,8 +14403,10 @@ function closeMatchPicker() {
 }
 
 function setMatchSlot(target, person) {
+  const wasEmpty = target === 'A' ? !matchSlotA : !matchSlotB;
   if (target === 'A') matchSlotA = person;
   else matchSlotB = person;
+  pendingMatchSlotMotion = wasEmpty ? target.toLowerCase() : null;
   renderMatch();
 }
 

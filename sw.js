@@ -1,8 +1,8 @@
-// 신의 음성 만세력 — 서비스워커
+// 취명선 만세력 — 서비스워커
 // 전략: HTML/CSS/JS = 네트워크 우선(항상 최신 디자인), 이미지/아이콘 = 캐시 우선(빠름).
 // 오프라인일 때만 캐시로 폴백한다. 배포 시 VERSION만 올리면 옛 캐시는 자동 삭제됨.
-const VERSION = 'v7-20260720-final-fix';
-const CACHE = 'sineum-manse-' + VERSION;
+const VERSION = 'v8-20260724-apple-redesign';
+const CACHE = 'chwimyeongseon-manse-' + VERSION;
 
 // 오프라인 첫 진입에도 동작하도록 핵심 자원을 미리 캐시(이후 온라인이면 네트워크본으로 갱신)
 const PRECACHE = [
@@ -10,6 +10,7 @@ const PRECACHE = [
   './index.html',
   './polish.css',
   './luxury.css',
+  './apple.css',
   './main-logo.png',
   './share.js',
   './nav.js',

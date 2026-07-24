@@ -88,6 +88,7 @@ body.dark .top-bar .title .logo-img {
   -webkit-background-clip: border-box !important;
   background-clip: border-box !important;
   color: var(--apple-label) !important;
+  -webkit-text-fill-color: var(--apple-label) !important;
   text-shadow: none !important;
 }
 
@@ -455,6 +456,62 @@ body.dark {
     transition-duration: 100ms !important;
     transform: none !important;
   }
+}
+
+/* Task 6 visual QA: remove the last decorative gold accents. */
+.card-title,
+.oguk-card .card-title,
+.result-right .luck-title,
+.sub-luck-label {
+  color: var(--apple-label) !important;
+  text-shadow: none !important;
+}
+
+.segmented button.active,
+.segmented button[aria-pressed="true"] {
+  border-color: transparent !important;
+  background: color-mix(in srgb, var(--apple-accent) 14%, var(--apple-surface)) !important;
+  color: var(--apple-accent) !important;
+  box-shadow: none !important;
+}
+
+.person-search-btn {
+  border-color: var(--apple-separator) !important;
+  background: var(--apple-inset) !important;
+  color: var(--apple-label) !important;
+  box-shadow: none !important;
+}
+
+.person-search-btn svg {
+  color: var(--apple-accent) !important;
+  stroke: currentColor !important;
+}
+
+.empty-mark {
+  border: 1px solid var(--apple-separator) !important;
+  background: color-mix(in srgb, var(--apple-accent) 12%, var(--apple-surface)) !important;
+  color: var(--apple-accent) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.bottom-bar .bb.primary,
+#saveBtn {
+  border-color: transparent !important;
+  background: var(--apple-accent) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.oguk-card .result-head .name {
+  color: var(--apple-label) !important;
+  -webkit-text-fill-color: var(--apple-label) !important;
+  text-shadow: none !important;
+}
+
+.oguk-card .result-head .info {
+  color: var(--apple-secondary) !important;
+  text-shadow: none !important;
 }
 
 /* Task 5: Apple secondary views, sheets, dialogs, and restrained motion. */

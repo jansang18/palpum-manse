@@ -14,11 +14,12 @@ $ErrorActionPreference = 'Stop'
 
 $ExpectedSignerSha256 = 'da1950eab27b62b7c0ac92a21b34a2fab32ff582f0e68be0d6e72d56488508aa'
 $ArtifactBaseName = [System.Text.Encoding]::UTF8.GetString(
-    [System.Convert]::FromBase64String('7Iug7J2Y7J2M7ISx66eM7IS466ClX+2UhOumrOuvuOyXhOuqqOyFmF/rs7TtmLg=')
+    [System.Convert]::FromBase64String('7Leo66qF7ISg66eM7IS466ClX+yVoO2UjOumrOuUlOyekOyduF/rs7TtmLg=')
 )
 $ReleaseWebFiles = @(
     'index.html',
     'luxury.css',
+    'apple.css',
     'nav.js',
     'share.js',
     'polish.css',
@@ -386,7 +387,7 @@ if ([string]::IsNullOrWhiteSpace($SigningPropertiesPath)) {
     $SigningPropertiesPath = Resolve-AbsolutePath -BasePath $WebRoot -Candidate $SigningPropertiesPath
 }
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $OutputDir = Join-Path (Split-Path -Parent $ResolvedAppRoot) 'outputs\2026-07-20-premium-motion'
+    $OutputDir = Join-Path (Split-Path -Parent $ResolvedAppRoot) 'outputs\2026-07-24-apple-redesign'
 } else {
     $OutputDir = Resolve-AbsolutePath -BasePath $WebRoot -Candidate $OutputDir
 }

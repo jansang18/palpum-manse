@@ -1072,6 +1072,19 @@ body.dark .f-tips .f-tip {
   --apple-content-measure: min(616px, calc(100vw - 10px));
 }
 
+/* Unfolded phones and compact tablets should use their inner display, not phone-width gutters. */
+@media (min-width: 700px) and (max-width: 1024px) {
+  :root {
+    --apple-content-measure: min(720px, calc(100vw - 32px));
+  }
+
+  .app {
+    width: var(--apple-content-measure) !important;
+    max-width: none !important;
+    padding-inline: 0 !important;
+  }
+}
+
 .bottom-bar {
   left: 50% !important;
   right: auto !important;

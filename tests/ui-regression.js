@@ -24,6 +24,8 @@ const URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
 const TEST_GROUP = process.env.TEST_GROUP || '';
 const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-width'
   ? [390, 1220]
+  : TEST_GROUP === 'fold-layout'
+    ? [720, 884]
   : TEST_GROUP === 'calendar-shell-width'
     ? [390, 520, 600, 700, 768, 900, 1220]
   : TEST_GROUP === 'all-tab-shell-width'
@@ -39,6 +41,7 @@ const runsCalendarCurrentYear = () => !TEST_GROUP || TEST_GROUP === 'calendar-cu
 const runsImportedFieldXss = () => !TEST_GROUP || TEST_GROUP === 'imported-fields-xss';
 const runsResultWidthBrand = () => TEST_GROUP === 'result-width-brand';
 const runsShellWidth = () => TEST_GROUP === 'shell-width';
+const runsFoldLayout = () => TEST_GROUP === 'fold-layout';
 const runsAndroidSafeArea = () => !TEST_GROUP || TEST_GROUP === 'android-safe-area';
 
 async function inspectCalendarShellWidth(page, width) {
@@ -214,6 +217,30 @@ async function inspectShellWidth(page, width) {
     `${width}px intro must move up by about 1cm/38px, got ${geometry.introMarginTop}px`
   );
   assert.ok(reference.left >= 0 && reference.right <= geometry.viewport + 1, `${width}px shared shell overflows viewport`);
+}
+
+async function inspectFoldLayout(page, width) {
+  await page.click('.tab[data-tab="input"]');
+  await sleep(50);
+  const geometry = await page.evaluate(() => {
+    const rect = selector => {
+      const box = document.querySelector(selector).getBoundingClientRect();
+      return { left: box.left, right: box.right, width: box.width };
+    };
+    return {
+      viewport: document.documentElement.clientWidth,
+      header: rect('.top-bar'),
+      tabs: rect('.tabs'),
+      card: rect('.input-card'),
+      action: rect('.primary-btn')
+    };
+  });
+  const expected = Math.min(720, geometry.viewport - 32);
+  for (const name of ['header', 'tabs', 'card', 'action']) {
+    const rect = geometry[name];
+    assert.ok(Math.abs(rect.width - expected) <= 1, `${width}px unfolded ${name} must use the wider fold measure`);
+    assert.ok(Math.abs(rect.left - (geometry.viewport - expected) / 2) <= 1, `${width}px unfolded ${name} must remain centered`);
+  }
 }
 
 async function inspectResultWidthAndBrand(page, width) {
@@ -2576,6 +2603,12 @@ async function inspectWidth(browser, width) {
 
   if (runsShellWidth()) {
     await inspectShellWidth(page, width);
+    await page.close();
+    return;
+  }
+
+  if (runsFoldLayout()) {
+    await inspectFoldLayout(page, width);
     await page.close();
     return;
   }

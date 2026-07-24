@@ -15,6 +15,7 @@
 - Use system blue `#007AFF` in light mode and `#0A84FF` in dark mode.
 - Render five-element Hanja and status text with the approved pastel palette only where they encode saju data; keep body copy neutral for contrast.
 - Preserve all calculation, storage, sharing, match, calendar, and back-button behavior.
+- Express a pretty, cute, and soft personality through rounded geometry, pastel element colors, calm spacing, and restrained motion; do not add mascots, decorative sparkles, or childish ornament.
 - All touch targets must be at least 44×44px.
 - CJK boxes must keep `aspect-ratio: 1 / 1`; width/height error must be at most 1px.
 - Same-row box height error must be at most 1px.

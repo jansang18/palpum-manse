@@ -28,6 +28,8 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [390, 520, 600, 700, 768, 900, 1220]
   : TEST_GROUP === 'all-tab-shell-width'
     ? [390, 520, 600, 700, 768, 1220]
+  : TEST_GROUP === 'frontend-quality'
+    ? [320, 768, 1440]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
@@ -111,6 +113,66 @@ async function inspectAllTabShellWidths(page, width) {
     assert.ok(Math.abs(savedGeometry[name].width - savedGeometry.target.width) <= 1, `${width}px saved ${name} width must match content`);
     assert.ok(Math.abs(savedGeometry[name].left - savedGeometry.target.left) <= 1, `${width}px saved ${name} left edge must match content`);
   }
+}
+
+async function inspectFrontendQuality(page, width) {
+  const state = await page.evaluate(() => {
+    const tabs = [...document.querySelectorAll('.tab')].map(tab => ({
+      role: tab.getAttribute('role'),
+      selected: tab.getAttribute('aria-selected'),
+      controls: tab.getAttribute('aria-controls'),
+      id: tab.id
+    }));
+    const panels = [...document.querySelectorAll('.view')].map(panel => ({
+      role: panel.getAttribute('role'),
+      labelledBy: panel.getAttribute('aria-labelledby'),
+      hidden: panel.hasAttribute('hidden')
+    }));
+    const labels = [...document.querySelectorAll('label.field-label[for]')].map(label => label.htmlFor);
+    const segmentButtons = [...document.querySelectorAll('#segGender button, #segCal button')].map(button => ({
+      role: button.getAttribute('role'),
+      checked: button.getAttribute('aria-checked')
+    }));
+    return {
+      headingCount: document.querySelectorAll('h1').length,
+      tablist: document.querySelector('.tabs').getAttribute('role'),
+      tabs,
+      panels,
+      labels,
+      aboutLabel: document.getElementById('aboutBtn').getAttribute('aria-label'),
+      prevLabel: document.getElementById('calPrev').getAttribute('aria-label'),
+      nextLabel: document.getElementById('calNext').getAttribute('aria-label'),
+      genderGroup: document.getElementById('segGender').getAttribute('role'),
+      calendarGroup: document.getElementById('segCal').getAttribute('role'),
+      segmentButtons
+    };
+  });
+
+  assert.equal(state.headingCount, 1, `${width}px page must expose one h1`);
+  assert.equal(state.tablist, 'tablist', `${width}px primary nav role`);
+  assert.ok(state.tabs.every(tab => tab.role === 'tab' && tab.controls && tab.id), `${width}px tabs need complete semantics`);
+  assert.equal(state.tabs.filter(tab => tab.selected === 'true').length, 1, `${width}px one selected tab`);
+  assert.ok(state.panels.every(panel => panel.role === 'tabpanel' && panel.labelledBy), `${width}px panels need tab semantics`);
+  assert.ok(['inputName', 'inBirth', 'inTime'].every(id => state.labels.includes(id)), `${width}px primary fields need associated labels`);
+  assert.equal(state.aboutLabel, '앱 정보', `${width}px about button accessible name`);
+  assert.equal(state.prevLabel, '이전 달', `${width}px previous month accessible name`);
+  assert.equal(state.nextLabel, '다음 달', `${width}px next month accessible name`);
+  assert.equal(state.genderGroup, 'radiogroup', `${width}px gender group semantics`);
+  assert.equal(state.calendarGroup, 'radiogroup', `${width}px calendar type group semantics`);
+  assert.ok(state.segmentButtons.every(button => button.role === 'radio' && ['true', 'false'].includes(button.checked)), `${width}px segmented choices need radio state`);
+
+  await page.evaluate(() => document.querySelector('.tab[data-tab="fortune"]').click());
+  const switched = await page.evaluate(() => ({
+    selected: document.querySelector('.tab[data-tab="fortune"]').getAttribute('aria-selected'),
+    previous: document.querySelector('.tab[data-tab="input"]').getAttribute('aria-selected'),
+    panelHidden: document.getElementById('view-fortune').hasAttribute('hidden')
+  }));
+  assert.deepEqual(switched, { selected: 'true', previous: 'false', panelHidden: false }, `${width}px tab state must update`);
+
+  await page.evaluate(() => document.querySelector('.tab[data-tab="input"]').click());
+  await page.evaluate(() => document.querySelector('#segGender button[data-val="F"]').click());
+  const selectedGender = await page.evaluate(() => [...document.querySelectorAll('#segGender button')].map(button => button.getAttribute('aria-checked')));
+  assert.deepEqual(selectedGender, ['false', 'true'], `${width}px segmented radio state must update`);
 }
 
 async function inspectShellWidth(page, width) {
@@ -1868,6 +1930,12 @@ async function inspectWidth(browser, width) {
   await page.goto(URL, { waitUntil: 'networkidle0' });
   console.log(`[ui] ${width}px: loaded`);
   await page.evaluate(() => document.body.classList.add('dark'));
+
+  if (TEST_GROUP === 'frontend-quality') {
+    await inspectFrontendQuality(page, width);
+    await page.close();
+    return;
+  }
 
   if (TEST_GROUP === 'calendar-shell-width') {
     await inspectCalendarShellWidth(page, width);

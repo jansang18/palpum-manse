@@ -1971,28 +1971,28 @@
 
 <div class="app">
   <header class="top-bar">
-    <div class="title"><span class="brand-main">취명선</span> <span class="title-sub">만세력</span></div>
+    <h1 class="title"><span class="brand-main">취명선</span> <span class="title-sub">만세력</span></h1>
     <div style="display:flex; gap:4px; align-items:center;">
       <button type="button" class="icon-btn" id="themeToggleBtn" aria-label="테마 전환">
         <svg id="themeIconSun" viewBox="0 0 24 24" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         <svg id="themeIconMoon" viewBox="0 0 24 24" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
-      <button type="button" class="icon-btn" id="aboutBtn">
+      <button type="button" class="icon-btn" id="aboutBtn" aria-label="앱 정보">
         <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
       </button>
     </div>
   </header>
 
-  <nav class="tabs">
-    <button type="button" class="tab active" data-tab="input">입력</button>
-    <button type="button" class="tab" data-tab="result">원국</button>
-    <button type="button" class="tab" data-tab="fortune">풀이</button>
-    <button type="button" class="tab" data-tab="match">궁합</button>
-    <button type="button" class="tab" data-tab="calendar">만세력</button>
-    <button type="button" class="tab" data-tab="saved">저장</button>
+  <nav class="tabs" role="tablist" aria-label="주요 화면">
+    <button type="button" class="tab active" id="tab-input" role="tab" aria-selected="true" aria-controls="view-input" data-tab="input">입력</button>
+    <button type="button" class="tab" id="tab-result" role="tab" aria-selected="false" aria-controls="view-result" data-tab="result">원국</button>
+    <button type="button" class="tab" id="tab-fortune" role="tab" aria-selected="false" aria-controls="view-fortune" data-tab="fortune">풀이</button>
+    <button type="button" class="tab" id="tab-match" role="tab" aria-selected="false" aria-controls="view-match" data-tab="match">궁합</button>
+    <button type="button" class="tab" id="tab-calendar" role="tab" aria-selected="false" aria-controls="view-calendar" data-tab="calendar">만세력</button>
+    <button type="button" class="tab" id="tab-saved" role="tab" aria-selected="false" aria-controls="view-saved" data-tab="saved">저장</button>
   </nav>
 
-  <section class="view active" id="view-input">
+  <section class="view active" id="view-input" role="tabpanel" aria-labelledby="tab-input">
     <div class="input-intro">
       <img class="intro-logo-img" src="main-logo.png" alt="취명선 만세력">
       <div class="sub">자평명리학 · 1000년 만세력 · 운세풀이 · 궁합</div>
@@ -2005,34 +2005,34 @@
 
     <div class="input-card">
     <div class="field">
-      <label class="field-label">이름</label>
+      <label class="field-label" for="inputName">이름</label>
       <input class="input" id="inputName" placeholder="이름을 입력하세요 (선택)" />
     </div>
 
     <div class="field field-row">
       <div class="field-half">
-        <label class="field-label">성별</label>
-        <div class="segmented" id="segGender">
-          <button type="button" data-val="M" class="active">남자</button>
-          <button type="button" data-val="F">여자</button>
+        <label class="field-label" id="segGenderLabel">성별</label>
+        <div class="segmented" id="segGender" role="radiogroup" aria-labelledby="segGenderLabel">
+          <button type="button" role="radio" aria-checked="true" data-val="M" class="active">남자</button>
+          <button type="button" role="radio" aria-checked="false" data-val="F">여자</button>
         </div>
       </div>
       <div class="field-half">
-        <label class="field-label">양/음력</label>
-        <div class="segmented" id="segCal">
-          <button type="button" data-val="solar" class="active">양력</button>
-          <button type="button" data-val="lunar">음력</button>
+        <label class="field-label" id="segCalLabel">양/음력</label>
+        <div class="segmented" id="segCal" role="radiogroup" aria-labelledby="segCalLabel">
+          <button type="button" role="radio" aria-checked="true" data-val="solar" class="active">양력</button>
+          <button type="button" role="radio" aria-checked="false" data-val="lunar">음력</button>
         </div>
       </div>
     </div>
 
     <div class="field field-row">
       <div class="field-half">
-        <label class="field-label">생년월일 <span style="font-size:12px; font-weight:500; color:var(--text-sub);">(YYYYMMDD)</span></label>
+        <label class="field-label" for="inBirth">생년월일 <span style="font-size:12px; font-weight:500; color:var(--text-sub);">(YYYYMMDD)</span></label>
         <input class="input" type="tel" inputmode="numeric" pattern="[0-9]*" id="inBirth" placeholder="19890319" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
       </div>
       <div class="field-half">
-        <label class="field-label">태어난 시간 <span style="font-size:12px; font-weight:500; color:var(--text-sub);">(HHMM · 선택)</span></label>
+        <label class="field-label" for="inTime">태어난 시간 <span style="font-size:12px; font-weight:500; color:var(--text-sub);">(HHMM · 선택)</span></label>
         <input class="input" type="tel" inputmode="numeric" pattern="[0-9]*" id="inTime" placeholder="1430" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
       </div>
     </div>
@@ -2046,27 +2046,27 @@
     </div>
   </section>
 
-  <section class="view" id="view-result"></section>
+  <section class="view" id="view-result" role="tabpanel" aria-labelledby="tab-result" hidden></section>
 
-  <section class="view" id="view-fortune">
+  <section class="view" id="view-fortune" role="tabpanel" aria-labelledby="tab-fortune" hidden>
     <div id="fortuneContent"></div>
   </section>
 
-  <section class="view" id="view-match">
+  <section class="view" id="view-match" role="tabpanel" aria-labelledby="tab-match" hidden>
     <div id="matchContent"></div>
   </section>
 
-  <section class="view" id="view-calendar">
+  <section class="view" id="view-calendar" role="tabpanel" aria-labelledby="tab-calendar" hidden>
     <div class="cal-head">
-      <button type="button" class="cal-nav" id="calPrev">‹</button>
+      <button type="button" class="cal-nav" id="calPrev" aria-label="이전 달">‹</button>
       <div class="cal-title" id="calTitle">—</div>
-      <button type="button" class="cal-nav" id="calNext">›</button>
+      <button type="button" class="cal-nav" id="calNext" aria-label="다음 달">›</button>
     </div>
     <div class="cal-grid" id="calGrid"></div>
     <div id="calDayDetail"></div>
   </section>
 
-  <section class="view" id="view-saved">
+  <section class="view" id="view-saved" role="tabpanel" aria-labelledby="tab-saved" hidden>
     <div id="savedContent" style="padding-top: 12px;"></div>
   </section>
 </div>
@@ -12645,12 +12645,37 @@ const $$ = s => document.querySelectorAll(s);
 let currentSaju = null;
 let selectedDaeun = null, selectedSeun = null, selectedWoon = null;
 
-$$('.tab').forEach(t => onTap(t, () => {
+function syncTabA11y(activeTab) {
+  $$('.tab').forEach(tab => {
+    const selected = tab === activeTab;
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  $$('.view').forEach(view => {
+    const selected = view.id === 'view-' + activeTab.dataset.tab;
+    view.hidden = !selected;
+  });
+}
+
+$$('.tab').forEach(t => {
+  t.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const tabs = [...$$('.tab')];
+    const current = tabs.indexOf(t);
+    const next = event.key === 'Home' ? 0
+      : event.key === 'End' ? tabs.length - 1
+      : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+    tabs[next].focus();
+    tabs[next].click();
+  });
+  onTap(t, () => {
   const tab = t.dataset.tab;
   $$('.tab').forEach(x => x.classList.remove('active'));
   t.classList.add('active');
   $$('.view').forEach(v => v.classList.remove('active'));
   $('#view-' + tab).classList.add('active');
+  syncTabA11y(t);
   $('#bottomBar').style.display = (tab === 'result' && currentSaju) ? 'flex' : 'none';
   if (tab === 'calendar') {
     initializeCalendarSession();
@@ -12659,19 +12684,44 @@ $$('.tab').forEach(t => onTap(t, () => {
   if (tab === 'saved') renderSaved();
   if (tab === 'fortune') renderFortune();
   if (tab === 'match') renderMatch();
-}));
+  });
+});
+syncTabA11y($('.tab.active'));
 
 // 세그먼트 버튼 (양력/음력, 남자/여자 등)
 function bindSegmented(root) {
   (root || document).querySelectorAll('.segmented').forEach(seg => {
-    seg.querySelectorAll('button').forEach(b => {
+    seg.setAttribute('role', 'radiogroup');
+    const sync = () => seg.querySelectorAll('button').forEach(button => {
+      const checked = button.classList.contains('active');
+      button.setAttribute('role', 'radio');
+      button.setAttribute('aria-checked', String(checked));
+      button.tabIndex = checked ? 0 : -1;
+    });
+    const buttons = [...seg.querySelectorAll('button')];
+    buttons.forEach(b => {
       if (b.__segBound) return;
       b.__segBound = true;
       onTap(b, () => {
         seg.querySelectorAll('button').forEach(x => x.classList.remove('active'));
         b.classList.add('active');
+        sync();
+      });
+      b.addEventListener('keydown', event => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        event.preventDefault();
+        const current = buttons.indexOf(b);
+        const direction = ['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1;
+        const next = buttons[(current + direction + buttons.length) % buttons.length];
+        next.focus();
+        next.click();
       });
     });
+    sync();
+    if (!seg.__a11yObserver) {
+      seg.__a11yObserver = new MutationObserver(sync);
+      seg.__a11yObserver.observe(seg, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
   });
 }
 bindSegmented();
@@ -12746,6 +12796,7 @@ onTap($('#calcBtn'), () => {
     $$('.tab')[1].classList.add('active');
     $$('.view').forEach(v => v.classList.remove('active'));
     $('#view-result').classList.add('active');
+    syncTabA11y($$('.tab')[1]);
     $('#bottomBar').style.display = 'flex';
     window.scrollTo({top: 0, behavior: 'smooth'});
   } catch (e) { console.error(e); alert('계산 오류: ' + e.message); }
@@ -13649,6 +13700,7 @@ async function renderSaved() {
         $$('.tab')[1].classList.add('active');
         $$('.view').forEach(v => v.classList.remove('active'));
         $('#view-result').classList.add('active');
+        syncTabA11y($$('.tab')[1]);
         $('#bottomBar').style.display = 'flex';
         window.scrollTo(0, 0);
       }
@@ -13799,6 +13851,7 @@ async function findSimilarSaju() {
         document.querySelector('.tab[data-tab="result"]').classList.add('active');
         $$('.view').forEach(v => v.classList.remove('active'));
         $('#view-result').classList.add('active');
+        syncTabA11y(document.querySelector('.tab[data-tab="result"]'));
       }
     });
   });

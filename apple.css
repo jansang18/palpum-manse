@@ -1188,6 +1188,14 @@ body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).a
   filter: none !important;
 }
 
+.top-bar h1.title {
+  margin: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 /* Give the eight natal characters 20% more presence without losing the grid. */
 .result-left .pillars-4,
 .pillars-4 {

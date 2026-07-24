@@ -24,6 +24,8 @@ const URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
 const TEST_GROUP = process.env.TEST_GROUP || '';
 const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-width'
   ? [390, 1220]
+  : TEST_GROUP === 'calendar-shell-width'
+    ? [390, 520, 600, 700, 768, 900, 1220]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
@@ -33,6 +35,34 @@ const runsCalendarCurrentYear = () => !TEST_GROUP || TEST_GROUP === 'calendar-cu
 const runsImportedFieldXss = () => !TEST_GROUP || TEST_GROUP === 'imported-fields-xss';
 const runsResultWidthBrand = () => TEST_GROUP === 'result-width-brand';
 const runsShellWidth = () => TEST_GROUP === 'shell-width';
+
+async function inspectCalendarShellWidth(page, width) {
+  await page.click('.tab[data-tab="calendar"]');
+  await sleep(100);
+  const geometry = await page.evaluate(() => {
+    const box = selector => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width };
+    };
+    return {
+      viewport: document.documentElement.clientWidth,
+      header: box('.top-bar'),
+      tabs: box('.tabs'),
+      calendar: box('.cal-grid')
+    };
+  });
+  for (const name of ['header', 'tabs']) {
+    assert.ok(
+      Math.abs(geometry[name].width - geometry.calendar.width) <= 1,
+      `${width}px calendar ${name} width ${geometry[name].width}px must match calendar card ${geometry.calendar.width}px`
+    );
+    assert.ok(
+      Math.abs(geometry[name].left - geometry.calendar.left) <= 1,
+      `${width}px calendar ${name} left edge must match calendar card`
+    );
+  }
+  assert.ok(geometry.calendar.left >= 0 && geometry.calendar.right <= geometry.viewport + 1, `${width}px calendar shell overflows viewport`);
+}
 
 async function inspectShellWidth(page, width) {
   await page.click('.tab[data-tab="input"]');
@@ -1789,6 +1819,12 @@ async function inspectWidth(browser, width) {
   await page.goto(URL, { waitUntil: 'networkidle0' });
   console.log(`[ui] ${width}px: loaded`);
   await page.evaluate(() => document.body.classList.add('dark'));
+
+  if (TEST_GROUP === 'calendar-shell-width') {
+    await inspectCalendarShellWidth(page, width);
+    await page.close();
+    return;
+  }
 
   await inspectCalendarCurrentYear(page, width);
   if (TEST_GROUP === 'calendar-current-year') {

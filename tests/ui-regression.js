@@ -25,6 +25,7 @@ const TEST_GROUP = process.env.TEST_GROUP || '';
 const widths = TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
+const runsSecondaryApple = () => !TEST_GROUP || TEST_GROUP === 'task-5' || TEST_GROUP === 'secondary-apple';
 
 function parseCssColor(value) {
   const match = String(value).match(/rgba?\(([^)]+)\)/i);
@@ -743,7 +744,7 @@ async function inspectAppleDesign(page, width) {
 }
 
 async function inspectAppleSecondaryScreens(page, width) {
-  if (!runsGroup('task-5')) return;
+  if (!runsSecondaryApple()) return;
 
   const legacyGold = /rgb(?:a)?\(\s*(?:216\s*,\s*181\s*,\s*106|240\s*,\s*214\s*,\s*154|169\s*,\s*119\s*,\s*50)(?:\s*,[^)]*)?\)/i;
   const themes = ['light', 'dark'];
@@ -788,21 +789,29 @@ async function inspectAppleSecondaryScreens(page, width) {
       const calendarControl = css(document.getElementById('calNext'));
 
       document.querySelector('.tab[data-tab="saved"]').click();
+      const savedId = `task5-${theme}`;
+      await window.storage.set(`saju:${savedId}`, JSON.stringify({
+        ...currentSaju,
+        id: savedId,
+        name: `실제저장-${theme}`,
+        memo: 'Task 5 QA',
+        fav: true,
+        savedAt: Date.now()
+      }));
+      await renderSaved();
       await wait(180);
-      const probe = document.createElement('article');
-      probe.className = 'saved-card';
-      probe.innerHTML = '<div class="row1"><strong class="sname">테스트</strong><button type="button" class="sdelete">삭제</button></div>';
-      document.body.appendChild(probe);
-      const savedCard = css(probe);
-      const savedControl = css(probe.querySelector('button'));
+      const savedCardElement = document.querySelector(`.saved-card[data-id="${savedId}"]`);
+      const savedCard = css(savedCardElement);
+      const savedControl = css(savedCardElement.querySelector('button'));
+      const savedContent = savedCardElement.textContent;
 
       document.querySelector('.tab[data-tab="fortune"]').click();
       await wait(180);
-      const fortuneProbe = document.createElement('article');
-      fortuneProbe.className = 'f-card';
-      fortuneProbe.textContent = '운세';
-      document.body.appendChild(fortuneProbe);
-      const fortuneCard = css(fortuneProbe);
+      renderFortune();
+      await wait(60);
+      const fortuneCardElement = document.querySelector('#fortuneContent .f-card');
+      const fortuneCard = css(fortuneCardElement);
+      const fortuneCount = document.querySelectorAll('#fortuneContent .f-card').length;
 
       const modalStates = [];
       for (const modal of document.querySelectorAll('.modal-bg')) {
@@ -830,6 +839,39 @@ async function inspectAppleSecondaryScreens(page, width) {
       window.shareCard(window.currentSaju || currentSaju);
       await wait(40);
       const share = document.getElementById('shareCardModal');
+      const shareImage = share.querySelector('.share-card-preview');
+      await shareImage.decode();
+      const pixelCanvas = document.createElement('canvas');
+      pixelCanvas.width = shareImage.naturalWidth;
+      pixelCanvas.height = shareImage.naturalHeight;
+      const pixelContext = pixelCanvas.getContext('2d', { willReadFrequently: true });
+      pixelContext.drawImage(shareImage, 0, 0);
+      const corner = [...pixelContext.getImageData(4, 4, 1, 1).data];
+      let darkSamples = 0;
+      let legacyGoldSamples = 0;
+      let samples = 0;
+      const legacy = [[216, 181, 106], [240, 214, 154], [169, 119, 50]];
+      for (let y = 4; y < pixelCanvas.height; y += 24) {
+        for (let x = 4; x < pixelCanvas.width; x += 24) {
+          const data = pixelContext.getImageData(x, y, 1, 1).data;
+          samples++;
+          if ((data[0] + data[1] + data[2]) / 3 < 45) darkSamples++;
+          if (legacy.some(rgb => Math.hypot(data[0] - rgb[0], data[1] - rgb[1], data[2] - rgb[2]) < 12)) {
+            legacyGoldSamples++;
+          }
+        }
+      }
+      window.__task5Share = null;
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+      Object.defineProperty(navigator, 'share', {
+        configurable: true,
+        value: async payload => {
+          window.__task5Share = {
+            text: payload.text,
+            filename: payload.files && payload.files[0] && payload.files[0].name
+          };
+        }
+      });
       const shareButtons = [...share.querySelectorAll('button')].map(css);
       const sharePanel = share.querySelector('.share-card-sheet');
       const shareState = {
@@ -839,6 +881,17 @@ async function inspectAppleSecondaryScreens(page, width) {
         buttons: shareButtons,
         focusedInside: share.contains(document.activeElement)
       };
+      document.getElementById('shareCardDo').click();
+      await wait(80);
+      shareState.image = {
+        width: pixelCanvas.width,
+        height: pixelCanvas.height,
+        corner,
+        darkSamples,
+        legacyGoldSamples,
+        samples
+      };
+      shareState.payload = window.__task5Share;
       window.closeShareCardModal();
 
       const activeView = document.querySelector('.view.active');
@@ -856,15 +909,16 @@ async function inspectAppleSecondaryScreens(page, width) {
         calendarControl,
         savedCard,
         savedControl,
+        savedContent,
         fortuneCard,
+        fortuneCount,
         modalStates,
         shareState,
         activeView: css(activeView),
         viewportHeight: window.innerHeight,
         width
       };
-      probe.remove();
-      fortuneProbe.remove();
+      await window.storage.delete(`saju:${savedId}`);
       surfaceProbe.remove();
       return result;
     }, { theme, width });
@@ -876,6 +930,8 @@ async function inspectAppleSecondaryScreens(page, width) {
     })) {
       assert.equal(surface.background, state.surface, `${width}px ${theme} ${name} must use the Apple grouped surface`);
     }
+    assert.match(state.savedContent, new RegExp(`실제저장-${theme}`), `${width}px ${theme} actual saved record was not rendered`);
+    assert.ok(state.fortuneCount >= 1, `${width}px ${theme} actual fortune cards were not rendered`);
     for (const color of state.matchDecorations) {
       assert.ok(!legacyGold.test(color), `${width}px ${theme} match decoration retains legacy gold: ${color}`);
     }
@@ -926,6 +982,14 @@ async function inspectAppleSecondaryScreens(page, width) {
     assert.ok(state.shareState.hasPanel, `${width}px ${theme} share dialog must expose an Apple sheet`);
     assert.equal(state.shareState.panel.background, state.surface, `${width}px ${theme} share sheet surface`);
     assert.ok(state.shareState.focusedInside, `${width}px ${theme} share dialog must receive focus`);
+    assert.deepEqual(state.shareState.image.corner, [242, 242, 247, 255], `${width}px ${theme} share PNG must use the Apple light canvas`);
+    assert.ok(
+      state.shareState.image.darkSamples / state.shareState.image.samples < 0.01,
+      `${width}px ${theme} share PNG still contains a dark/cosmic field`
+    );
+    assert.equal(state.shareState.image.legacyGoldSamples, 0, `${width}px ${theme} share PNG retains legacy gold pixels`);
+    assert.match(state.shareState.payload.filename, /취명선_만세력\.png$/, `${width}px ${theme} share filename branding`);
+    assert.match(state.shareState.payload.text, /취명선 만세력/, `${width}px ${theme} share text branding`);
     for (const control of state.shareState.buttons) {
       assert.ok(control.width >= 43.5 && control.height >= 43.5, `${width}px ${theme} share control is below 44x44px`);
     }
@@ -938,6 +1002,50 @@ async function inspectAppleSecondaryScreens(page, width) {
     })) {
       assert.notEqual(element.transitionProperty, 'all', `${width}px ${theme} ${name} must not animate all properties`);
     }
+  }
+
+  const transparencySession = await page.createCDPSession();
+  try {
+    await transparencySession.send('Emulation.setEmulatedMedia', {
+      features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }]
+    });
+    const reducedTransparency = await page.evaluate(async () => {
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      document.body.classList.add('dark');
+      const inspect = element => {
+        const style = getComputedStyle(element);
+        return {
+          background: style.backgroundColor,
+          backdropFilter: style.backdropFilter || style.webkitBackdropFilter
+        };
+      };
+      const modal = document.getElementById('aboutModal');
+      window.openAppModal(modal);
+      await wait(40);
+      const modalState = {
+        backdrop: inspect(modal),
+        sheet: inspect(modal.querySelector('.modal'))
+      };
+      window.closeAppModal(modal);
+      await wait(230);
+      window.shareCard(currentSaju);
+      await wait(40);
+      const share = document.getElementById('shareCardModal');
+      const shareState = {
+        backdrop: inspect(share),
+        sheet: inspect(share.querySelector('.share-card-sheet'))
+      };
+      window.closeShareCardModal();
+      return { modalState, shareState };
+    });
+    for (const [name, overlay] of Object.entries(reducedTransparency)) {
+      assert.equal(parseCssColor(overlay.sheet.background).a, 1, `${name} reduced-transparency sheet must be solid`);
+      assert.equal(overlay.sheet.backdropFilter, 'none', `${name} reduced-transparency sheet must remove blur`);
+      assert.equal(overlay.backdrop.backdropFilter, 'none', `${name} reduced-transparency backdrop must remove blur`);
+    }
+  } finally {
+    await transparencySession.send('Emulation.setEmulatedMedia', { features: [] }).catch(() => {});
+    await transparencySession.detach().catch(() => {});
   }
 }
 
@@ -1576,7 +1684,7 @@ async function inspectWidth(browser, width) {
   assert.ok(metrics.overflow <= 1, `${width}px horizontal overflow: ${metrics.overflow}px`);
   assert.equal(metrics.pillars.length, 8, `${width}px pillar count`);
 
-  if (runsGroup('apple-design') || runsGroup('task-5')) {
+  if (runsGroup('apple-design') || runsSecondaryApple()) {
     await inspectAppleDesign(page, width);
     await inspectAppleSecondaryScreens(page, width);
     await page.close();

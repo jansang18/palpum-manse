@@ -583,6 +583,7 @@ body.dark .saved-card {
 }
 
 .cal-nav,
+.sfav,
 .sdelete,
 #psClearBtn,
 .saved-toolbar .bb,
@@ -658,6 +659,13 @@ body.dark .cal-day.selected {
   display: grid;
   place-items: center;
   color: #ff3b30 !important;
+}
+
+.saved-card .sfav,
+.saved-card .sdelete {
+  width: 44px !important;
+  height: 44px !important;
+  padding: 0 !important;
 }
 
 .saved-empty,

@@ -2,21 +2,22 @@
 (function () {
   // 오행 색 (목/화/토/금/수)
   var EL = [
-    { bg: '#42c184', fg: '#ffffff' }, // 목
-    { bg: '#ff6b4d', fg: '#ffffff' }, // 화
-    { bg: '#ffd23a', fg: '#3a2e00' }, // 토
-    { bg: '#e9e3d2', fg: '#2a2a2a' }, // 금
-    { bg: '#3f51c4', fg: '#ffffff' }  // 수
+    { bg: '#ddf6e8', fg: '#237a4b' }, // 목
+    { bg: '#ffe3df', fg: '#b84438' }, // 화
+    { bg: '#fff1c7', fg: '#7a6200' }, // 토
+    { bg: '#eceff4', fg: '#505b6b' }, // 금
+    { bg: '#e2e7ff', fg: '#4054a3' }  // 수
   ];
   var THEME = {
-    bg: '#07080d',
-    card: '#10131c',
-    text: '#f4f1e8',
-    sub: '#a6a9b4',
-    gold: '#d8b56a',
-    goldBright: '#f0d69a',
-    goldDeep: '#a97732',
-    line: 'rgba(216,181,106,0.22)'
+    bg: '#f2f2f7',
+    card: '#ffffff',
+    inset: '#f7f7fa',
+    text: '#1c1c1e',
+    sub: '#636366',
+    tertiary: '#8e8e93',
+    accent: '#007aff',
+    accentSoft: '#e7f2ff',
+    line: 'rgba(60,60,67,0.16)'
   };
   var shareCardOpener = null;
 
@@ -36,47 +37,39 @@
     cv.width = W; cv.height = H;
     var c = cv.getContext('2d');
 
-    // 배경
+    // Apple light canvas and grouped card.
     c.fillStyle = THEME.bg; c.fillRect(0, 0, W, H);
-    var g = c.createRadialGradient(W / 2, 120, 60, W / 2, 120, 760);
-    g.addColorStop(0, 'rgba(216,181,106,0.22)');
-    g.addColorStop(0.5, 'rgba(92,74,45,0.08)');
-    g.addColorStop(1, 'rgba(7,8,13,0)');
-    c.fillStyle = g; c.fillRect(0, 0, W, H);
-    // 별
-    for (var i = 0; i < 60; i++) {
-      var sx = (i * 167.3) % W, sy = (i * 311.7) % H, sr = ((i % 3) + 1) * 0.8;
-      c.globalAlpha = 0.18 + (i % 5) * 0.07;
-      c.fillStyle = THEME.goldBright; c.beginPath(); c.arc(sx, sy, sr, 0, 7); c.fill();
-    }
-    c.globalAlpha = 1;
-    // 테두리
+    c.fillStyle = THEME.card;
+    rr(c, 24, 24, W - 48, H - 48, 40); c.fill();
     c.strokeStyle = THEME.line; c.lineWidth = 2;
     rr(c, 24, 24, W - 48, H - 48, 36); c.stroke();
 
     c.textAlign = 'center';
 
-    // 타이틀
-    var tg = c.createLinearGradient(W / 2 - 240, 0, W / 2 + 240, 0);
-    tg.addColorStop(0, '#fff2c8'); tg.addColorStop(0.5, THEME.goldBright); tg.addColorStop(1, THEME.goldDeep);
-    c.fillStyle = tg;
-    c.font = '700 60px "Batang","바탕",serif';
-    c.fillText('신의 음성 만세력', W / 2, 130);
-    c.fillStyle = 'rgba(255,255,255,0.45)';
-    c.font = '500 24px sans-serif';
-    c.fillText('사주 명식', W / 2, 176);
+    // Product title.
+    c.fillStyle = THEME.accentSoft;
+    rr(c, W / 2 - 118, 72, 236, 48, 24); c.fill();
+    c.fillStyle = THEME.accent;
+    c.font = '700 24px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif';
+    c.fillText('사주 명식', W / 2, 104);
+    c.fillStyle = THEME.text;
+    c.font = '800 58px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif';
+    c.fillText('취명선 만세력', W / 2, 184);
 
     // 이름 + 정보
     var age = (new Date().getFullYear()) - s.year;
     c.fillStyle = THEME.text;
-    c.font = '800 56px sans-serif';
-    c.fillText(s.name || '이름 없음', W / 2, 300);
-    c.fillStyle = 'rgba(255,255,255,0.6)';
-    c.font = '500 28px sans-serif';
-    c.fillText((s.gender === 'M' ? '남성' : '여성') + ' · 만 ' + age + '세', W / 2, 348);
+    c.font = '800 54px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif';
+    c.fillText(s.name || '이름 없음', W / 2, 292);
+    c.fillStyle = THEME.sub;
+    c.font = '500 27px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif';
+    c.fillText((s.gender === 'M' ? '남성' : '여성') + ' · 만 ' + age + '세', W / 2, 340);
     var dline = '양력 ' + s.year + '.' + p2(s.month) + '.' + p2(s.day) +
       (s.unknown ? ' · 시 모름' : ' · ' + p2(s.hour) + ':' + p2(s.minute));
-    c.fillText(dline, W / 2, 392);
+    c.fillText(dline, W / 2, 382);
+
+    c.fillStyle = THEME.inset;
+    rr(c, 54, 430, W - 108, 720, 30); c.fill();
 
     // 사주 4기둥
     var labels = ['시주', '일주', '월주', '년주'];
@@ -93,10 +86,10 @@
     for (var k = 0; k < 4; k++) {
       var cx = pad + colW * k + colW / 2;
       // 십신
-      c.fillStyle = 'rgba(255,255,255,0.55)'; c.font = '700 26px sans-serif';
+      c.fillStyle = THEME.sub; c.font = '700 26px sans-serif';
       c.fillText(sips[k] || '', cx, topY);
       // 라벨
-      c.fillStyle = THEME.goldBright; c.font = '700 24px sans-serif';
+      c.fillStyle = THEME.accent; c.font = '700 24px sans-serif';
       c.fillText(labels[k], cx, topY + 38);
 
       var unknown = (k === 0 && s.unknown);
@@ -109,8 +102,8 @@
     }
 
     // 푸터
-    c.fillStyle = 'rgba(255,255,255,0.4)'; c.font = '500 24px sans-serif';
-    c.fillText('jansang18.github.io/sineum-manse', W / 2, H - 70);
+    c.fillStyle = THEME.tertiary; c.font = '500 23px sans-serif';
+    c.fillText('취명선 만세력 · jansang18.github.io/sineum-manse', W / 2, H - 72);
 
     return cv;
   }
@@ -118,9 +111,9 @@
   function drawBlk(c, cx, y, size, idx, isStem) {
     var x = cx - size / 2;
     if (idx == null || idx < 0) {
-      c.fillStyle = 'rgba(255,255,255,0.05)';
+      c.fillStyle = '#ececf0';
       rr(c, x, y, size, size, 22); c.fill();
-      c.fillStyle = 'rgba(255,255,255,0.4)'; c.font = '800 ' + Math.round(size * 0.5) + 'px sans-serif';
+      c.fillStyle = THEME.tertiary; c.font = '800 ' + Math.round(size * 0.5) + 'px sans-serif';
       c.textBaseline = 'middle'; c.fillText('?', cx, y + size / 2 + 2); c.textBaseline = 'alphabetic';
       return;
     }
@@ -136,7 +129,7 @@
   }
   function drawKor(c, cx, y, t) {
     if (!t) return;
-    c.fillStyle = 'rgba(255,255,255,0.55)'; c.font = '600 24px sans-serif';
+    c.fillStyle = THEME.sub; c.font = '600 24px sans-serif';
     c.fillText(t, cx, y);
   }
   function p2(n) { return ('0' + n).slice(-2); }
@@ -190,8 +183,8 @@
     m.onclick = function (e) { if (e.target === m) closeShareCardModal(); };
     document.getElementById('shareCardDo').onclick = function () {
       cv.toBlob(async function (blob) {
-        var file = new File([blob], (s.name || 'saju') + '_사주.png', { type: 'image/png' });
-        var txt = (s.name || '') + ' 사주 · 신의 음성 만세력\njansang18.github.io/sineum-manse';
+        var file = new File([blob], (s.name || '사주') + '_취명선_만세력.png', { type: 'image/png' });
+        var txt = (s.name || '') + ' 사주 · 취명선 만세력\njansang18.github.io/sineum-manse';
         try {
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({ files: [file], text: txt });

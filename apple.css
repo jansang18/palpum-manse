@@ -1,0 +1,195 @@
+/* Final Apple-system layer: foundation, branding, and navigation only. */
+:root {
+  color-scheme: light dark;
+  --apple-bg: #f2f2f7;
+  --apple-surface: #fff;
+  --apple-surface-2: #f7f7fa;
+  --apple-label: #111113;
+  --apple-secondary: #636366;
+  --apple-tertiary: #8e8e93;
+  --apple-separator: rgba(60, 60, 67, .16);
+  --apple-accent: #007aff;
+  --apple-focus: rgba(0, 122, 255, .28);
+  --apple-cjk-offset: -.035em;
+  --apple-wood-surface: #ddf6e8;
+  --apple-wood-foreground: #237a4b;
+  --apple-fire-surface: #ffe3df;
+  --apple-fire-foreground: #b84438;
+  --apple-earth-surface: #fff1c7;
+  --apple-earth-foreground: #7a6200;
+  --apple-metal-surface: #eceff4;
+  --apple-metal-foreground: #505b6b;
+  --apple-water-surface: #e2e7ff;
+  --apple-water-foreground: #4054a3;
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Noto Sans KR", sans-serif;
+}
+
+body.dark {
+  --apple-bg: #000;
+  --apple-surface: #1c1c1e;
+  --apple-surface-2: #2c2c2e;
+  --apple-label: #f5f5f7;
+  --apple-secondary: #aeaeb2;
+  --apple-tertiary: #8e8e93;
+  --apple-separator: rgba(84, 84, 88, .58);
+  --apple-accent: #0a84ff;
+  --apple-focus: rgba(10, 132, 255, .34);
+  --apple-wood-surface: #143629;
+  --apple-wood-foreground: #7be0a8;
+  --apple-fire-surface: #41201d;
+  --apple-fire-foreground: #ff9a8f;
+  --apple-earth-surface: #3a3014;
+  --apple-earth-foreground: #f2d36f;
+  --apple-metal-surface: #2b3038;
+  --apple-metal-foreground: #c8d0dc;
+  --apple-water-surface: #20284a;
+  --apple-water-foreground: #a7b4ff;
+}
+
+html,
+body {
+  background: var(--apple-bg) !important;
+  background-image: none !important;
+  color: var(--apple-label);
+  font-family: inherit;
+}
+
+body.dark { color: var(--apple-label); }
+
+.app,
+.view {
+  background-image: none !important;
+  font-family: inherit;
+}
+
+/* Retire the legacy celestial decoration without restyling the result card. */
+.oguk-card::before {
+  content: none !important;
+  background: none !important;
+  background-image: none !important;
+}
+
+/* Product artwork and wordmarks are intentionally monochrome. */
+.intro-logo-img,
+.top-bar .title .logo-img {
+  filter: grayscale(1) contrast(1.15) brightness(.16) !important;
+  text-shadow: none !important;
+}
+
+body.dark .intro-logo-img,
+body.dark .top-bar .title .logo-img {
+  filter: grayscale(1) brightness(0) invert(1) contrast(.92) !important;
+}
+
+.brand-main,
+.input-intro .big {
+  background: none !important;
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+  color: var(--apple-label) !important;
+  text-shadow: none !important;
+}
+
+/* Navigation chrome is the only blurred, translucent layer. */
+.top-bar {
+  min-height: 60px;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--apple-surface) 78%, transparent) !important;
+  border-bottom: 1px solid var(--apple-separator) !important;
+  box-shadow: none !important;
+  backdrop-filter: saturate(180%) blur(20px) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
+}
+
+.top-bar .title,
+.top-bar .title .title-sub {
+  color: var(--apple-label) !important;
+  font-family: inherit !important;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+
+.icon-btn,
+.top-bar .icon-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--apple-label);
+}
+
+.icon-btn:hover,
+.icon-btn:active {
+  background: color-mix(in srgb, var(--apple-label) 8%, transparent) !important;
+}
+
+.icon-btn svg { stroke: currentColor !important; }
+
+.tabs {
+  top: 60px;
+  gap: 2px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--apple-surface) 78%, transparent) !important;
+  border-bottom: 1px solid var(--apple-separator) !important;
+  backdrop-filter: saturate(180%) blur(20px) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
+}
+
+.tab {
+  min-height: 36px;
+  padding: 8px 2px;
+  border-radius: 999px;
+  color: var(--apple-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: var(--apple-cjk-offset);
+  transition: background-color .18s ease, color .18s ease;
+}
+
+.tab.active {
+  color: var(--apple-accent) !important;
+  background: rgba(0, 122, 255, .12) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+body.dark .tab.active { background: rgba(10, 132, 255, .12) !important; }
+
+.tab.active::after { display: none !important; }
+
+/* Neutralize the inherited metallic primary action without restyling forms. */
+.primary-btn {
+  background: var(--apple-accent) !important;
+  box-shadow: none !important;
+}
+
+.input {
+  border: 1px solid var(--apple-separator) !important;
+}
+
+.input:focus {
+  border-color: var(--apple-accent) !important;
+  box-shadow: 0 0 0 3px var(--apple-focus) !important;
+}
+
+/* Legacy gender/calendar glyphs offset the segmented labels from center. */
+.segmented button::before { display: none !important; }
+
+/* Remove the inherited selected-luck gold glow; component geometry stays untouched. */
+.luck-item.selected .luck-block { box-shadow: none !important; }
+
+:focus-visible {
+  outline: 2px solid var(--apple-focus);
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .top-bar { min-height: 68px; padding: 12px 32px; }
+  .tabs { top: 68px; padding-inline: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab { transition: none; }
+}

@@ -261,76 +261,102 @@ async function fillAndCalculate(page) {
   await sleep(600);
 }
 
+async function collectAppleInspection(page, selectors) {
+  return page.evaluate(({ styleSelectors, geometrySelectors }) => {
+    const visualProperties = [
+      'background', 'backgroundColor', 'backgroundImage',
+      'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
+      'color', 'outlineColor', 'boxShadow', 'textShadow'
+    ];
+    const styleSnapshot = (element, pseudo = null) => {
+      const computed = getComputedStyle(element, pseudo);
+      return {
+        values: Object.fromEntries(visualProperties.map(property => [property, computed[property]])),
+        rendered: !pseudo || (
+          computed.content !== 'none' &&
+          computed.display !== 'none' &&
+          computed.visibility !== 'hidden' &&
+          Number(computed.opacity) > 0
+        )
+      };
+    };
+    const styles = selector => [...document.querySelectorAll(selector)]
+      .filter(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
+      .map(element => ({
+        base: styleSnapshot(element),
+        before: styleSnapshot(element, '::before'),
+        after: styleSnapshot(element, '::after')
+      }));
+    const geometry = selector => [...document.querySelectorAll(selector)]
+      .filter(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
+      .map(element => {
+        const rect = element.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const textRect = range.getBoundingClientRect();
+        return {
+          rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height },
+          textRect: { left: textRect.left, top: textRect.top, right: textRect.right, bottom: textRect.bottom },
+          textLines: range.getClientRects().length,
+          center: {
+            x: Math.abs((textRect.left + textRect.right) / 2 - (rect.left + rect.right) / 2),
+            y: Math.abs((textRect.top + textRect.bottom) / 2 - (rect.top + rect.bottom) / 2)
+          }
+        };
+      });
+    return {
+      accent: getComputedStyle(document.body).getPropertyValue('--apple-accent').trim(),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      styles: Object.fromEntries(Object.entries(styleSelectors).map(([name, selector]) => [name, styles(selector)])),
+      geometry: Object.fromEntries(Object.entries(geometrySelectors).map(([name, selector]) => [name, geometry(selector)]))
+    };
+  }, selectors);
+}
+
 async function inspectAppleDesign(page, width) {
   const expectedAccents = { light: '#007aff', dark: '#0a84ff' };
   const expectedAccentColors = { light: 'rgb(0, 122, 255)', dark: 'rgb(10, 132, 255)' };
   const expectedAccentTints = { light: { r: 0, g: 122, b: 255 }, dark: { r: 10, g: 132, b: 255 } };
   const legacyGold = /#(?:d8b56a|f0d69a|a97732)\b|rgba?\(\s*(?:216\s*,\s*181\s*,\s*106|240\s*,\s*214\s*,\s*154|169\s*,\s*119\s*,\s*50)\b/i;
+  const inputSelectors = {
+    styleSelectors: {
+      topBar: '.top-bar',
+      activeTab: '.tab.active',
+      primaryButton: '.primary-btn',
+      formFields: '.input'
+    },
+    geometrySelectors: {
+      segmentedButtons: '.segmented button',
+      tabs: '.tab',
+      primaryButtons: '.primary-btn'
+    }
+  };
+  const resultSelectors = {
+    styleSelectors: {
+      pillarBlocks: '.pillar-block',
+      luckBlocks: '.luck-block'
+    },
+    geometrySelectors: {
+      pillarBlocks: '.pillar-block',
+      luckBlocks: '.luck-block'
+    }
+  };
 
   for (const [theme, accent] of Object.entries(expectedAccents)) {
-    const inspection = await page.evaluate(isDark => {
-      document.body.classList.toggle('dark', isDark);
-      const visualProperties = [
-        'background', 'backgroundColor', 'backgroundImage',
-        'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
-        'color', 'outlineColor', 'boxShadow', 'textShadow'
-      ];
-      const styleSnapshot = (element, pseudo = null) => {
-        const computed = getComputedStyle(element, pseudo);
-        return {
-          values: Object.fromEntries(visualProperties.map(property => [property, computed[property]])),
-          rendered: !pseudo || (
-            computed.content !== 'none' &&
-            computed.display !== 'none' &&
-            computed.visibility !== 'hidden' &&
-            Number(computed.opacity) > 0
-          )
-        };
-      };
-      const styles = selector => [...document.querySelectorAll(selector)]
-        .filter(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
-        .map(element => ({
-          base: styleSnapshot(element),
-          before: styleSnapshot(element, '::before'),
-          after: styleSnapshot(element, '::after')
-        }));
-      const geometry = selector => [...document.querySelectorAll(selector)]
-        .filter(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
-        .map(element => {
-          const rect = element.getBoundingClientRect();
-          const range = document.createRange();
-          range.selectNodeContents(element);
-          const textRect = range.getBoundingClientRect();
-          return {
-            rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height },
-            textRect: { left: textRect.left, top: textRect.top, right: textRect.right, bottom: textRect.bottom },
-            textLines: range.getClientRects().length,
-            center: {
-              x: Math.abs((textRect.left + textRect.right) / 2 - (rect.left + rect.right) / 2),
-              y: Math.abs((textRect.top + textRect.bottom) / 2 - (rect.top + rect.bottom) / 2)
-            }
-          };
-        });
-      return {
-        accent: getComputedStyle(document.body).getPropertyValue('--apple-accent').trim(),
-        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        styles: {
-          topBar: styles('.top-bar'),
-          activeTab: styles('.tab.active'),
-          primaryButton: styles('.primary-btn'),
-          formFields: styles('.input'),
-          pillarBlocks: styles('.pillar-block'),
-          luckBlocks: styles('.luck-block')
-        },
-        geometry: {
-          pillarBlocks: geometry('.pillar-block'),
-          luckBlocks: geometry('.luck-block'),
-          segmentedButtons: geometry('.segmented button'),
-          tabs: geometry('.tab'),
-          primaryButtons: geometry('.primary-btn')
-        }
-      };
-    }, theme === 'dark');
+    await page.evaluate(isDark => document.body.classList.toggle('dark', isDark), theme === 'dark');
+    await page.click('.tab[data-tab="input"]');
+    await page.waitForFunction(() => document.querySelector('#view-input')?.classList.contains('active'));
+    await sleep(250);
+    const inputInspection = await collectAppleInspection(page, inputSelectors);
+
+    await fillAndCalculate(page);
+    const resultInspection = await collectAppleInspection(page, resultSelectors);
+    const inspection = {
+      accent: inputInspection.accent,
+      overflow: Math.max(inputInspection.overflow, resultInspection.overflow),
+      styles: { ...inputInspection.styles, ...resultInspection.styles },
+      geometry: { ...inputInspection.geometry, ...resultInspection.geometry }
+    };
 
     assert.equal(inspection.accent, accent, `${width}px ${theme} --apple-accent`);
     assert.ok(inspection.overflow <= 1, `${width}px ${theme} horizontal overflow: ${inspection.overflow}px`);

@@ -42,6 +42,7 @@ const runsImportedFieldXss = () => !TEST_GROUP || TEST_GROUP === 'imported-field
 const runsResultWidthBrand = () => TEST_GROUP === 'result-width-brand';
 const runsShellWidth = () => TEST_GROUP === 'shell-width';
 const runsFoldLayout = () => TEST_GROUP === 'fold-layout';
+const runsResultHeaderCompact = () => !TEST_GROUP || TEST_GROUP === 'result-header-compact';
 const runsAndroidSafeArea = () => !TEST_GROUP || TEST_GROUP === 'android-safe-area';
 
 async function inspectCalendarShellWidth(page, width) {
@@ -471,6 +472,14 @@ function inspectAndroidSafeAreaContract() {
   );
   assert.equal(capacitorConfig.plugins?.SystemBars?.style, 'DARK', 'dark app must request light status-bar icons');
   assert.equal(capacitorConfig.plugins?.SystemBars?.insetsHandling, 'css', 'Capacitor must expose Android safe-area insets to CSS');
+}
+
+function inspectResultHeaderCompactContract() {
+  const indexHtml = fs.readFileSync(path.join(UI_ROOT, 'index.html'), 'utf8');
+  const appleCss = fs.readFileSync(path.join(UI_ROOT, 'apple.css'), 'utf8');
+  assert.doesNotMatch(indexHtml, /<div class="card-title">&#10022; 사주 원국<\/div>/, 'result card must not repeat the "사주 원국" heading');
+  assert.match(appleCss, /\.oguk-card \.result-head\s*\{[\s\S]*?padding:\s*0 0 8px !important/, 'result identity header must use compact vertical spacing');
+  assert.match(appleCss, /#seunScroll \.luck-item\s*\{[\s\S]*?grid-template-rows:\s*34px 22px auto auto 22px/, 'yearly-flow labels must reserve separate rows for year, age, and ten-god text');
 }
 
 function inspectFinalSecuritySourceContracts() {
@@ -2770,9 +2779,10 @@ async function inspectWidth(browser, width) {
 (async () => {
   if (runsGroup('android-backup')) inspectAndroidBackupPolicy();
   if (runsAndroidSafeArea()) inspectAndroidSafeAreaContract();
+  if (runsResultHeaderCompact()) inspectResultHeaderCompactContract();
   if (runsGroup('release-contract')) inspectReleaseContract();
   if (process.env.SKIP_SOURCE_CONTRACTS !== '1' && runsGroup('final-security')) inspectFinalSecuritySourceContracts();
-  if (TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'release-contract') {
+  if (TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'result-header-compact' || TEST_GROUP === 'release-contract') {
     console.log(`${TEST_GROUP} regression PASS`);
     return;
   }

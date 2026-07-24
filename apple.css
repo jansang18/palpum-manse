@@ -559,6 +559,11 @@ body.dark {
   text-shadow: none !important;
 }
 
+/* The result tab already identifies itself in navigation; keep the chart header compact. */
+.oguk-card .result-head {
+  padding: 0 0 8px !important;
+}
+
 /* Task 5: Apple secondary views, sheets, dialogs, and restrained motion. */
 #view-fortune,
 #view-match,
@@ -1330,6 +1335,27 @@ body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).a
   min-height: 0 !important;
   margin: 0 !important;
   line-height: 1 !important;
+}
+
+/* A yearly cell has an extra age line: give all three labels distinct vertical rhythm. */
+#seunScroll .luck-item {
+  grid-template-rows: 34px 22px auto auto 22px;
+  row-gap: 2px;
+  padding: 4px 0 6px !important;
+}
+
+#seunScroll .label {
+  line-height: 1.25 !important;
+}
+
+#seunScroll .label .meta {
+  display: block;
+  margin-top: 2px;
+}
+
+#seunScroll .sipsin-t,
+#seunScroll .sipsin-b {
+  line-height: 1.15 !important;
 }
 
 .luck-block {

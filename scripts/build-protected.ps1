@@ -273,14 +273,17 @@ function Test-ProtectedAssets {
     $runner = Join-Path $WebRoot 'tests\ui-regression.js'
     $previousAppRoot = $env:APP_ROOT
     $previousUiRoot = $env:UI_ROOT
+    $previousSkipSourceContracts = $env:SKIP_SOURCE_CONTRACTS
     try {
         $env:APP_ROOT = $ResolvedAppRoot
         $env:UI_ROOT = $assetRoot
+        $env:SKIP_SOURCE_CONTRACTS = '1'
         $null = Invoke-Checked -Label 'protected UI regression' -FilePath $Toolchain.Node `
             -Arguments @($runner) -WorkingDirectory $WebRoot
     } finally {
         $env:APP_ROOT = $previousAppRoot
         $env:UI_ROOT = $previousUiRoot
+        $env:SKIP_SOURCE_CONTRACTS = $previousSkipSourceContracts
     }
 }
 

@@ -2,6 +2,7 @@
 
 Date: 2026-07-24
 Branch: `codex/luxury-ui-redesign`
+Rebuilt from runtime source: `3f29456 security: close imported-name XSS paths`
 
 ## Release source
 
@@ -36,6 +37,8 @@ blocks retain the specified pastel yellow semantic palette.
 - Source UI regression: PASS at 360, 390, 412, and 768.
 - Web mirror UI regression: PASS at 360, 390, 412, and 768.
 - Protected Android asset UI regression: PASS at 360, 390, 412, and 768.
+- Protected regression runs all browser/runtime checks while source-shape
+  contracts remain limited to the clean, unobfuscated source tree.
 - JavaScript syntax checks: PASS.
 - PowerShell release script parse: PASS.
 - `git diff --check`: PASS.
@@ -51,10 +54,10 @@ Artifacts:
 
 - `취명선만세력_애플리디자인_보호.apk`
   - SHA-256:
-    `F531B9325B3088E4BDA9EA5F98E0C137FBA7C969289C39528B6E69E9A30828F6`
+    `43E4156869F65EC1EF45BA652EB7A3DA4940AF2B273CE15A2AEF26C8A698F82F`
 - `취명선만세력_애플리디자인_보호.aab`
   - SHA-256:
-    `94C67CCF827A5A01093A18813A26109B55A64FDCFF24825961912C000C46AC7D`
+    `248ECBF4AD248ACDF78EA8B41375D3783FE7CF0936CD8395C11D934BF858F900`
 
 Verification:
 
@@ -65,6 +68,8 @@ Verification:
 - Pinned signer SHA-256:
   `da1950eab27b62b7c0ac92a21b34a2fab32ff582f0e68be0d6e72d56488508aa`
 - APK manifest `android:allowBackup`: `false`
+- Resolved APK application label: `취명선 만세력`
+- Resolved APK package ID: `com.jansang.manse`
 - Protected assets restored to clean source state after build: verified
 - Independent artifact `VerifyOnly`: PASS
 

@@ -599,6 +599,7 @@ function inspectReleaseContract() {
     [/Sync-CleanAssets/, 'clean Capacitor sync must be explicit'],
     [/obfuscate_assets\.js/, 'Android assets must be obfuscated'],
     [/tests[\\/]ui-regression\.js/, 'the versioned protected regression must run'],
+    [/\$env:SKIP_SOURCE_CONTRACTS\s*=\s*['"]1['"]/, 'protected regression must explicitly skip only source-shape contracts'],
     [/assembleRelease/, 'the release APK must be built'],
     [/bundleRelease/, 'the release AAB must be built'],
     [/apksigner/, 'APK signature verification must run'],
@@ -610,6 +611,11 @@ function inspectReleaseContract() {
     [/Get-FileHash/, 'artifact SHA-256 hashes must be calculated'],
     [/finally\s*\{[\s\S]*Restore-CleanAssets/, 'clean Android assets must be restored even after failure']
   ]) assert.match(script, pattern, message);
+  assert.match(
+    fs.readFileSync(versionedRunner, 'utf8'),
+    /process\.env\.SKIP_SOURCE_CONTRACTS\s*!==\s*['"]1['"]\s*&&\s*runsGroup\(['"]final-security['"]\)/,
+    'source-shape security contracts must remain enabled except for explicitly protected assets'
+  );
   assert.doesNotMatch(script, /storePassword\s*=\s*['"][^'"]+['"]/, 'credentials must not be committed in release tooling');
   assert.doesNotMatch(script, /keyPassword\s*=\s*['"][^'"]+['"]/, 'credentials must not be committed in release tooling');
 
@@ -2420,7 +2426,7 @@ async function inspectWidth(browser, width) {
 (async () => {
   if (runsGroup('android-backup')) inspectAndroidBackupPolicy();
   if (runsGroup('release-contract')) inspectReleaseContract();
-  if (runsGroup('final-security')) inspectFinalSecuritySourceContracts();
+  if (process.env.SKIP_SOURCE_CONTRACTS !== '1' && runsGroup('final-security')) inspectFinalSecuritySourceContracts();
   if (TEST_GROUP === 'android-backup' || TEST_GROUP === 'release-contract') {
     console.log(`${TEST_GROUP} regression PASS`);
     return;

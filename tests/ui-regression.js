@@ -39,6 +39,7 @@ const runsCalendarCurrentYear = () => !TEST_GROUP || TEST_GROUP === 'calendar-cu
 const runsImportedFieldXss = () => !TEST_GROUP || TEST_GROUP === 'imported-fields-xss';
 const runsResultWidthBrand = () => TEST_GROUP === 'result-width-brand';
 const runsShellWidth = () => TEST_GROUP === 'shell-width';
+const runsAndroidSafeArea = () => !TEST_GROUP || TEST_GROUP === 'android-safe-area';
 
 async function inspectCalendarShellWidth(page, width) {
   await page.click('.tab[data-tab="calendar"]');
@@ -420,6 +421,29 @@ function inspectAndroidBackupPolicy() {
   const manifest = fs.readFileSync(manifestPath, 'utf8');
   assert.match(manifest, /android:allowBackup="false"/, 'saved chart data must be excluded from Android backup');
   assert.doesNotMatch(manifest, /android:allowBackup="true"/);
+}
+
+function inspectAndroidSafeAreaContract() {
+  const appleCss = fs.readFileSync(path.join(UI_ROOT, 'apple.css'), 'utf8');
+  const capacitorConfig = JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'capacitor.config.json'), 'utf8'));
+
+  assert.match(
+    appleCss,
+    /--app-safe-top\s*:\s*var\(--safe-area-inset-top,\s*env\(safe-area-inset-top,\s*0px\)\)/,
+    'the header must consume Capacitor Android safe-area CSS variables'
+  );
+  assert.match(
+    appleCss,
+    /\.top-bar\s*\{[\s\S]*?padding-top:\s*calc\(8px\s*\+\s*var\(--app-safe-top\)\)/,
+    'the title bar must reserve space for the Android status bar'
+  );
+  assert.match(
+    appleCss,
+    /\.tabs\s*\{[\s\S]*?top:\s*calc\(76px\s*\+\s*var\(--app-safe-top\)\)/,
+    'the tab rail must begin below the status-bar-safe title bar'
+  );
+  assert.equal(capacitorConfig.plugins?.SystemBars?.style, 'DARK', 'dark app must request light status-bar icons');
+  assert.equal(capacitorConfig.plugins?.SystemBars?.insetsHandling, 'css', 'Capacitor must expose Android safe-area insets to CSS');
 }
 
 function inspectFinalSecuritySourceContracts() {
@@ -2712,9 +2736,10 @@ async function inspectWidth(browser, width) {
 
 (async () => {
   if (runsGroup('android-backup')) inspectAndroidBackupPolicy();
+  if (runsAndroidSafeArea()) inspectAndroidSafeAreaContract();
   if (runsGroup('release-contract')) inspectReleaseContract();
   if (process.env.SKIP_SOURCE_CONTRACTS !== '1' && runsGroup('final-security')) inspectFinalSecuritySourceContracts();
-  if (TEST_GROUP === 'android-backup' || TEST_GROUP === 'release-contract') {
+  if (TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'release-contract') {
     console.log(`${TEST_GROUP} regression PASS`);
     return;
   }

@@ -8,6 +8,8 @@
   --apple-secondary: #636366;
   --apple-tertiary: #8e8e93;
   --apple-separator: rgba(60, 60, 67, .16);
+  /* Capacitor 8 writes this value on Android 15+; Safari falls back to env(). */
+  --app-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --apple-accent: #007aff;
   --apple-focus: rgba(0, 122, 255, .28);
   --apple-cjk-offset: -.023em;
@@ -101,6 +103,7 @@ body.dark .top-bar .title .logo-img {
   box-shadow: none !important;
   backdrop-filter: saturate(180%) blur(20px) !important;
   -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
+  padding-top: calc(8px + var(--app-safe-top));
 }
 
 .top-bar .title,
@@ -1084,6 +1087,7 @@ body.dark .f-tips .f-tip {
   max-width: none !important;
   margin-inline: auto !important;
   box-sizing: border-box;
+  top: calc(76px + var(--app-safe-top));
 }
 
 /* Match the title/theme header rectangle to the navigation rectangle below. */

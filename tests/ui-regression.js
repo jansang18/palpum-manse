@@ -26,6 +26,8 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
   ? [390, 1220]
   : TEST_GROUP === 'calendar-shell-width'
     ? [390, 520, 600, 700, 768, 900, 1220]
+  : TEST_GROUP === 'all-tab-shell-width'
+    ? [390, 520, 600, 700, 768, 1220]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
@@ -62,6 +64,53 @@ async function inspectCalendarShellWidth(page, width) {
     );
   }
   assert.ok(geometry.calendar.left >= 0 && geometry.calendar.right <= geometry.viewport + 1, `${width}px calendar shell overflows viewport`);
+}
+
+async function inspectAllTabShellWidths(page, width) {
+  const targets = {
+    input: '.input-card',
+    result: '.oguk-card',
+    fortune: '.overall-card',
+    match: '.match-intro',
+    calendar: '.cal-grid'
+  };
+  for (const [tab, selector] of Object.entries(targets)) {
+    await page.click(`.tab[data-tab="${tab}"]`);
+    await sleep(60);
+    const geometry = await page.evaluate(selector => {
+      const rect = element => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, right: box.right, width: box.width };
+      };
+      return {
+        header: rect(document.querySelector('.top-bar')),
+        tabs: rect(document.querySelector('.tabs')),
+        target: rect(document.querySelector(selector))
+      };
+    }, selector);
+    for (const name of ['header', 'tabs']) {
+      assert.ok(Math.abs(geometry[name].width - geometry.target.width) <= 1, `${width}px ${tab} ${name} width must match content`);
+      assert.ok(Math.abs(geometry[name].left - geometry.target.left) <= 1, `${width}px ${tab} ${name} left edge must match content`);
+    }
+  }
+
+  await page.click('.tab[data-tab="saved"]');
+  await sleep(60);
+  const savedGeometry = await page.evaluate(() => {
+    const shell = element => {
+      const box = element.getBoundingClientRect();
+      return { left: box.left, width: box.width };
+    };
+    const view = document.getElementById('view-saved');
+    const style = getComputedStyle(view);
+    const left = view.getBoundingClientRect().left + parseFloat(style.paddingLeft);
+    const width = view.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return { header: shell(document.querySelector('.top-bar')), tabs: shell(document.querySelector('.tabs')), target: { left, width } };
+  });
+  for (const name of ['header', 'tabs']) {
+    assert.ok(Math.abs(savedGeometry[name].width - savedGeometry.target.width) <= 1, `${width}px saved ${name} width must match content`);
+    assert.ok(Math.abs(savedGeometry[name].left - savedGeometry.target.left) <= 1, `${width}px saved ${name} left edge must match content`);
+  }
 }
 
 async function inspectShellWidth(page, width) {
@@ -2440,6 +2489,12 @@ async function inspectWidth(browser, width) {
   }
 
   await fillAndCalculate(page);
+
+  if (TEST_GROUP === 'all-tab-shell-width') {
+    await inspectAllTabShellWidths(page, width);
+    await page.close();
+    return;
+  }
 
   if (runsResultWidthBrand()) {
     await inspectResultWidthAndBrand(page, width);

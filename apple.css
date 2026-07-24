@@ -1121,6 +1121,48 @@ body:has(.tab[data-tab="calendar"].active) .tabs {
   }
 }
 
+/* Result keeps the natal-card measure through every intermediate breakpoint. */
+@media (min-width: 520px) and (max-width: 600px) {
+  body:has(.tab[data-tab="result"].active) .top-bar,
+  body:has(.tab[data-tab="result"].active) .tabs {
+    width: 510px !important;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 767px) {
+  body:has(.tab[data-tab="result"].active) .top-bar,
+  body:has(.tab[data-tab="result"].active) .tabs {
+    width: 496px !important;
+  }
+}
+
+/* Fortune, compatibility, and saved views share the same card measure. */
+body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .top-bar,
+body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .tabs {
+  width: calc(100vw - 14px) !important;
+}
+
+@media (min-width: 520px) and (max-width: 600px) {
+  body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .top-bar,
+  body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .tabs {
+    width: 504px !important;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 767px) {
+  body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .top-bar,
+  body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .tabs {
+    width: 496px !important;
+  }
+}
+
+@media (min-width: 768px) {
+  body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .top-bar,
+  body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .tabs {
+    width: 656px !important;
+  }
+}
+
 /* Remove the legacy nested horizontal padding that made input sections stagger. */
 #view-input {
   width: var(--apple-content-measure) !important;

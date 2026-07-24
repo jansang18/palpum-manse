@@ -44,6 +44,24 @@
   - CORS 실패 시 호출자에서 내장 목록만 유지한다.
 - 검증: 비허용 호스트가 네트워크 호출 전에 거부되고, 허용 API 실패 시 동적 스크립트 생성이 `0`인지 확인한다.
 
+### SEC-005 — High — 가져온 이름의 궁합 설명 DOM XSS
+
+- 위치: `index.html`의 기존 `genCompatText`와 `renderMatchResult`
+- 기존 영향: 정규화된 백업 이름에 HTML 이벤트 속성이 포함되면, 궁합 설명 생성기가 이름을 `<strong>${name}</strong>` 문자열에 직접 삽입하고 결과를 `innerHTML`로 해석했다. 저장 화면에서 안전했던 값이 궁합 계산이라는 하위 기능에서 다시 실행 가능한 HTML이 되었다.
+- 수정:
+  - 이름을 포함하던 HTML 문자열 생성기 `genCompatText`를 제거했다.
+  - 궁합 해설 자체는 앱이 관리하는 일반 텍스트로만 반환한다.
+  - 두 이름은 별도의 `<strong>` 요소에 `textContent`로 넣고, 연결 문구와 해설은 `document.createTextNode`로 추가한다.
+  - 정상적인 한글 이름과 `<strong>` 시각적 의미는 그대로 유지한다.
+- 하위 사용처 감사:
+  - 결과·운세·유사 명식·궁합 선택/요약: 기존 `escapeHtml` 또는 DOM `textContent` 사용을 확인했다.
+  - 저장 목록: DOM API와 `textContent`만 사용한다.
+  - 유사 명식·궁합 선택의 레코드 ID 속성: 정규화 시 UUID로 재발급하고 출력 시에도 속성 이스케이프를 적용했다.
+  - 공유 카드: Canvas `fillText`를 사용하며 이름을 HTML로 해석하지 않는다.
+  - 궁합 설명: 이번 수정으로 DOM `textContent`/텍스트 노드만 사용한다.
+- TDD RED: 수정 전 동일 E2E에서 궁합 계산 후 이벤트 카운터가 `1`이 되어 실제 실행 경로를 재현했다.
+- 검증 GREEN: 악성 백업을 실제 파일 입력으로 가져온 뒤 저장 명반을 결과·운세·공유·유사 명식에 전달하고, 동일 명반을 궁합 A/B 양쪽에 선택해 자동 계산한다. 모든 단계에서 이벤트 실행 `0`, 공격자 노드 `0`을 확인하며 `홍길동`과 공격 문자열은 실행되지 않는 텍스트로 보존된다.
+
 ### SEC-004 — Release — Android 백업 및 브랜드
 
 - 위치: `android/app/src/main/res/values/strings.xml` (`3`–`4`)
@@ -70,7 +88,7 @@
 
 ### SEC-R02 — Low — 기존 템플릿용 `innerHTML`
 
-앱에는 계산 결과와 고정 템플릿을 그리는 기존 `innerHTML` 사용이 남아 있다. 이번에 외부 백업이 연결되던 저장 카드 경로는 제거했으며, 네트워크 문자열을 HTML로 출력하는 경로는 기존 `escapeHtml` 처리를 유지한다. 향후 단계적으로 DOM API 또는 Trusted Types로 이전하면 공격 표면을 더 줄일 수 있다.
+앱에는 계산 결과와 고정 템플릿을 그리는 기존 `innerHTML` 사용이 남아 있다. 외부 백업이 연결되는 저장 카드와 궁합 해설은 DOM API로 전환했으며, 이름이 남아 있는 다른 HTML 템플릿은 `escapeHtml` 처리를 확인했다. 향후 단계적으로 DOM API 또는 Trusted Types로 이전하면 공격 표면을 더 줄일 수 있다.
 
 ### SEC-R03 — Low — CSP
 
@@ -79,9 +97,11 @@
 ## 검증
 
 - 보안 집중 회귀: `TEST_GROUP=final-security` — 통과
+- 가져온 필드 하위 경로 E2E: `TEST_GROUP=imported-fields-xss` — 통과
 - 결정적 달력 시계 회귀: `TEST_GROUP=calendar-current-year` — 통과
 - 전체 UI 회귀: `360 / 390 / 412 / 768px` — 통과
 - 악성 백업 이벤트 실행: `0`
+- 결과·운세·공유·유사 명식·궁합 공격자 노드: 각각 `0`
 - 동적 온라인 보강 스크립트 생성: `0`
 - 비허용 호스트의 실제 `fetch` 호출: `0`
 - 소스/웹 `index.html`, `apple.css`, 테스트 러너 SHA-256: 각각 일치

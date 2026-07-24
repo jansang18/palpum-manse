@@ -13767,7 +13767,7 @@ async function findSimilarSaju() {
         const sCls = sim.score >= 75 ? 'high' : sim.score >= 50 ? 'mid' : 'low';
         const pillarTxt = sim.pillars.length ? sim.pillars.join('·') + ' 일치' : `${sim.hits}/${sim.totalSlots}글자 일치`;
         const hHan = (rec.hStem>=0 && rec.hBranch>=0) ? `${STEM[rec.hStem]}${BRANCH[rec.hBranch]}` : '시?';
-        return `<div class="similar-card" data-id="${rec.id}">
+        return `<div class="similar-card" data-id="${escapeHtml(String(rec.id || ''))}">
           <div class="sc-head">
             <div class="sc-name">${escapeHtml(rec.name || '이름 없음')}</div>
             <div class="sc-score ${sCls}">${sim.score}<span>점</span></div>
@@ -14730,7 +14730,7 @@ async function openMatchPicker() {
         { s: r.dStem, b: r.dBranch }
       ];
       if (r.hStem >= 0) pl.push({ s: r.hStem, b: r.hBranch });
-      return `<div class="pick-item" data-id="${r.id || ''}">
+      return `<div class="pick-item" data-id="${escapeHtml(String(r.id || ''))}">
         <div class="pi-head">
           <div class="pi-name">${escapeHtml(r.name)} <span class="g-tag">${r.gender==='M'?'남':'여'}</span></div>
           <div class="pi-date">${r.year}.${pad(r.month)}.${pad(r.day)}</div>
@@ -14941,24 +14941,36 @@ function compatGrade(score) {
   return '난관';
 }
 
-function genCompatText(compat, a, b) {
+function compatNarrative(compat) {
   const t = compat.total;
-  const aN = a.name || '본인';
-  const bN = b.name || '상대';
   const ilgan = compat.sub.ilgan.score;
   const ilji = compat.sub.ilji.score;
 
   if (t >= 80) {
-    return `<strong>${aN}</strong>과(와) <strong>${bN}</strong>은 명리적으로 매우 잘 어울리는 한 쌍입니다. 일간이 조화롭고 일지가 가까워, 일상에서의 호흡이 자연스럽고 큰 갈등 없이 관계가 깊어집니다. 서로의 부족함을 채워주는 관계로, 장기적인 동반자로도 적합합니다.`;
+    return '은 명리적으로 매우 잘 어울리는 한 쌍입니다. 일간이 조화롭고 일지가 가까워, 일상에서의 호흡이 자연스럽고 큰 갈등 없이 관계가 깊어집니다. 서로의 부족함을 채워주는 관계로, 장기적인 동반자로도 적합합니다.';
   } else if (t >= 65) {
-    return `<strong>${aN}</strong>과(와) <strong>${bN}</strong>은 전반적으로 좋은 궁합입니다. 작은 마찰은 있을 수 있으나 근본적으로 상생하는 관계라, 서로 노력하면 오랜 관계로 발전할 수 있습니다. ${ilgan > 60 ? '특히 성격적 이해도가 높아' : '일지가 가까워'} 편안함을 주는 사이입니다.`;
+    return `은 전반적으로 좋은 궁합입니다. 작은 마찰은 있을 수 있으나 근본적으로 상생하는 관계라, 서로 노력하면 오랜 관계로 발전할 수 있습니다. ${ilgan > 60 ? '특히 성격적 이해도가 높아' : '일지가 가까워'} 편안함을 주는 사이입니다.`;
   } else if (t >= 50) {
-    return `<strong>${aN}</strong>과(와) <strong>${bN}</strong>은 평균적인 궁합입니다. 크게 좋지도 나쁘지도 않으며, 관계의 질은 전적으로 두 분의 노력과 이해에 달려있습니다. 성격 차이가 보이는 부분은 대화로 풀고, 서로의 다름을 존중하는 태도가 중요합니다.`;
+    return '은 평균적인 궁합입니다. 크게 좋지도 나쁘지도 않으며, 관계의 질은 전적으로 두 분의 노력과 이해에 달려있습니다. 성격 차이가 보이는 부분은 대화로 풀고, 서로의 다름을 존중하는 태도가 중요합니다.';
   } else if (t >= 35) {
-    return `<strong>${aN}</strong>과(와) <strong>${bN}</strong>은 주의가 필요한 궁합입니다. ${ilgan < 45 ? '일간이 서로를 자극해 자존심 싸움이 벌어지기 쉽고, ' : ''}${ilji < 45 ? '일지가 충돌해 가까이 지낼수록 갈등이 커질 수 있습니다. ' : ''}관계를 지속하려면 상대의 영역을 깊이 침범하지 않는 거리두기와, 말보다 행동으로 보여주는 배려가 필요합니다.`;
+    return `은 주의가 필요한 궁합입니다. ${ilgan < 45 ? '일간이 서로를 자극해 자존심 싸움이 벌어지기 쉽고, ' : ''}${ilji < 45 ? '일지가 충돌해 가까이 지낼수록 갈등이 커질 수 있습니다. ' : ''}관계를 지속하려면 상대의 영역을 깊이 침범하지 않는 거리두기와, 말보다 행동으로 보여주는 배려가 필요합니다.`;
   } else {
-    return `<strong>${aN}</strong>과(와) <strong>${bN}</strong>은 명리적으로 난관이 많은 궁합입니다. 일간·일지·원국 전반에서 충돌 요소가 겹쳐, 서로를 자극하고 소진시키기 쉽습니다. 그러나 명리는 운명이 아니라 경향성이니, 관계를 유지하고자 한다면 서로를 바꾸려 하지 말고 있는 그대로 받아들이는 연습이 필수적입니다.`;
+    return '은 명리적으로 난관이 많은 궁합입니다. 일간·일지·원국 전반에서 충돌 요소가 겹쳐, 서로를 자극하고 소진시키기 쉽습니다. 그러나 명리는 운명이 아니라 경향성이니, 관계를 유지하고자 한다면 서로를 바꾸려 하지 말고 있는 그대로 받아들이는 연습이 필수적입니다.';
   }
+}
+
+function renderCompatibilityDescription(container, compat, a, b) {
+  container.replaceChildren();
+  const firstName = document.createElement('strong');
+  firstName.textContent = typeof a.name === 'string' && a.name ? a.name : '본인';
+  const secondName = document.createElement('strong');
+  secondName.textContent = typeof b.name === 'string' && b.name ? b.name : '상대';
+  container.append(
+    firstName,
+    document.createTextNode('과(와) '),
+    secondName,
+    document.createTextNode(compatNarrative(compat))
+  );
 }
 
 function genSubText(key, sub, a, b) {
@@ -15027,7 +15039,7 @@ function renderMatchResult() {
         <div class="mt-score">${compat.total}<span class="pt">점</span></div>
         <div class="mt-grade">${grade}</div>
         <div class="mt-names">${escapeHtml(matchSlotA.name)} &nbsp;✕&nbsp; ${escapeHtml(matchSlotB.name)}</div>
-        <div class="mt-text">${genCompatText(compat, matchSlotA, matchSlotB)}</div>
+        <div class="mt-text" id="matchCompatText"></div>
       </div>
 
       <div class="match-breakdown">
@@ -15041,6 +15053,7 @@ function renderMatchResult() {
       </div>
   `;
 
+  renderCompatibilityDescription($('#matchCompatText'), compat, matchSlotA, matchSlotB);
   $('#matchResetBtn2').addEventListener('click', () => {
     matchSlotA = null; matchSlotB = null;
     pendingMatchSlotMotion = null;

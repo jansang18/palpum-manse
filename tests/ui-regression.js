@@ -28,6 +28,7 @@ const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
 const runsSecondaryApple = () => !TEST_GROUP || TEST_GROUP === 'task-5' || TEST_GROUP === 'secondary-apple';
 const runsAppleMotion = () => !TEST_GROUP || TEST_GROUP === 'motion-contract';
 const runsCalendarCurrentYear = () => !TEST_GROUP || TEST_GROUP === 'calendar-current-year';
+const runsImportedFieldXss = () => !TEST_GROUP || TEST_GROUP === 'imported-fields-xss';
 
 function parseCssColor(value) {
   const match = String(value).match(/rgba?\(([^)]+)\)/i);
@@ -183,6 +184,27 @@ function inspectFinalSecuritySourceContracts() {
     renderSavedSource[0],
     /\.innerHTML\s*=|insertAdjacentHTML\(/,
     'saved records must be rendered with DOM APIs rather than HTML parsing sinks'
+  );
+  const compatibilityRendererSource = indexHtml.match(
+    /function renderCompatibilityDescription\([^)]*\)\s*\{[\s\S]*?\n\}/
+  );
+  assert.ok(compatibilityRendererSource, 'compatibility description DOM renderer is required');
+  assert.match(compatibilityRendererSource[0], /\.textContent\s*=/);
+  assert.match(compatibilityRendererSource[0], /document\.createTextNode\(/);
+  assert.doesNotMatch(
+    compatibilityRendererSource[0],
+    /\.innerHTML\s*=|insertAdjacentHTML\(/,
+    'imported names must never reach an HTML parsing sink in compatibility descriptions'
+  );
+  assert.doesNotMatch(
+    indexHtml,
+    /function genCompatText\(/,
+    'the legacy name-interpolating compatibility HTML generator must not return'
+  );
+  assert.doesNotMatch(
+    indexHtml,
+    /data-id="\$\{(?:rec|r)\.id(?:\s*\|\|\s*['"]{2})?\}"/,
+    'saved-record IDs must not be interpolated raw into downstream HTML attributes'
   );
   assert.match(indexHtml, /crypto\.randomUUID\(\)/, 'imported records must receive cryptographic UUIDs');
   assert.match(indexHtml, /function normalizeImportedRecord\(/, 'strict imported-record normalization is required');
@@ -429,6 +451,112 @@ async function inspectCalendarCurrentYear(page, width) {
   assert.equal(state.reopened.ariaCurrent, null);
   assert.equal(state.reopened.selectedClass, false);
   assert.equal(state.reopened.badge, null);
+}
+
+async function inspectImportedFieldDownstreamSafety(page, width) {
+  if (!runsImportedFieldXss() || width !== 390) return;
+  const state = await page.evaluate(async () => {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const listKeys = async () => {
+      const result = await window.storage.list('saju:');
+      return result && Array.isArray(result.keys) ? result.keys : [];
+    };
+    const attackerNodes = root => [
+      ...root.querySelectorAll('img[src="x"], [onerror], [onload], script[data-attacker]')
+    ].map(element => element.outerHTML);
+    const snapshot = (name, root) => ({
+      name,
+      executed: window.__x,
+      attackerNodes: attackerNodes(root),
+      text: root.textContent
+    });
+
+    for (const key of await listKeys()) await window.storage.delete(key);
+    localStorage.removeItem('saju_list');
+    window.__x = 0;
+    window.alert = () => {};
+    const maliciousName = '홍길동<img src=x onerror=__x=1>';
+    const maliciousMemo = '메모<svg onload=__x=2>';
+    const record = {
+      ...currentSaju,
+      id: 'attacker-controlled-id',
+      name: maliciousName,
+      memo: maliciousMemo,
+      fav: true
+    };
+
+    document.querySelector('.tab[data-tab="saved"]').click();
+    await renderSaved();
+    const input = document.getElementById('savedImportFile');
+    const file = new File(
+      [JSON.stringify({ app: '취명선 만세력', version: 1, records: [record] })],
+      'downstream-xss.json',
+      { type: 'application/json' }
+    );
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    const deadline = Date.now() + 2500;
+    let keys = [];
+    while (Date.now() < deadline) {
+      keys = await listKeys();
+      if (keys.length === 1) break;
+      await wait(25);
+    }
+    await renderSaved();
+    await wait(30);
+
+    const snapshots = [snapshot('saved', document.getElementById('savedContent'))];
+    document.querySelector('#savedContent .saved-card').click();
+    await wait(40);
+    snapshots.push(snapshot('result', document.getElementById('view-result')));
+
+    document.querySelector('.tab[data-tab="fortune"]').click();
+    renderFortune();
+    await wait(40);
+    snapshots.push(snapshot('fortune', document.getElementById('fortuneContent')));
+
+    window.shareCard(currentSaju);
+    await wait(60);
+    snapshots.push(snapshot('share', document.getElementById('shareCardModal')));
+    window.closeShareCardModal();
+    await wait(230);
+
+    await findSimilarSaju();
+    await wait(60);
+    snapshots.push(snapshot('similar', document.getElementById('similarModal')));
+    window.closeAppModal(document.getElementById('similarModal'));
+    await wait(230);
+
+    document.querySelector('.tab[data-tab="match"]').click();
+    await wait(30);
+    document.querySelector('.match-slot.a').click();
+    await wait(30);
+    document.querySelector('#matchPickerBody .pick-item').click();
+    await wait(240);
+    document.querySelector('.match-slot.b').click();
+    await wait(30);
+    document.querySelector('#matchPickerBody .pick-item').click();
+    await wait(240);
+    snapshots.push(snapshot('match', document.getElementById('matchContent')));
+
+    const finalNameText = document.querySelector('#matchContent .mt-text')?.textContent || '';
+    for (const key of await listKeys()) await window.storage.delete(key);
+    localStorage.removeItem('saju_list');
+    return {
+      maliciousName,
+      snapshots,
+      finalNameText,
+      finalExecuted: window.__x
+    };
+  });
+
+  for (const snapshot of state.snapshots) {
+    assert.equal(snapshot.executed, 0, `${width}px imported name executed in ${snapshot.name}`);
+    assert.deepEqual(snapshot.attackerNodes, [], `${width}px attacker node reached ${snapshot.name}`);
+  }
+  assert.equal(state.finalExecuted, 0, `${width}px imported name executed during compatibility calculation`);
+  assert.match(state.finalNameText, /홍길동/, 'legitimate Korean name characters must be preserved');
+  assert.match(state.finalNameText, /<img src=x onerror=/, 'malicious markup must remain inert visible text');
 }
 
 function inspectReleaseContract() {
@@ -2148,6 +2276,14 @@ async function inspectWidth(browser, width) {
   assert.equal(inputPolish.collapsedErrorBorder, 'rgba(0, 0, 0, 0)', `${width}px collapsed error line`);
 
   await fillAndCalculate(page);
+
+  if (runsImportedFieldXss()) {
+    await inspectImportedFieldDownstreamSafety(page, width);
+    if (TEST_GROUP === 'imported-fields-xss') {
+      await page.close();
+      return;
+    }
+  }
 
   if (runsGroup('final-security')) {
     await inspectFinalSecurityRuntime(page, width);

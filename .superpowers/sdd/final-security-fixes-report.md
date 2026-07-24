@@ -14,6 +14,8 @@ Date: 2026-07-24
 - Added first-open local-year calendar initialization, a visible `올해` selected state, and same-session navigation preservation.
 - Kept Earth as a distinct pastel semantic color while tests reject only the exact legacy gold values.
 - Mirrored runtime and versioned web files byte-identically.
+- Closed the remaining imported-name XSS in the compatibility narrative by rendering names with `textContent` and narrative copy with text nodes.
+- Audited imported fields across saved, result, fortune, share, similar-chart, match-picker, and match-result surfaces.
 
 ## TDD evidence
 
@@ -25,6 +27,11 @@ Date: 2026-07-24
 3. Full regression:
    - `node ui-regression.js`
    - Passed at 360, 390, 412, and 768px.
+4. Remaining imported-name path RED:
+   - `TEST_GROUP=imported-fields-xss node ui-regression.js`
+   - The pre-fix compatibility calculation failed with `executed === 1`.
+5. Remaining imported-name path GREEN:
+   - The same focused E2E passed after replacing name interpolation with DOM text rendering.
 
 The focused test imports a JSON file containing malicious ID, name, and memo payloads. It asserts:
 
@@ -35,6 +42,15 @@ The focused test imports a JSON file containing malicious ID, name, and memo pay
 - unknown fields removed;
 - name/memo limits enforced;
 - invalid enum rejected.
+
+An additional downstream E2E test imports `홍길동<img src=x onerror=__x=1>`, opens the saved result, fortune, share, and similar-chart surfaces, selects the imported record in both match slots, and lets compatibility calculate. It asserts:
+
+- the event counter remains `0` at every surface;
+- no attacker `img`, event-handler, or script node reaches any inspected DOM;
+- the legitimate Korean name remains visible;
+- malicious markup remains inert text in the final compatibility description.
+
+The source contract also rejects the former `genCompatText` implementation and requires the compatibility renderer to use `textContent`/`document.createTextNode` without an HTML parsing sink.
 
 It also asserts:
 

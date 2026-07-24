@@ -62,4 +62,3 @@ Additional checks:
 - `app/ui-regression.js` ↔ `app/web/tests/ui-regression.js`: SHA-256 identical
 - No previous product name, legacy gold hex values, radial cosmos gradient, or star renderer remains in `share.js`
 - `git diff --check`: pass
-

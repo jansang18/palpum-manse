@@ -1068,10 +1068,18 @@ body.dark .f-tips .f-tip {
 .bottom-bar {
   left: 50% !important;
   right: auto !important;
-  width: min(616px, calc(100vw - 12px)) !important;
+  width: min(616px, calc(100vw - 10px)) !important;
   max-width: none !important;
   box-sizing: border-box;
   transform: translateX(-50%);
+}
+
+/* Align the primary navigation rail with the chart below it. */
+.tabs {
+  width: min(616px, calc(100vw - 10px)) !important;
+  max-width: none !important;
+  margin-inline: auto !important;
+  box-sizing: border-box;
 }
 
 /* The full product name uses one system typeface and one optical rhythm. */
@@ -1118,6 +1126,12 @@ body.dark .f-tips .f-tip {
   line-height: 1 !important;
   transform: translateY(var(--apple-cjk-offset)) !important;
   transform-origin: center !important;
+}
+
+.pillar-block .han,
+.pillar-block.empty .han {
+  font-size: clamp(46px, 13.333vw, 54px) !important;
+  transform: translateY(-3px) !important;
 }
 
 .pillar-col {

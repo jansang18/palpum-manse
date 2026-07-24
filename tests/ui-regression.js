@@ -23,7 +23,7 @@ const UI_ROOT = process.env.UI_ROOT
 const URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
 const TEST_GROUP = process.env.TEST_GROUP || '';
 const widths = TEST_GROUP === 'result-width-brand'
-  ? [1220]
+  ? [390, 1220]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
@@ -37,6 +37,7 @@ async function inspectResultWidthAndBrand(page, width) {
   const state = await page.evaluate(() => {
     const bottomBar = document.getElementById('bottomBar').getBoundingClientRect();
     const card = document.querySelector('.oguk-card').getBoundingClientRect();
+    const tabs = document.querySelector('.tabs').getBoundingClientRect();
     const brand = getComputedStyle(document.querySelector('.top-bar .brand-main'));
     const suffix = getComputedStyle(document.querySelector('.top-bar .title-sub'));
     const typography = style => ({
@@ -50,15 +51,19 @@ async function inspectResultWidthAndBrand(page, width) {
       const range = document.createRange();
       range.selectNodeContents(block.querySelector('.han'));
       const glyph = range.getBoundingClientRect();
+      const matrix = new DOMMatrixReadOnly(getComputedStyle(block.querySelector('.han')).transform);
       return {
         width: rect.width,
         height: rect.height,
+        fontSize: parseFloat(getComputedStyle(block.querySelector('.han')).fontSize),
+        transformY: matrix.m42,
         glyphCenterY: Math.abs((glyph.top + glyph.bottom) / 2 - (rect.top + rect.bottom) / 2)
       };
     });
     return {
       bottomBar: { left: bottomBar.left, right: bottomBar.right, width: bottomBar.width },
       card: { left: card.left, right: card.right, width: card.width },
+      tabs: { left: tabs.left, right: tabs.right, width: tabs.width },
       viewportWidth: document.documentElement.clientWidth,
       brand: typography(brand),
       suffix: typography(suffix),
@@ -78,12 +83,22 @@ async function inspectResultWidthAndBrand(page, width) {
     state.bottomBar.left >= 0 && state.bottomBar.right <= state.viewportWidth + 1,
     `${width}px bottom bar overflows viewport`
   );
+  assert.ok(
+    Math.abs(state.tabs.width - state.card.width) <= 1,
+    `${width}px tabs width ${state.tabs.width}px must match natal card ${state.card.width}px`
+  );
+  assert.ok(
+    Math.abs(state.tabs.left - state.card.left) <= 1,
+    `${width}px tabs and natal card must share the same left edge`
+  );
   assert.deepEqual(state.brand, state.suffix, `${width}px 취명선 and 만세력 typography must match`);
   assert.equal(state.pillars.length, 8, `${width}px natal Hanja block count`);
   for (const pillar of state.pillars) {
     assert.ok(pillar.width >= 83 && pillar.width <= 85, `${width}px natal block must be about 84px, got ${pillar.width}px`);
     assert.ok(Math.abs(pillar.width - pillar.height) <= 1, `${width}px natal block must stay square`);
-    assert.ok(pillar.glyphCenterY <= 2, `${width}px natal glyph vertical center delta ${pillar.glyphCenterY}px`);
+    assert.ok(pillar.fontSize >= 51 && pillar.fontSize <= 55, `${width}px natal Hanja must be about 52px, got ${pillar.fontSize}px`);
+    assert.ok(pillar.transformY <= -2.8 && pillar.transformY >= -3.2, `${width}px natal Hanja optical offset must be about -3px, got ${pillar.transformY}px`);
+    assert.ok(pillar.glyphCenterY <= 4, `${width}px natal glyph line-box center delta ${pillar.glyphCenterY}px`);
   }
 }
 
@@ -1159,8 +1174,11 @@ async function inspectAppleDesign(page, width) {
         );
         assert.ok(!block.inlineHack, `${width}px ${theme} ${group} uses an inline alignment correction`);
         if (block.center) {
+          const verticallyAligned = group === 'pillars'
+            ? block.center.signedY >= -4 && block.center.signedY <= -2.5
+            : block.center.y <= 2;
           assert.ok(
-            block.center.x <= 2 && block.center.y <= 2,
+            block.center.x <= 2 && verticallyAligned,
             `${width}px ${theme} ${group} Hanja is off-center: ${block.center.x}x${block.center.y} (signedY ${block.center.signedY})`
           );
         }

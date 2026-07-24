@@ -263,18 +263,37 @@ async function fillAndCalculate(page) {
 
 async function inspectAppleDesign(page, width) {
   const expectedAccents = { light: '#007aff', dark: '#0a84ff' };
-  const legacyGold = new Set(['rgb(216, 181, 106)', 'rgb(240, 214, 154)', 'rgb(169, 119, 50)']);
+  const expectedAccentColors = { light: 'rgb(0, 122, 255)', dark: 'rgb(10, 132, 255)' };
+  const legacyGold = /#(?:d8b56a|f0d69a|a97732)\b|rgba?\(\s*(?:216\s*,\s*181\s*,\s*106|240\s*,\s*214\s*,\s*154|169\s*,\s*119\s*,\s*50)\b/i;
+  const includesColor = (style, color) => Object.values(style).some(value => String(value).includes(color));
 
   for (const [theme, accent] of Object.entries(expectedAccents)) {
     const inspection = await page.evaluate(isDark => {
       document.body.classList.toggle('dark', isDark);
-      const colorProperties = ['backgroundColor', 'borderTopColor', 'color', 'outlineColor'];
+      const visualProperties = [
+        'background', 'backgroundColor', 'backgroundImage',
+        'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
+        'color', 'outlineColor', 'boxShadow', 'textShadow'
+      ];
+      const styleSnapshot = (element, pseudo = null) => {
+        const computed = getComputedStyle(element, pseudo);
+        return {
+          values: Object.fromEntries(visualProperties.map(property => [property, computed[property]])),
+          rendered: !pseudo || (
+            computed.content !== 'none' &&
+            computed.display !== 'none' &&
+            computed.visibility !== 'hidden' &&
+            Number(computed.opacity) > 0
+          )
+        };
+      };
       const styles = selector => [...document.querySelectorAll(selector)]
         .filter(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
-        .map(element => {
-          const computed = getComputedStyle(element);
-          return Object.fromEntries(colorProperties.map(property => [property, computed[property]]));
-        });
+        .map(element => ({
+          base: styleSnapshot(element),
+          before: styleSnapshot(element, '::before'),
+          after: styleSnapshot(element, '::after')
+        }));
       const geometry = selector => [...document.querySelectorAll(selector)]
         .filter(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
         .map(element => {
@@ -294,6 +313,7 @@ async function inspectAppleDesign(page, width) {
         });
       return {
         accent: getComputedStyle(document.body).getPropertyValue('--apple-accent').trim(),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         styles: {
           topBar: styles('.top-bar'),
           activeTab: styles('.tab.active'),
@@ -313,14 +333,23 @@ async function inspectAppleDesign(page, width) {
     }, theme === 'dark');
 
     assert.equal(inspection.accent, accent, `${width}px ${theme} --apple-accent`);
+    assert.ok(inspection.overflow <= 1, `${width}px ${theme} horizontal overflow: ${inspection.overflow}px`);
     for (const [surface, elements] of Object.entries(inspection.styles)) {
       assert.ok(elements.length > 0, `${width}px ${theme} ${surface} missing`);
-      for (const colors of elements) {
-        for (const [property, value] of Object.entries(colors)) {
-          assert.ok(!legacyGold.has(value), `${width}px ${theme} ${surface} ${property} retains legacy gold: ${value}`);
+      for (const element of elements) {
+        for (const [part, snapshot] of Object.entries(element)) {
+          for (const [property, value] of Object.entries(snapshot.values)) {
+            assert.ok(!legacyGold.test(value), `${width}px ${theme} ${surface} ${part} ${property} retains legacy gold: ${value}`);
+          }
         }
       }
     }
+
+    const activeTab = inspection.styles.activeTab[0];
+    const expectedColor = expectedAccentColors[theme];
+    assert.ok(includesColor(activeTab.base.values, expectedColor), `${width}px ${theme} active tab does not render ${expectedColor}`);
+    assert.equal(activeTab.after.rendered, true, `${width}px ${theme} active tab ::after selection is not rendered`);
+    assert.ok(includesColor(activeTab.after.values, expectedColor), `${width}px ${theme} active tab ::after does not render ${expectedColor}`);
 
     for (const [group, blocks] of Object.entries({
       pillarBlocks: inspection.geometry.pillarBlocks,

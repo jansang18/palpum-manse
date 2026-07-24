@@ -44,7 +44,9 @@ async function inspectShellWidth(page, width) {
     };
     return {
       viewport: document.documentElement.clientWidth,
+      header: box('.top-bar'),
       tabs: box('.tabs'),
+      introMarginTop: parseFloat(getComputedStyle(document.querySelector('.input-intro')).marginTop),
       inputView: box('#view-input'),
       search: box('.person-search-btn'),
       card: box('.input-card'),
@@ -55,7 +57,7 @@ async function inspectShellWidth(page, width) {
 
   const reference = geometry.tabs;
   for (const [name, rect] of Object.entries(geometry)) {
-    if (name === 'viewport' || name === 'tabs') continue;
+    if (name === 'viewport' || name === 'tabs' || name === 'introMarginTop') continue;
     assert.ok(
       Math.abs(rect.width - reference.width) <= 1,
       `${width}px ${name} width ${rect.width}px must match tabs ${reference.width}px`
@@ -65,6 +67,10 @@ async function inspectShellWidth(page, width) {
       `${width}px ${name} left ${rect.left}px must match tabs ${reference.left}px`
     );
   }
+  assert.ok(
+    geometry.introMarginTop >= -38.5 && geometry.introMarginTop <= -37.5,
+    `${width}px intro must move up by about 1cm/38px, got ${geometry.introMarginTop}px`
+  );
   assert.ok(reference.left >= 0 && reference.right <= geometry.viewport + 1, `${width}px shared shell overflows viewport`);
 }
 

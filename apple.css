@@ -1086,6 +1086,14 @@ body.dark .f-tips .f-tip {
   box-sizing: border-box;
 }
 
+/* Match the title/theme header rectangle to the navigation rectangle below. */
+.top-bar {
+  width: var(--apple-content-measure) !important;
+  max-width: none !important;
+  margin-inline: auto !important;
+  box-sizing: border-box;
+}
+
 /* Remove the legacy nested horizontal padding that made input sections stagger. */
 #view-input {
   width: var(--apple-content-measure) !important;
@@ -1093,6 +1101,11 @@ body.dark .f-tips .f-tip {
   margin-inline: auto !important;
   padding-inline: 0 !important;
   box-sizing: border-box;
+}
+
+/* Lift the logo and its supporting copy by roughly one screen centimetre. */
+#view-input .input-intro {
+  margin-top: -38px !important;
 }
 
 /* The full product name uses one system typeface and one optical rhythm. */

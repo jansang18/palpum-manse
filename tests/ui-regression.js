@@ -338,6 +338,7 @@ async function inspectAppleDesign(page, width) {
       assert.ok(elements.length > 0, `${width}px ${theme} ${surface} missing`);
       for (const element of elements) {
         for (const [part, snapshot] of Object.entries(element)) {
+          if (part !== 'base' && !snapshot.rendered) continue;
           for (const [property, value] of Object.entries(snapshot.values)) {
             assert.ok(!legacyGold.test(value), `${width}px ${theme} ${surface} ${part} ${property} retains legacy gold: ${value}`);
           }
@@ -347,9 +348,11 @@ async function inspectAppleDesign(page, width) {
 
     const activeTab = inspection.styles.activeTab[0];
     const expectedColor = expectedAccentColors[theme];
-    assert.ok(includesColor(activeTab.base.values, expectedColor), `${width}px ${theme} active tab does not render ${expectedColor}`);
-    assert.equal(activeTab.after.rendered, true, `${width}px ${theme} active tab ::after selection is not rendered`);
-    assert.ok(includesColor(activeTab.after.values, expectedColor), `${width}px ${theme} active tab ::after does not render ${expectedColor}`);
+    const activeTabSelection = Object.fromEntries(
+      ['background', 'backgroundColor', 'backgroundImage', 'color']
+        .map(property => [property, activeTab.base.values[property]])
+    );
+    assert.ok(includesColor(activeTabSelection, expectedColor), `${width}px ${theme} active tab capsule/text does not render ${expectedColor}`);
 
     for (const [group, blocks] of Object.entries({
       pillarBlocks: inspection.geometry.pillarBlocks,

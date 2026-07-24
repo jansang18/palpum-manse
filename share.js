@@ -20,6 +20,40 @@
     line: 'rgba(60,60,67,0.16)'
   };
   var shareCardOpener = null;
+  var shareMotion = { generation: 0, backdrop: null, sheet: null };
+
+  function shareReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  function sharePresentation(element, opacity, transform) {
+    if (!element) return { opacity: opacity, transform: transform };
+    var style = getComputedStyle(element);
+    var value = Number(style.opacity);
+    return {
+      opacity: Number.isFinite(value) ? value : opacity,
+      transform: style.transform === 'none' ? transform : style.transform
+    };
+  }
+
+  function stopShareAnimation(key) {
+    var animation = shareMotion[key];
+    if (!animation) return;
+    animation.cancel();
+    shareMotion[key] = null;
+  }
+
+  function runShareAnimation(element, key, frames, options) {
+    if (!element || typeof element.animate !== 'function') return null;
+    stopShareAnimation(key);
+    var animation = element.animate(frames, options);
+    shareMotion[key] = animation;
+    return animation;
+  }
+
+  function shareSettled(animation) {
+    return Promise.resolve(animation ? animation.finished : null).catch(function () {});
+  }
 
   function rr(ctx, x, y, w, h, r) {
     ctx.beginPath();
@@ -138,15 +172,35 @@
   function closeShareCardModal() {
     var modal = document.getElementById('shareCardModal');
     if (!modal) return false;
-    modal.remove();
-    if (typeof window.refreshAppOverlayAccessibility === 'function') window.refreshAppOverlayAccessibility();
-    if (document.querySelector('.modal-bg.active')) {
-      if (typeof window.focusTopAppOverlay === 'function') window.focusTopAppOverlay();
-    } else if (shareCardOpener && shareCardOpener.isConnected && typeof shareCardOpener.focus === 'function') {
-      try { shareCardOpener.focus({ preventScroll: true }); }
-      catch (e) { shareCardOpener.focus(); }
-    }
-    shareCardOpener = null;
+    var sheet = modal.querySelector('.share-card-sheet');
+    var reduce = shareReducedMotion();
+    var centered = window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
+    var backdropStart = sharePresentation(modal, 1, 'none');
+    var sheetStart = sharePresentation(sheet, 1, 'translateY(0)');
+    var operation = ++shareMotion.generation;
+    modal.classList.add('is-closing');
+    var backdropAnimation = runShareAnimation(modal, 'backdrop', [
+      { opacity: backdropStart.opacity },
+      { opacity: 0 }
+    ], { duration: reduce ? 100 : 180, easing: 'cubic-bezier(.23,1,.32,1)', fill: 'both' });
+    var sheetAnimation = runShareAnimation(sheet, 'sheet', [
+      { opacity: sheetStart.opacity, transform: reduce ? 'translateY(0)' : sheetStart.transform },
+      { opacity: reduce ? 0 : .9, transform: reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)' }
+    ], { duration: reduce ? 120 : 220, easing: 'cubic-bezier(.23,1,.32,1)', fill: 'both' });
+    Promise.all([shareSettled(backdropAnimation), shareSettled(sheetAnimation)]).then(function () {
+      if (shareMotion.generation !== operation || !modal.classList.contains('is-closing')) return;
+      stopShareAnimation('backdrop');
+      stopShareAnimation('sheet');
+      modal.remove();
+      if (typeof window.refreshAppOverlayAccessibility === 'function') window.refreshAppOverlayAccessibility();
+      if (document.querySelector('.modal-bg.active')) {
+        if (typeof window.focusTopAppOverlay === 'function') window.focusTopAppOverlay();
+      } else if (shareCardOpener && shareCardOpener.isConnected && typeof shareCardOpener.focus === 'function') {
+        try { shareCardOpener.focus({ preventScroll: true }); }
+        catch (e) { shareCardOpener.focus(); }
+      }
+      shareCardOpener = null;
+    });
     return true;
   }
 
@@ -156,27 +210,48 @@
   function showModal(cv, s) {
     var old = document.getElementById('shareCardModal');
     var opener = old ? shareCardOpener : document.activeElement;
-    if (old) old.remove();
     shareCardOpener = opener;
     var url = cv.toDataURL('image/png');
-    var m = document.createElement('div');
-    m.id = 'shareCardModal';
-    m.setAttribute('role', 'dialog');
-    m.setAttribute('aria-modal', 'true');
-    m.setAttribute('aria-labelledby', 'shareCardTitle');
-    m.setAttribute('tabindex', '-1');
-    m.className = 'share-card-overlay';
-    m.innerHTML =
-      '<div class="share-card-sheet">' +
-      '<div id="shareCardTitle" class="share-card-title">공유 카드 미리보기</div>' +
-      '<img class="share-card-preview" src="' + url + '" alt="사주 카드">' +
-      '<div class="share-card-help">이미지를 길게 눌러 저장하거나 아래 버튼으로 공유하세요</div>' +
-      '<div class="share-card-actions">' +
-      '<button id="shareCardDo">공유 / 저장</button>' +
-      '<button id="shareCardClose">닫기</button>' +
-      '</div>' +
-      '</div>';
-    document.body.appendChild(m);
+    var m = old;
+    if (!m) {
+      m = document.createElement('div');
+      m.id = 'shareCardModal';
+      m.setAttribute('role', 'dialog');
+      m.setAttribute('aria-modal', 'true');
+      m.setAttribute('aria-labelledby', 'shareCardTitle');
+      m.setAttribute('tabindex', '-1');
+      m.className = 'share-card-overlay';
+      m.innerHTML =
+        '<div class="share-card-sheet">' +
+        '<div id="shareCardTitle" class="share-card-title">공유 카드 미리보기</div>' +
+        '<img class="share-card-preview" src="' + url + '" alt="사주 카드">' +
+        '<div class="share-card-help">이미지를 길게 눌러 저장하거나 아래 버튼으로 공유하세요</div>' +
+        '<div class="share-card-actions">' +
+        '<button id="shareCardDo">공유 / 저장</button>' +
+        '<button id="shareCardClose">닫기</button>' +
+        '</div>' +
+        '</div>';
+      document.body.appendChild(m);
+    } else {
+      m.querySelector('.share-card-preview').src = url;
+    }
+    var sheet = m.querySelector('.share-card-sheet');
+    var reduce = shareReducedMotion();
+    var centered = window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
+    var backdropStart = old ? sharePresentation(m, 0, 'none') : { opacity: 0, transform: 'none' };
+    var sheetStart = old
+      ? sharePresentation(sheet, 0, reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)')
+      : { opacity: 0, transform: reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)' };
+    ++shareMotion.generation;
+    m.classList.remove('is-closing');
+    runShareAnimation(m, 'backdrop', [
+      { opacity: backdropStart.opacity },
+      { opacity: 1 }
+    ], { duration: reduce ? 100 : 180, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+    runShareAnimation(sheet, 'sheet', [
+      { opacity: sheetStart.opacity, transform: reduce ? 'translateY(0)' : sheetStart.transform },
+      { opacity: 1, transform: 'translateY(0)' }
+    ], { duration: reduce ? 120 : 240, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
     if (typeof window.refreshAppOverlayAccessibility === 'function') window.refreshAppOverlayAccessibility();
     if (typeof window.focusTopAppOverlay === 'function') requestAnimationFrame(window.focusTopAppOverlay);
     document.getElementById('shareCardClose').onclick = closeShareCardModal;

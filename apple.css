@@ -120,9 +120,14 @@ body.dark .top-bar .title .logo-img {
   color: var(--apple-label);
 }
 
-.icon-btn:hover,
 .icon-btn:active {
   background: color-mix(in srgb, var(--apple-label) 8%, transparent) !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .icon-btn:hover {
+    background: color-mix(in srgb, var(--apple-label) 8%, transparent) !important;
+  }
 }
 
 .icon-btn svg { stroke: currentColor !important; }
@@ -321,8 +326,9 @@ body.dark {
   -webkit-tap-highlight-color: transparent;
   transition:
     transform 100ms ease-out,
-    filter 100ms ease-out,
     background-color 180ms ease,
+    border-color 180ms ease,
+    opacity 180ms ease,
     color 180ms ease;
 }
 
@@ -335,7 +341,7 @@ body.dark {
 .person-search-btn:active,
 .match-go-btn:active {
   transform: scale(.98) !important;
-  filter: brightness(var(--apple-pressed));
+  opacity: .84;
 }
 
 .input-card,
@@ -887,6 +893,42 @@ body.dark .f-tips .f-tip {
   .modal::before,
   .share-card-sheet::before {
     content: none;
+  }
+}
+
+/* Motion contract: explicit properties only; never animate layout or filters. */
+*,
+*::before,
+*::after {
+  transition-property: transform, background-color, border-color, opacity, color !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .similar-card:hover,
+  .day-item:hover {
+    transform: translateY(-1px);
+  }
+
+  .pillar-col.clickable:hover .pillar-block,
+  .luck-item:hover,
+  .cal-day.clickable:hover,
+  .cal-nav:hover,
+  .siju-item:hover,
+  .saved-card:hover,
+  .bb:hover,
+  .match-picker-modal .pick-item:hover,
+  .ps-item:hover {
+    border-color: var(--apple-separator-strong) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }
 

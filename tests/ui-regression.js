@@ -26,6 +26,7 @@ const widths = TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
 const runsSecondaryApple = () => !TEST_GROUP || TEST_GROUP === 'task-5' || TEST_GROUP === 'secondary-apple';
+const runsAppleMotion = () => !TEST_GROUP || TEST_GROUP === 'motion-contract';
 
 function parseCssColor(value) {
   const match = String(value).match(/rgba?\(([^)]+)\)/i);
@@ -1049,6 +1050,207 @@ async function inspectAppleSecondaryScreens(page, width) {
   }
 }
 
+async function inspectAppleMotion(page, width) {
+  if (!runsAppleMotion()) return;
+  const exitEase = 'cubic-bezier(0.23, 1, 0.32, 1)';
+  const motion = await page.evaluate(async () => {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const presentation = element => {
+      const style = getComputedStyle(element);
+      const matrix = style.transform === 'none' ? new DOMMatrixReadOnly() : new DOMMatrixReadOnly(style.transform);
+      return { opacity: Number(style.opacity), x: matrix.m41, y: matrix.m42 };
+    };
+    const firstFrame = animation => {
+      const frame = animation?.effect?.getKeyframes()?.[0] || {};
+      let x = 0;
+      let y = 0;
+      try {
+        const matrix = !frame.transform || frame.transform === 'none'
+          ? new DOMMatrixReadOnly()
+          : new DOMMatrixReadOnly(frame.transform);
+        x = matrix.m41;
+        y = matrix.m42;
+      } catch {
+        const values = String(frame.transform || '').match(/translate\([^,]+,\s*(-?[\d.]+)px\)/);
+        y = values ? Number(values[1]) : 0;
+      }
+      return { opacity: Number(frame.opacity), x, y };
+    };
+
+    window.showAppToast('first');
+    await wait(60);
+    const toast = document.getElementById('appToast');
+    const toastBefore = presentation(toast);
+    window.showAppToast('second');
+    const toastEntry = toast.getAnimations().find(animation =>
+      !(animation instanceof CSSTransition) &&
+      animation.effect?.getTiming().easing === 'cubic-bezier(0.2, 0.7, 0.2, 1)'
+    );
+    const toastRestart = {
+      before: toastBefore,
+      first: firstFrame(toastEntry)
+    };
+    await wait(1820);
+    const toastExitAnimation = toast.getAnimations().find(animation =>
+      !(animation instanceof CSSTransition) &&
+      animation.playState !== 'finished'
+    );
+    const toastExit = toastExitAnimation ? {
+      easing: toastExitAnimation.effect.getTiming().easing,
+      frames: toastExitAnimation.effect.getKeyframes()
+    } : null;
+    await wait(180);
+
+    const modal = document.getElementById('aboutModal');
+    window.openAppModal(modal);
+    await wait(260);
+    window.closeAppModal(modal);
+    const modalPanel = modal.querySelector('.modal');
+    const modalExit = {
+      backdrop: modal.getAnimations()[0]?.effect?.getTiming().easing,
+      sheet: modalPanel.getAnimations()[0]?.effect?.getTiming().easing
+    };
+    await wait(40);
+    window.openAppModal(modal);
+    await wait(260);
+    window.closeAppModal(modal);
+    await wait(260);
+
+    window.shareCard(currentSaju);
+    await wait(60);
+    const share = document.getElementById('shareCardModal');
+    const shareSheet = share.querySelector('.share-card-sheet');
+    const shareOpenAnimations = {
+      backdrop: share.getAnimations()[0]?.effect?.getTiming(),
+      sheet: shareSheet.getAnimations()[0]?.effect?.getTiming()
+    };
+    window.closeShareCardModal();
+    const existsDuringClose = !!document.getElementById('shareCardModal');
+    const closingShare = document.getElementById('shareCardModal');
+    const shareExit = closingShare ? {
+      backdrop: closingShare.getAnimations()[0]?.effect?.getTiming().easing,
+      sheet: closingShare.querySelector('.share-card-sheet').getAnimations()[0]?.effect?.getTiming().easing
+    } : null;
+    await wait(60);
+    const closePresentation = closingShare ? {
+      backdrop: presentation(closingShare),
+      sheet: presentation(closingShare.querySelector('.share-card-sheet'))
+    } : null;
+    window.shareCard(currentSaju);
+    const reopened = document.getElementById('shareCardModal');
+    const reopenFirst = {
+      backdrop: firstFrame(reopened?.getAnimations()[0]),
+      sheet: firstFrame(reopened?.querySelector('.share-card-sheet')?.getAnimations()[0])
+    };
+    await wait(280);
+    window.closeShareCardModal();
+    await wait(280);
+    const removedAfterClose = !document.getElementById('shareCardModal');
+
+    const visibleTransitionAll = [...document.querySelectorAll('body *')]
+      .filter(element => element.getClientRects().length)
+      .filter(element => getComputedStyle(element).transitionProperty.split(',').map(value => value.trim()).includes('all'))
+      .map(element => element.id || element.className || element.tagName);
+
+    const hoverViolations = [];
+    const inspectRules = (rules, finePointer) => {
+      for (const rule of [...(rules || [])]) {
+        if (rule instanceof CSSMediaRule) {
+          const condition = rule.conditionText.replace(/\s+/g, '').toLowerCase();
+          inspectRules(rule.cssRules, finePointer || (
+            condition.includes('(hover:hover)') &&
+            condition.includes('(pointer:fine)')
+          ));
+        } else if (rule instanceof CSSStyleRule && rule.selectorText?.includes(':hover') && !finePointer) {
+          hoverViolations.push(rule.selectorText);
+        } else if (rule.cssRules) {
+          inspectRules(rule.cssRules, finePointer);
+        }
+      }
+    };
+    for (const sheet of [...document.styleSheets]) {
+      try { inspectRules(sheet.cssRules, false); }
+      catch (error) {
+        if (error.name !== 'SecurityError') throw error;
+      }
+    }
+
+    document.querySelector('.tab[data-tab="input"]').click();
+    const pressTarget = document.getElementById('calcBtn');
+    const beforePress = getComputedStyle(pressTarget);
+    pressTarget.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+    const duringPress = getComputedStyle(pressTarget);
+    const press = {
+      beforeFilter: beforePress.filter,
+      duringFilter: duringPress.filter,
+      transitionProperty: duringPress.transitionProperty
+    };
+    pressTarget.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+
+    return {
+      toastRestart,
+      toastExit,
+      modalExit,
+      shareOpenAnimations,
+      existsDuringClose,
+      shareExit,
+      closePresentation,
+      reopenFirst,
+      removedAfterClose,
+      visibleTransitionAll,
+      hoverViolations,
+      press
+    };
+  });
+
+  assert.ok(Math.abs(motion.toastRestart.first.opacity - motion.toastRestart.before.opacity) <= 0.08, `${width}px toast re-entry opacity restarted: ${JSON.stringify(motion.toastRestart)}`);
+  assert.ok(Math.abs(motion.toastRestart.first.y - motion.toastRestart.before.y) <= 2, `${width}px toast re-entry position restarted`);
+  assert.equal(motion.toastExit.easing, exitEase, `${width}px toast exit easing`);
+  assert.equal(motion.modalExit.backdrop, exitEase, `${width}px modal backdrop exit easing`);
+  assert.equal(motion.modalExit.sheet, exitEase, `${width}px modal sheet exit easing`);
+  assert.ok(motion.shareOpenAnimations.backdrop && motion.shareOpenAnimations.sheet, `${width}px share enter animations missing`);
+  assert.equal(motion.existsDuringClose, true, `${width}px share overlay was removed before its exit animation`);
+  assert.deepEqual(motion.shareExit, { backdrop: exitEase, sheet: exitEase }, `${width}px share exit easing`);
+  assert.ok(Math.abs(motion.reopenFirst.backdrop.opacity - motion.closePresentation.backdrop.opacity) <= 0.08, `${width}px share backdrop reopen jumped`);
+  assert.ok(Math.abs(motion.reopenFirst.sheet.y - motion.closePresentation.sheet.y) <= 12, `${width}px share sheet reopen jumped`);
+  assert.equal(motion.removedAfterClose, true, `${width}px share overlay remained after exit animation`);
+  assert.deepEqual(motion.visibleTransitionAll, [], `${width}px visible elements retain transition: all`);
+  assert.deepEqual(motion.hoverViolations, [], `${width}px hover rules must be fine-pointer gated`);
+  assert.equal(motion.press.duringFilter, 'none', `${width}px active feedback must not animate filter`);
+  assert.ok(!motion.press.transitionProperty.split(',').map(value => value.trim()).includes('filter'), `${width}px press transition includes filter`);
+
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  const reduced = await page.evaluate(async () => {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    window.showAppToast('reduced');
+    const toastFrames = document.getElementById('appToast').getAnimations()
+      .find(animation => !(animation instanceof CSSTransition))?.effect?.getKeyframes() || [];
+    const modal = document.getElementById('aboutModal');
+    window.openAppModal(modal);
+    const modalFrames = modal.querySelector('.modal').getAnimations()
+      .find(animation => !(animation instanceof CSSTransition))?.effect?.getKeyframes() || [];
+    await wait(130);
+    window.closeAppModal(modal);
+    await wait(140);
+    window.shareCard(currentSaju);
+    const shareFrames = document.querySelector('.share-card-sheet').getAnimations()
+      .find(animation => !(animation instanceof CSSTransition))?.effect?.getKeyframes() || [];
+    window.closeShareCardModal();
+    await wait(140);
+    const transforms = frames => frames.map(frame => frame.transform || 'none');
+    return {
+      toast: transforms(toastFrames),
+      modal: transforms(modalFrames),
+      share: transforms(shareFrames)
+    };
+  });
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  for (const [name, transforms] of Object.entries(reduced)) {
+    assert.ok(transforms.length >= 2, `${width}px reduced-motion ${name} frames missing`);
+    assert.equal(new Set(transforms).size, 1, `${width}px reduced-motion ${name} must fade without displacement: ${JSON.stringify(transforms)}`);
+  }
+}
+
 async function inspectWidth(browser, width) {
   console.log(`[ui] ${width}px: opening page`);
   const page = await browser.newPage();
@@ -1684,9 +1886,10 @@ async function inspectWidth(browser, width) {
   assert.ok(metrics.overflow <= 1, `${width}px horizontal overflow: ${metrics.overflow}px`);
   assert.equal(metrics.pillars.length, 8, `${width}px pillar count`);
 
-  if (runsGroup('apple-design') || runsSecondaryApple()) {
+  if (runsGroup('apple-design') || runsSecondaryApple() || runsAppleMotion()) {
     await inspectAppleDesign(page, width);
     await inspectAppleSecondaryScreens(page, width);
+    await inspectAppleMotion(page, width);
     await page.close();
     return;
   }

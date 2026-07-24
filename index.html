@@ -229,7 +229,9 @@
     border-radius: 10px;
     display: grid; place-items: center; cursor: pointer;
   }
-  .icon-btn:hover { background: var(--bg-soft); }
+  @media (hover: hover) and (pointer: fine) {
+    .icon-btn:hover { background: var(--bg-soft); }
+  }
   .icon-btn svg { width: 20px; height: 20px; stroke: var(--text); fill: none; }
 
   .tabs {
@@ -305,7 +307,7 @@
     font-family: inherit; font-size: 16px; font-weight: 600;
     color: var(--text); border-radius: 12px;
     -webkit-appearance: none; appearance: none;
-    transition: all 0.15s;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s, transform 0.15s;
   }
   .input::placeholder { font-weight: 500; color: var(--text-light); }
   .input:focus, .select:focus { outline: none; border-color: var(--text); background: var(--bg); }
@@ -320,7 +322,7 @@
     border: 1.5px solid var(--line);
     font-family: inherit; font-size: 14px; font-weight: 700;
     color: var(--text-sub); cursor: pointer;
-    border-radius: 12px; transition: all 0.15s;
+    border-radius: 12px; transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s, transform 0.15s;
     -webkit-appearance: none; appearance: none;
     -webkit-user-select: none; user-select: none;
     touch-action: manipulation;
@@ -385,7 +387,10 @@
     border: 1.5px solid transparent;
     transition: border-color 0.15s;
   }
-  .ps-item:active, .ps-item:hover { border-color: var(--line); }
+  .ps-item:active { border-color: var(--line); }
+  @media (hover: hover) and (pointer: fine) {
+    .ps-item:hover { border-color: var(--line); }
+  }
   .ps-item .ps-thumb {
     width: 48px; height: 48px;
     border-radius: 8px;
@@ -956,9 +961,11 @@
   .similar-card {
     background: var(--bg-soft); border-radius: 12px;
     padding: 12px 14px; cursor: pointer;
-    border: 1.5px solid transparent; transition: all 0.15s;
+    border: 1.5px solid transparent; transition: background-color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.15s;
   }
-  .similar-card:hover { border-color: var(--line); transform: translateY(-1px); }
+  @media (hover: hover) and (pointer: fine) {
+    .similar-card:hover { border-color: var(--line); transform: translateY(-1px); }
+  }
   .similar-card .sc-head {
     display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 6px;
@@ -1001,7 +1008,9 @@
     padding: 14px; cursor: pointer;
     border: 1.5px solid transparent;
   }
-  .saved-card:hover { border-color: var(--line); }
+  @media (hover: hover) and (pointer: fine) {
+    .saved-card:hover { border-color: var(--line); }
+  }
   .saved-card .row1 {
     display: flex; justify-content: space-between; align-items: center;
     margin-bottom: 6px;
@@ -1102,7 +1111,9 @@
     line-height: 1.1;
   }
   .cal-day.clickable { cursor: pointer; transition: background 0.1s; }
-  .cal-day.clickable:hover { background: var(--line-soft); }
+  @media (hover: hover) and (pointer: fine) {
+    .cal-day.clickable:hover { background: var(--line-soft); }
+  }
   .cal-day.selected { background: #fff4f1; border: 2px solid var(--fire-deep); }
 
   /* 만세력 - 선택한 날짜의 시주 */
@@ -1164,7 +1175,7 @@
     border-radius: 12px;
     background: white;
     border: 1.5px solid transparent;
-    transition: all 0.15s;
+    transition: background-color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.15s;
   }
   .siju-item.selected {
     border-color: var(--fire-deep);
@@ -1228,7 +1239,9 @@
       font-size: 14px;
       transition: color 0.15s;
     }
-    .tab:hover { color: var(--text); }
+    @media (hover: hover) and (pointer: fine) {
+      .tab:hover { color: var(--text); }
+    }
     .tab.active::after { height: 3px; }
 
     /* 뷰 패딩 확장 */
@@ -1250,12 +1263,14 @@
     .primary-btn {
       padding: 18px;
       font-size: 16px;
-      transition: all 0.15s;
+      transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s, transform 0.15s;
       box-shadow: 0 4px 12px rgba(232, 66, 30, 0.25);
     }
-    .primary-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 16px rgba(232, 66, 30, 0.3);
+    @media (hover: hover) and (pointer: fine) {
+      .primary-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(232, 66, 30, 0.3);
+      }
     }
 
     /* ----- 원국 화면: 2단 그리드 ----- */
@@ -1308,8 +1323,10 @@
       aspect-ratio: 1 / 1.15;
       transition: transform 0.15s;
     }
-    .pillar-col.clickable:hover .pillar-block {
-      transform: translateY(-2px);
+    @media (hover: hover) and (pointer: fine) {
+      .pillar-col.clickable:hover .pillar-block {
+        transform: translateY(-2px);
+      }
     }
     .pillar-block .han { font-size: 36px; }
     .pillar-block .kor { font-size: 12px; }
@@ -1330,7 +1347,9 @@
       width: 62px;
       transition: background 0.15s;
     }
-    .luck-item:hover { background: rgba(0,0,0,0.03); }
+    @media (hover: hover) and (pointer: fine) {
+      .luck-item:hover { background: rgba(0,0,0,0.03); }
+    }
 
     .sub-luck {
       margin-left: 0; margin-right: 0;
@@ -1345,7 +1364,9 @@
       padding: 8px 2px;
       transition: transform 0.1s, border-color 0.15s;
     }
-    .day-item:hover { transform: translateY(-1px); border-color: var(--line); }
+    @media (hover: hover) and (pointer: fine) {
+      .day-item:hover { transform: translateY(-1px); border-color: var(--line); }
+    }
     .day-item .d-num { font-size: 12px; }
     .day-item .d-han { font-size: 15px; }
     .day-item .d-kor,
@@ -1373,7 +1394,9 @@
       font-size: 22px;
       transition: background 0.15s;
     }
-    .cal-nav:hover { background: var(--line-soft); }
+    @media (hover: hover) and (pointer: fine) {
+      .cal-nav:hover { background: var(--line-soft); }
+    }
     .cal-grid { gap: 6px; }
     .cal-wd { padding: 10px 0; font-size: 12px; }
     .cal-day {
@@ -1381,9 +1404,11 @@
       padding: 10px 4px;
       transition: background 0.15s, transform 0.1s;
     }
-    .cal-day.clickable:hover {
-      background: var(--line-soft);
-      transform: translateY(-1px);
+    @media (hover: hover) and (pointer: fine) {
+      .cal-day.clickable:hover {
+        background: var(--line-soft);
+        transform: translateY(-1px);
+      }
     }
     .cal-day .d { font-size: 14px; margin-bottom: 4px; }
     .cal-day .gj { font-size: 15px; margin-bottom: 3px; }
@@ -1401,7 +1426,9 @@
     .siju-item .sj-label { font-size: 12px; }
     .siju-item .sj-time { font-size: 11px; margin-bottom: 8px; }
     .siju-item .sj-gj { font-size: 20px; }
-    .siju-item:hover { border-color: var(--line); }
+    @media (hover: hover) and (pointer: fine) {
+      .siju-item:hover { border-color: var(--line); }
+    }
 
     /* ----- 저장 ----- */
     #view-saved { max-width: 800px; margin: 0 auto; }
@@ -1412,12 +1439,14 @@
     }
     .saved-card {
       padding: 18px;
-      transition: all 0.15s;
+      transition: background-color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.15s;
     }
-    .saved-card:hover {
-      border-color: var(--line);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    @media (hover: hover) and (pointer: fine) {
+      .saved-card:hover {
+        border-color: var(--line);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      }
     }
     .saved-card .sname { font-size: 17px; }
     .saved-card .sdate { font-size: 13px; }
@@ -1432,11 +1461,13 @@
     .bb {
       padding: 16px;
       font-size: 15px;
-      transition: all 0.15s;
+      transition: background-color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.15s;
     }
-    .bb:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    @media (hover: hover) and (pointer: fine) {
+      .bb:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      }
     }
 
     /* ----- 모달 ----- */
@@ -1648,7 +1679,7 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    transition: all 0.15s;
+    transition: background-color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.15s;
   }
   .match-slot.filled {
     border-style: solid;
@@ -1727,8 +1758,10 @@
     cursor: pointer;
     border: 1.5px solid transparent;
   }
-  .match-picker-modal .pick-item:hover {
-    border-color: var(--line);
+  @media (hover: hover) and (pointer: fine) {
+    .match-picker-modal .pick-item:hover {
+      border-color: var(--line);
+    }
   }
   .match-picker-modal .pick-item .pi-head {
     display: flex; justify-content: space-between; align-items: center;
@@ -13203,26 +13236,45 @@ function readPresentation(element, fallbackOpacity, fallbackTransform) {
 
 let appToastTimer = 0;
 let appToastAnimation = null;
+function readToastPresentation(toast) {
+  const style = getComputedStyle(toast);
+  return {
+    opacity: Number.isFinite(Number(style.opacity)) ? Number(style.opacity) : 0,
+    transform: style.transform === 'none' ? 'translate(-50%, 0)' : style.transform
+  };
+}
+function stopToastAnimation() {
+  if (!appToastAnimation) return;
+  appToastAnimation.cancel();
+  appToastAnimation = null;
+}
 window.showAppToast = function showAppToast(message) {
   const toast = document.getElementById('appToast');
   if (!toast) return;
   clearTimeout(appToastTimer);
-  if (appToastAnimation) { appToastAnimation.cancel(); appToastAnimation = null; }
+  const wasVisible = toast.classList.contains('show');
+  const entryStart = wasVisible
+    ? readToastPresentation(toast)
+    : { opacity: 0, transform: reducedMotion() ? 'translate(-50%, 0)' : 'translate(-50%, 12px)' };
+  stopToastAnimation();
   toast.textContent = String(message || '');
   toast.classList.add('show');
   const reduce = reducedMotion();
   if (toast.animate) appToastAnimation = toast.animate([
-    { opacity: 0, transform: reduce ? 'translate(-50%, 0)' : 'translate(-50%, 12px)' },
+    { opacity: entryStart.opacity, transform: reduce ? 'translate(-50%, 0)' : entryStart.transform },
     { opacity: 1, transform: 'translate(-50%, 0)' }
   ], { duration: reduce ? 100 : 180, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
   appToastTimer = setTimeout(() => {
+    const exitStart = readToastPresentation(toast);
+    stopToastAnimation();
     const out = toast.animate ? toast.animate([
-      { opacity: 1, transform: 'translate(-50%, 0)' },
+      { opacity: exitStart.opacity, transform: reduce ? 'translate(-50%, 0)' : exitStart.transform },
       { opacity: 0, transform: reduce ? 'translate(-50%, 0)' : 'translate(-50%, 6px)' }
-    ], { duration: reduce ? 100 : 140, easing: 'cubic-bezier(.4,0,.8,.2)', fill: 'both' }) : null;
+    ], { duration: reduce ? 100 : 140, easing: 'cubic-bezier(.23,1,.32,1)', fill: 'both' }) : null;
     appToastAnimation = out;
     Promise.resolve(out ? out.finished : null).catch(() => {}).then(() => {
       if (out && appToastAnimation !== out) return;
+      if (out) out.cancel();
       appToastAnimation = null;
       toast.classList.remove('show');
       toast.textContent = '';
@@ -13365,11 +13417,11 @@ window.closeAppModal = function closeAppModal(modal) {
   const bg = runElementAnimation(modal, [
     { opacity: backdropStart.opacity },
     { opacity: 0 }
-  ], { duration: reduce ? 100 : 180, easing: 'linear', fill: 'both' });
+  ], { duration: reduce ? 100 : 180, easing: 'cubic-bezier(.23,1,.32,1)', fill: 'both' });
   const sheet = panel && runElementAnimation(panel, [
     { opacity: panelStart.opacity, transform: panelStart.transform },
     { opacity: reduce ? 0 : .9, transform: reduce ? 'translateY(0)' : centered ? 'translateY(8px)' : 'translateY(100%)' }
-  ], { duration: reduce ? 120 : 220, easing: 'cubic-bezier(.4,0,1,1)', fill: 'both' });
+  ], { duration: reduce ? 120 : 220, easing: 'cubic-bezier(.23,1,.32,1)', fill: 'both' });
 
   Promise.all([animationSettled(bg), animationSettled(sheet)]).then(() => {
     if (state.generation !== operation || !modal.classList.contains('is-closing')) return;

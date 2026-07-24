@@ -464,6 +464,42 @@ body.dark {
   }
 }
 
+/* Final release hardening: retire remaining legacy-gold presentation. */
+.icon-btn,
+.top-bar .icon-btn,
+.saved-toolbar .bb,
+.empty-cta {
+  border-color: var(--apple-separator) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.f-score-num,
+.overall-card .ov-label,
+.overall-card .ov-grade,
+.sfav.on {
+  color: var(--apple-accent) !important;
+  text-shadow: none !important;
+}
+
+.saved-empty h3 {
+  color: var(--apple-label) !important;
+  -webkit-text-fill-color: var(--apple-label) !important;
+}
+
+.saved-empty p { color: var(--apple-secondary) !important; }
+
+.empty-cta {
+  background: var(--apple-inset) !important;
+  color: var(--apple-accent) !important;
+}
+
+.result-right .luck-title::before,
+.sub-luck-label::before {
+  content: none !important;
+  display: none !important;
+}
+
 /* Task 6 visual QA: remove the last decorative gold accents. */
 .card-title,
 .oguk-card .card-title,
@@ -643,6 +679,36 @@ body.dark .saved-card {
   grid-template-columns: 44px 1fr 44px;
   align-items: center;
   gap: 8px;
+}
+
+.cal-title {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 7px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 999px;
+  color: var(--apple-label);
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.cal-title.is-current-year {
+  background: color-mix(in srgb, var(--apple-accent) 13%, var(--apple-surface)) !important;
+  color: var(--apple-accent) !important;
+}
+
+.cal-current-year {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: var(--apple-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -.02em;
 }
 
 .cal-nav,

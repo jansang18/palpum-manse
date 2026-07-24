@@ -12652,7 +12652,10 @@ $$('.tab').forEach(t => onTap(t, () => {
   $$('.view').forEach(v => v.classList.remove('active'));
   $('#view-' + tab).classList.add('active');
   $('#bottomBar').style.display = (tab === 'result' && currentSaju) ? 'flex' : 'none';
-  if (tab === 'calendar') renderCalendar();
+  if (tab === 'calendar') {
+    initializeCalendarSession();
+    renderCalendar();
+  }
   if (tab === 'saved') renderSaved();
   if (tab === 'fortune') renderFortune();
   if (tab === 'match') renderMatch();
@@ -13515,6 +13518,73 @@ onTap($('#shareBtn'), () => {
 
 onTap($('#similarBtn'), () => findSimilarSaju());
 
+function makeSavedElement(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = String(text);
+  return element;
+}
+
+function makeSavedToolbar(count) {
+  const toolbar = makeSavedElement('div', 'saved-toolbar');
+  const exportButton = makeSavedElement('button', 'bb', count ? `📤 내보내기 (${count})` : '📤 내보내기');
+  exportButton.type = 'button';
+  exportButton.id = 'savedExportBtn';
+  const importButton = makeSavedElement('button', 'bb', '📥 불러오기');
+  importButton.type = 'button';
+  importButton.id = 'savedImportBtn';
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.id = 'savedImportFile';
+  fileInput.accept = '.json,application/json';
+  fileInput.hidden = true;
+  toolbar.append(exportButton, importButton, fileInput);
+  return toolbar;
+}
+
+function makeSavedCard(record) {
+  const card = makeSavedElement('div', 'saved-card');
+  card.dataset.id = String(record.id || '');
+
+  const row = makeSavedElement('div', 'row1');
+  const name = makeSavedElement('div', 'sname', record.name || '이름 없음');
+  name.append(' ', makeSavedElement('span', 'sgender', record.gender === 'M' ? '남' : '여'));
+  const actions = makeSavedElement('div', 'scard-actions');
+  const favourite = makeSavedElement('button', `sfav${record.fav ? ' on' : ''}`, record.fav ? '★' : '☆');
+  favourite.type = 'button';
+  favourite.dataset.fav = String(record.id || '');
+  favourite.setAttribute('aria-label', record.fav ? '즐겨찾기 해제' : '즐겨찾기');
+  const remove = makeSavedElement('button', 'sdelete', '✕');
+  remove.type = 'button';
+  remove.dataset.del = String(record.id || '');
+  remove.setAttribute('aria-label', '명반 삭제');
+  actions.append(favourite, remove);
+  row.append(name, actions);
+
+  const dateText = `${record.year}.${pad(record.month)}.${pad(record.day)}${record.memo ? ` · ${record.memo}` : ''}`;
+  const date = makeSavedElement('div', 'sdate', dateText);
+  const pillars = makeSavedElement('div', 'spillars');
+  const parts = [
+    { s: record.yStem, b: record.yBranch },
+    { s: record.mStem, b: record.mBranch },
+    { s: record.dStem, b: record.dBranch }
+  ];
+  if (Number.isInteger(record.hStem) && record.hStem >= 0) {
+    parts.push({ s: record.hStem, b: record.hBranch });
+  }
+  for (const part of parts) {
+    if (
+      !Number.isInteger(part.s) || part.s < 0 || part.s >= STEM.length ||
+      !Number.isInteger(part.b) || part.b < 0 || part.b >= BRANCH.length
+    ) continue;
+    const stem = makeSavedElement('span', `spill ${EL_CLASS[STEM_EL[part.s]]}`, STEM[part.s]);
+    const branch = makeSavedElement('span', `spill ${EL_CLASS[BRANCH_EL[part.b]]}`, BRANCH[part.b]);
+    pillars.append(stem, branch);
+  }
+  card.append(row, date, pillars);
+  return card;
+}
+
 async function renderSaved() {
   let list = [];
   try {
@@ -13525,51 +13595,39 @@ async function renderSaved() {
     }
   } catch (e) { list = JSON.parse(localStorage.getItem('saju_list') || '[]'); }
 
+  list = list.filter(record => record && typeof record === 'object');
+  const content = $('#savedContent');
+  content.replaceChildren(makeSavedToolbar(list.length));
+
   if (list.length === 0) {
-    $('#savedContent').innerHTML = `
-      <div class="saved-toolbar">
-        <button type="button" class="bb" id="savedExportBtn">📤 내보내기</button>
-        <button type="button" class="bb" id="savedImportBtn">📥 불러오기</button>
-        <input type="file" id="savedImportFile" accept=".json,application/json" style="display:none">
-      </div>
-      <div class="saved-empty">
-        <div class="empty-mark">神</div>
-        <h3>아직 저장된 명반이 없습니다</h3>
-        <p>원국에서 자주 보는 명반을 저장하면<br>이곳에서 빠르게 다시 열 수 있습니다.</p>
-        <button type="button" class="empty-cta" data-go-input>명반 만들러 가기</button>
-      </div>`;
+    const empty = makeSavedElement('div', 'saved-empty');
+    const mark = makeSavedElement('div', 'empty-mark', '神');
+    const heading = makeSavedElement('h3', '', '아직 저장된 명반이 없습니다');
+    const copy = makeSavedElement('p');
+    copy.append('원국에서 자주 보는 명반을 저장하면', document.createElement('br'), '이곳에서 빠르게 다시 열 수 있습니다.');
+    const action = makeSavedElement('button', 'empty-cta', '명반 만들러 가기');
+    action.type = 'button';
+    action.dataset.goInput = '';
+    empty.append(mark, heading, copy, action);
+    content.appendChild(empty);
     bindSavedToolbar(list);
-    document.querySelector('[data-go-input]')?.addEventListener('click', () => {
+    action.addEventListener('click', () => {
       document.querySelector('.tab[data-tab="input"]')?.click();
     });
     return;
   }
   list.sort((a, b) => (b.fav?1:0)-(a.fav?1:0) || b.savedAt - a.savedAt);
-  $('#savedContent').innerHTML = `
-    <div class="saved-toolbar">
-      <button type="button" class="bb" id="savedExportBtn">📤 내보내기 (${list.length})</button>
-      <button type="button" class="bb" id="savedImportBtn">📥 불러오기</button>
-      <input type="file" id="savedImportFile" accept=".json,application/json" style="display:none">
-    </div>
-    <input id="savedSearch" class="input" placeholder="🔍 이름·메모 검색" style="margin-bottom:10px" oninput="filterSaved(this.value)" />
-    <div class="saved-list" id="savedListEl">${list.map(r => {
-    const pl = [
-      { s: r.yStem, b: r.yBranch },
-      { s: r.mStem, b: r.mBranch },
-      { s: r.dStem, b: r.dBranch }
-    ];
-    if (r.hStem >= 0) pl.push({ s: r.hStem, b: r.hBranch });
-    return `<div class="saved-card" data-id="${r.id || ''}">
-      <div class="row1">
-        <div class="sname">${escapeHtml(r.name)} <span class="sgender">${r.gender==='M'?'남':'여'}</span></div>
-        <div class="scard-actions"><button class="sfav${r.fav?' on':''}" data-fav="${r.id || ''}">${r.fav?'★':'☆'}</button><button class="sdelete" data-del="${r.id || ''}">✕</button></div>
-      </div>
-      <div class="sdate">${r.year}.${pad(r.month)}.${pad(r.day)}${r.memo?` · ${escapeHtml(r.memo)}`:''}</div>
-      <div class="spillars">
-        ${pl.map(p => `<span class="spill ${EL_CLASS[STEM_EL[p.s]]}">${STEM[p.s]}</span><span class="spill ${EL_CLASS[BRANCH_EL[p.b]]}">${BRANCH[p.b]}</span>`).join('')}
-      </div>
-    </div>`;
-  }).join('')}</div>`;
+
+  const search = document.createElement('input');
+  search.id = 'savedSearch';
+  search.className = 'input';
+  search.placeholder = '🔍 이름·메모 검색';
+  search.style.marginBottom = '10px';
+  search.addEventListener('input', () => filterSaved(search.value));
+  const cards = makeSavedElement('div', 'saved-list');
+  cards.id = 'savedListEl';
+  for (const record of list) cards.appendChild(makeSavedCard(record));
+  content.append(search, cards);
 
   bindSavedToolbar(list);
 
@@ -13746,6 +13804,86 @@ async function findSimilarSaju() {
   });
 }
 
+function createSecureUuid() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
+    throw new Error('안전한 식별자를 만들 수 없습니다.');
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(value => value.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10).join('')}`;
+}
+
+function normalizeImportedRecord(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const integer = (value, min, max) => (
+    Number.isInteger(value) && value >= min && value <= max ? value : null
+  );
+  const year = integer(input.year, 1026, 2099);
+  const month = integer(input.month, 1, 12);
+  const day = integer(input.day, 1, 31);
+  const unknown = typeof input.unknown === 'boolean' ? input.unknown : null;
+  const gender = input.gender === 'M' || input.gender === 'F' ? input.gender : null;
+  const hour = unknown === true ? integer(input.hour ?? 0, 0, 23) : integer(input.hour, 0, 23);
+  const minute = unknown === true ? integer(input.minute ?? 0, 0, 59) : integer(input.minute, 0, 59);
+  if ([year, month, day, unknown, gender, hour, minute].includes(null)) return null;
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) return null;
+  if (input.name !== undefined && typeof input.name !== 'string') return null;
+  if (input.memo !== undefined && typeof input.memo !== 'string') return null;
+  if (input.fav !== undefined && typeof input.fav !== 'boolean') return null;
+  if (input.savedAt !== undefined && (!Number.isFinite(input.savedAt) || input.savedAt < 0)) return null;
+
+  const calculated = calcSaju({
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    calendar: 'solar',
+    gender,
+    unknown
+  });
+  return {
+    ...calculated,
+    id: createSecureUuid(),
+    name: (input.name || '이름 없음').trim().slice(0, 40) || '이름 없음',
+    memo: (input.memo || '').trim().slice(0, 240),
+    fav: input.fav === true,
+    savedAt: Number.isFinite(input.savedAt) ? Math.min(input.savedAt, Date.now()) : Date.now()
+  };
+}
+
+async function importSavedRecords(records) {
+  if (!Array.isArray(records)) return { added: 0, skipped: 0 };
+  const accepted = [];
+  let skipped = Math.max(0, records.length - 500);
+  for (const input of records.slice(0, 500)) {
+    const record = normalizeImportedRecord(input);
+    if (record) accepted.push(record);
+    else skipped++;
+  }
+
+  try {
+    for (const record of accepted) {
+      await window.storage.set(`saju:${record.id}`, JSON.stringify(record));
+    }
+  } catch (error) {
+    const existing = JSON.parse(localStorage.getItem('saju_list') || '[]');
+    localStorage.setItem('saju_list', JSON.stringify(existing.concat(accepted)));
+  }
+  return { added: accepted.length, skipped };
+}
+
 function bindSavedToolbar(list) {
   const expBtn = $('#savedExportBtn');
   const impBtn = $('#savedImportBtn');
@@ -13766,7 +13904,7 @@ function bindSavedToolbar(list) {
     const a = document.createElement('a');
     const ts = new Date().toISOString().slice(0,10).replace(/-/g,'');
     a.href = url;
-    a.download = `신의음성만세력_백업_${ts}.json`;
+    a.download = `취명선만세력_백업_${ts}.json`;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
@@ -13778,38 +13916,21 @@ function bindSavedToolbar(list) {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
     try {
+      if (f.size > 2 * 1024 * 1024) throw new Error('백업 파일은 2MB 이하여야 합니다.');
       const text = await f.text();
       const data = JSON.parse(text);
-      const records = Array.isArray(data) ? data : (data.records || []);
-      if (!records.length) { alert('가져올 명반이 없습니다.'); fileIn.value=''; return; }
-
-      // 기존 목록 가져오기
-      let existing = [];
-      try {
-        const res = await window.storage.list('saju:');
-        if (res && res.keys) for (const k of res.keys) {
-          const r = await window.storage.get(k);
-          if (r) existing.push(JSON.parse(r.value));
-        }
-      } catch (err) { existing = JSON.parse(localStorage.getItem('saju_list') || '[]'); }
-
-      const existingIds = new Set(existing.map(x => x.id));
-      let added = 0, skipped = 0;
-      for (const rec of records) {
-        if (!rec || !rec.year || !rec.month || !rec.day) { skipped++; continue; }
-        // 중복 방지: 같은 id가 있으면 새 id 부여
-        if (!rec.id || existingIds.has(rec.id)) {
-          rec.id = 'saju_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
-        }
-        existingIds.add(rec.id);
-        try { await window.storage.set('saju:' + rec.id, JSON.stringify(rec)); }
-        catch (err) {
-          const arr = JSON.parse(localStorage.getItem('saju_list') || '[]');
-          arr.push(rec);
-          localStorage.setItem('saju_list', JSON.stringify(arr));
-        }
-        added++;
+      if (!Array.isArray(data) && (!data || typeof data !== 'object' || Array.isArray(data.records) === false)) {
+        throw new Error('지원하지 않는 백업 형식입니다.');
       }
+      if (!Array.isArray(data) && data.version !== undefined && data.version !== 1) {
+        throw new Error('지원하지 않는 백업 버전입니다.');
+      }
+      if (!Array.isArray(data) && data.app !== undefined && (
+        typeof data.app !== 'string' || data.app.length > 40
+      )) throw new Error('잘못된 앱 식별자입니다.');
+      const records = Array.isArray(data) ? data : data.records;
+      if (!records.length) { alert('가져올 명반이 없습니다.'); fileIn.value=''; return; }
+      const { added, skipped } = await importSavedRecords(records);
       alert(`${added}개 가져왔습니다${skipped?` (${skipped}개 형식 오류로 건너뜀)`:''}.`);
       fileIn.value = '';
       renderSaved();
@@ -13821,23 +13942,49 @@ function bindSavedToolbar(list) {
 }
 
 /* 만세력 달력 */
-let calY = new Date().getFullYear();
-let calM = new Date().getMonth() + 1;
+let calY = null;
+let calM = null;
 let selectedCalDay = null;
 let selectedSijuBranch = null;
+let calendarSessionInitialized = false;
+
+function calendarLocalNow() {
+  const injectedClock = window.__calendarNow;
+  const value = typeof injectedClock === 'function' ? injectedClock() : new Date();
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function initializeCalendarSession() {
+  if (calendarSessionInitialized) return false;
+  const now = calendarLocalNow();
+  calY = now.getFullYear();
+  calM = now.getMonth() + 1;
+  selectedCalDay = null;
+  selectedSijuBranch = null;
+  calendarSessionInitialized = true;
+  return true;
+}
+window.initializeCalendarSession = initializeCalendarSession;
 
 function renderCalendar() {
+  initializeCalendarSession();
+  const today = calendarLocalNow();
   const gy = yearGanji(calY);
   const first = new Date(calY, calM - 1, 1);
   const daysInMonth = new Date(calY, calM, 0).getDate();
   const startWd = first.getDay();
   const prevLast = new Date(calY, calM - 1, 0).getDate();
 
-  $('#calTitle').innerHTML = `${calY}년 ${calM}월 <span class="ganji">${STEM[gy.stem]}${BRANCH[gy.branch]}年</span>`;
+  const title = $('#calTitle');
+  const isCurrentYear = calY === today.getFullYear();
+  title.classList.toggle('is-current-year', isCurrentYear);
+  if (isCurrentYear) title.setAttribute('aria-current', 'date');
+  else title.removeAttribute('aria-current');
+  title.innerHTML = `${calY}년 ${calM}월 <span class="ganji">${STEM[gy.stem]}${BRANCH[gy.branch]}年</span>${isCurrentYear ? '<span class="cal-current-year">올해</span>' : ''}`;
   const wd = ['일','월','화','수','목','금','토'];
   let html = wd.map((w, i) => `<div class="cal-wd ${i===0?'sun':i===6?'sat':''}">${w}</div>`).join('');
 
-  const today = new Date();
   const isT = (y,m,d) => today.getFullYear()===y && today.getMonth()+1===m && today.getDate()===d;
 
   for (let i = 0; i < startWd; i++) {
@@ -14953,7 +15100,6 @@ function submitMatchNewForm() {
    ============================================ */
 let psSearchDebounce = null;
 let psLastQuery = '';
-let psJsonpCounter = 0;
 
 function openPersonSearch() {
   window.openAppModal($('#personSearchModal'));
@@ -14966,90 +15112,68 @@ function closePersonSearch() {
   $('#psClearBtn').style.display = 'none';
 }
 
-// JSONP 방식으로 Wikipedia API 호출 - file:// 환경에서도 CORS 회피 가능
-function jsonpFetch(url, timeout) {
-  return new Promise((resolve, reject) => {
-    const cb = '__psJsonp_' + (++psJsonpCounter) + '_' + Date.now();
-    const script = document.createElement('script');
-    script.async = true;
-    script.charset = 'utf-8';
-    let done = false;
-    const cleanup = () => {
-      try { if (script.parentNode) script.parentNode.removeChild(script); } catch(e){}
-      try { window[cb] = undefined; delete window[cb]; } catch(e) {}
-      clearTimeout(timer);
-    };
-    window[cb] = function(data) {
-      if (done) return;
-      done = true;
-      cleanup();
-      resolve(data);
-    };
-    const timer = setTimeout(() => {
-      if (done) return;
-      done = true;
-      cleanup();
-      reject(new Error('요청 시간 초과 — 인터넷 연결을 확인해주세요'));
-    }, timeout || 12000);
-    script.onerror = script.onload = function(ev) {
-      // onload는 JSONP가 성공적으로 콜백 호출한 후에도 불릴 수 있음
-      // 에러는 onerror로 감지, 콜백이 호출됐으면 done=true인 상태
-      if (ev && ev.type === 'error' && !done) {
-        done = true;
-        cleanup();
-        reject(new Error('스크립트 로드 실패'));
-      }
-    };
-    const sep = url.indexOf('?') === -1 ? '?' : '&';
-    script.src = url + sep + 'callback=' + cb;
-    // BODY에 추가하는 것이 iOS Safari에서 더 안정적
-    (document.body || document.head || document.documentElement).appendChild(script);
-  });
+const ALLOWED_ENRICHMENT_HOSTS = new Set(['ko.wikipedia.org', 'www.wikidata.org']);
+
+function validateEnrichmentUrl(value) {
+  const url = new URL(String(value));
+  if (url.protocol !== 'https:' || !ALLOWED_ENRICHMENT_HOSTS.has(url.hostname)) {
+    throw new Error('허용되지 않은 외부 정보 주소입니다.');
+  }
+  const wikipediaPath = url.hostname === 'ko.wikipedia.org' && url.pathname === '/w/api.php';
+  const wikidataPath = url.hostname === 'www.wikidata.org' && (
+    url.pathname === '/w/api.php' ||
+    /^\/wiki\/Special:EntityData\/Q\d{1,12}\.json$/.test(url.pathname)
+  );
+  if (!wikipediaPath && !wikidataPath) {
+    throw new Error('허용되지 않은 외부 정보 경로입니다.');
+  }
+  return url;
 }
 
-// fetch에 타임아웃 래퍼 - iOS에서 가끔 영구 pending되는 문제 방지
-function fetchWithTimeout(url, ms) {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('fetch 타임아웃')), ms || 6000);
-    fetch(url).then(r => { clearTimeout(timer); resolve(r); })
-              .catch(e => { clearTimeout(timer); reject(e); });
-  });
-}
-
-// fetch 우선, 실패 시 JSONP로 자동 fallback
-async function wikiQuery(params) {
-  const baseUrl = 'https://ko.wikipedia.org/w/api.php';
-  const qs = 'action=query&format=json&' + params;
-
-  // 1차 시도: fetch + origin=* (https:// 환경에서 작동)
+async function fetchAllowedJson(value, timeout) {
+  const url = validateEnrichmentUrl(value);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout || 6000);
   try {
-    const res = await fetchWithTimeout(baseUrl + '?' + qs + '&origin=*', 6000);
-    if (res.ok) return await res.json();
-    throw new Error('HTTP ' + res.status);
-  } catch (e) {
-    // 2차 시도: JSONP (file:// 같은 null origin에서도 작동)
-    console.log('fetch 실패, JSONP로 재시도:', e.message);
-    return await jsonpFetch(baseUrl + '?' + qs, 12000);
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      mode: 'cors',
+      credentials: 'omit',
+      redirect: 'error',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
   }
 }
 
+// CORS 요청이 실패하면 호출자가 내장 인물 목록만 유지한다.
+async function wikiQuery(params) {
+  const url = new URL('https://ko.wikipedia.org/w/api.php');
+  const query = new URLSearchParams(`action=query&format=json&${params}`);
+  query.set('origin', '*');
+  url.search = query.toString();
+  return await fetchAllowedJson(url, 6000);
+}
+
 async function wikidataQuery(qid) {
-  // Wikidata는 CORS가 열려있음. 그래도 fallback은 준비.
-  const url = 'https://www.wikidata.org/wiki/Special:EntityData/' + qid + '.json';
+  if (!/^Q\d{1,12}$/.test(String(qid))) throw new Error('잘못된 Wikidata 식별자입니다.');
+  const url = `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`;
   try {
-    const res = await fetchWithTimeout(url, 6000);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    return await res.json();
-  } catch (e) {
-    // Special:EntityData는 JSONP 미지원. wbgetentities API로 전환.
-    const apiUrl = 'https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&ids=' + qid + '&props=claims';
-    try {
-      const res = await fetchWithTimeout(apiUrl + '&origin=*', 6000);
-      if (res.ok) return await res.json();
-      throw new Error('HTTP ' + res.status);
-    } catch (e2) {
-      return await jsonpFetch(apiUrl, 12000);
-    }
+    return await fetchAllowedJson(url, 6000);
+  } catch (firstError) {
+    const apiUrl = new URL('https://www.wikidata.org/w/api.php');
+    apiUrl.search = new URLSearchParams({
+      action: 'wbgetentities',
+      format: 'json',
+      ids: qid,
+      props: 'claims',
+      origin: '*'
+    }).toString();
+    return await fetchAllowedJson(apiUrl, 6000);
   }
 }
 

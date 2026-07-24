@@ -27,12 +27,22 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
 const runsSecondaryApple = () => !TEST_GROUP || TEST_GROUP === 'task-5' || TEST_GROUP === 'secondary-apple';
 const runsAppleMotion = () => !TEST_GROUP || TEST_GROUP === 'motion-contract';
+const runsCalendarCurrentYear = () => !TEST_GROUP || TEST_GROUP === 'calendar-current-year';
 
 function parseCssColor(value) {
   const match = String(value).match(/rgba?\(([^)]+)\)/i);
-  assert.ok(match, `unsupported computed color: ${value}`);
-  const parts = match[1].split(/[\s,\/]+/).filter(Boolean).map(Number);
-  return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+  if (match) {
+    const parts = match[1].split(/[\s,\/]+/).filter(Boolean).map(Number);
+    return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
+  }
+  const srgb = String(value).match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+))?\)/i);
+  assert.ok(srgb, `unsupported computed color: ${value}`);
+  return {
+    r: Number(srgb[1]) * 255,
+    g: Number(srgb[2]) * 255,
+    b: Number(srgb[3]) * 255,
+    a: srgb[4] === undefined ? 1 : Number(srgb[4])
+  };
 }
 
 function compositeColor(foreground, background) {
@@ -155,6 +165,270 @@ function inspectAndroidBackupPolicy() {
   const manifest = fs.readFileSync(manifestPath, 'utf8');
   assert.match(manifest, /android:allowBackup="false"/, 'saved chart data must be excluded from Android backup');
   assert.doesNotMatch(manifest, /android:allowBackup="true"/);
+}
+
+function inspectFinalSecuritySourceContracts() {
+  const indexHtml = fs.readFileSync(path.join(UI_ROOT, 'index.html'), 'utf8');
+  const appleCss = fs.readFileSync(path.join(UI_ROOT, 'apple.css'), 'utf8');
+  const stringsXml = fs.readFileSync(
+    path.join(APP_ROOT, 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml'),
+    'utf8'
+  );
+  const renderSavedSource = indexHtml.match(
+    /async function renderSaved\(\)\s*\{[\s\S]*?\n\}\n\nasync function updateSavedRecord/
+  );
+
+  assert.ok(renderSavedSource, 'renderSaved source contract missing');
+  assert.doesNotMatch(
+    renderSavedSource[0],
+    /\.innerHTML\s*=|insertAdjacentHTML\(/,
+    'saved records must be rendered with DOM APIs rather than HTML parsing sinks'
+  );
+  assert.match(indexHtml, /crypto\.randomUUID\(\)/, 'imported records must receive cryptographic UUIDs');
+  assert.match(indexHtml, /function normalizeImportedRecord\(/, 'strict imported-record normalization is required');
+  assert.doesNotMatch(indexHtml, /function jsonpFetch\(|psJsonpCounter|callback=['"]?\s*\+\s*cb/);
+  assert.doesNotMatch(
+    indexHtml,
+    /createElement\(\s*['"]script['"]\s*\)[\s\S]{0,1200}(?:script\.src|appendChild\(script\))/,
+    'person enrichment must not create executable third-party script elements'
+  );
+  assert.match(indexHtml, /const ALLOWED_ENRICHMENT_HOSTS\s*=\s*new Set/);
+  assert.match(indexHtml, /function fetchAllowedJson\(/);
+  assert.match(indexHtml, /취명선만세력_백업_/);
+  assert.doesNotMatch(indexHtml, /신의음성만세력_백업_/);
+  assert.match(stringsXml, /<string name="app_name">취명선 만세력<\/string>/);
+  assert.match(stringsXml, /<string name="title_activity_main">취명선 만세력<\/string>/);
+  assert.match(
+    appleCss,
+    /\.result-right \.luck-title::before[\s\S]*\.sub-luck-label::before[\s\S]*content:\s*none\s*!important/,
+    'flow-title sparkle pseudo-elements must be disabled by the final Apple layer'
+  );
+}
+
+async function inspectFinalSecurityRuntime(page, width) {
+  const state = await page.evaluate(async () => {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const listSavedKeys = async () => {
+      const result = await window.storage.list('saju:');
+      return result && Array.isArray(result.keys) ? result.keys : [];
+    };
+
+    for (const key of await listSavedKeys()) await window.storage.delete(key);
+    localStorage.removeItem('saju_list');
+
+    const sample = {
+      ...currentSaju,
+      id: `unsafe"><img src=x onerror="window.__backupXssExecuted=1">`,
+      name: `<img src=x onerror="window.__backupXssExecuted=2">`,
+      memo: `<svg onload="window.__backupXssExecuted=3"></svg>`,
+      fav: true,
+      unexpected: 'must be removed'
+    };
+    const invalid = { ...sample, id: 'also-unsafe', gender: 'X' };
+    window.__backupXssExecuted = 0;
+    window.__lastImportAlert = '';
+    window.alert = message => { window.__lastImportAlert = String(message); };
+
+    document.querySelector('.tab[data-tab="saved"]').click();
+    await renderSaved();
+    const input = document.getElementById('savedImportFile');
+    const file = new File(
+      [JSON.stringify({ app: '취명선 만세력', version: 1, records: [sample, invalid] })],
+      'malicious-backup.json',
+      { type: 'application/json' }
+    );
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const deadline = Date.now() + 2500;
+    let keys = [];
+    while (Date.now() < deadline) {
+      keys = await listSavedKeys();
+      if (keys.length) break;
+      await wait(25);
+    }
+    await wait(100);
+    await renderSaved();
+    await wait(50);
+
+    keys = await listSavedKeys();
+    const stored = keys[0] ? JSON.parse((await window.storage.get(keys[0])).value) : null;
+    const cards = [...document.querySelectorAll('#savedContent .saved-card')];
+    const importState = {
+      xssExecuted: window.__backupXssExecuted,
+      keys,
+      stored,
+      cardIds: cards.map(card => card.dataset.id),
+      cardText: cards.map(card => card.textContent),
+      executableNodes: document.querySelectorAll('#savedContent [onerror], #savedContent [onload], #savedContent script').length,
+      alertText: window.__lastImportAlert
+    };
+
+    let blockedFetchCalls = 0;
+    const originalFetch = window.fetch;
+    window.fetch = async () => {
+      blockedFetchCalls++;
+      throw new Error('network should not be reached');
+    };
+    let disallowedHostRejected = false;
+    let fetchApiType = typeof window.fetchAllowedJson;
+    try {
+      await window.fetchAllowedJson('https://evil.example.invalid/data.json', 50);
+    } catch (error) {
+      disallowedHostRejected = /허용되지 않은|allowlisted|allowed/i.test(String(error && error.message));
+    }
+
+    let scriptCreates = 0;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = function (tagName, ...args) {
+      if (String(tagName).toLowerCase() === 'script') scriptCreates++;
+      return originalCreateElement(tagName, ...args);
+    };
+    try {
+      await wikiQuery('generator=search&gsrsearch=test&gsrlimit=1');
+    } catch (error) {
+      // CORS/network failure must gracefully disable online enrichment.
+    } finally {
+      document.createElement = originalCreateElement;
+      window.fetch = originalFetch;
+    }
+
+    for (const key of keys) await window.storage.delete(key);
+    localStorage.removeItem('saju_list');
+    document.body.classList.remove('dark');
+    document.querySelector('.tab[data-tab="saved"]').click();
+    await renderSaved();
+    const savedEmpty = document.querySelector('.saved-empty');
+    const savedHeading = savedEmpty.querySelector('h3');
+    const savedContrast = {
+      foreground: getComputedStyle(savedHeading).color,
+      background: getComputedStyle(savedEmpty).backgroundColor,
+      canvas: getComputedStyle(document.body).backgroundColor
+    };
+
+    document.querySelector('.tab[data-tab="fortune"]').click();
+    renderFortune();
+    await wait(40);
+    const fortuneColors = [
+      ...document.querySelectorAll('.f-score-num, .overall-card .ov-label, .overall-card .ov-grade')
+    ].map(element => getComputedStyle(element).color);
+    const iconBorders = [...document.querySelectorAll('.icon-btn')]
+      .filter(element => element.getClientRects().length)
+      .map(element => getComputedStyle(element).borderTopColor);
+
+    document.querySelector('.tab[data-tab="result"]').click();
+    renderResult();
+    await wait(40);
+    document.querySelector('#daeunScroll .luck-item')?.click();
+    await wait(20);
+    document.querySelector('#seunScroll .luck-item')?.click();
+    await wait(20);
+    const flowDecorations = [
+      ...document.querySelectorAll('.result-right .luck-title, .sub-luck-label')
+    ].map(element => getComputedStyle(element, '::before').content);
+
+    return {
+      importState,
+      fetchSecurity: {
+        fetchApiType,
+        blockedFetchCalls,
+        disallowedHostRejected,
+        scriptCreates
+      },
+      savedContrast,
+      fortuneColors,
+      iconBorders,
+      flowDecorations
+    };
+  });
+
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  assert.equal(state.importState.xssExecuted, 0, `${width}px malicious backup executed script`);
+  assert.equal(state.importState.executableNodes, 0, `${width}px imported markup became executable DOM`);
+  assert.equal(state.importState.keys.length, 1, `${width}px invalid imported schemas must be rejected`);
+  assert.ok(uuid.test(state.importState.stored.id), `${width}px imported id is not a UUID: ${state.importState.stored.id}`);
+  assert.equal(state.importState.keys[0], `saju:${state.importState.stored.id}`);
+  assert.deepEqual(state.importState.cardIds, [state.importState.stored.id]);
+  assert.match(state.importState.cardText[0], /<img src=x onerror=/, 'malicious display text must remain inert text');
+  assert.equal(Object.hasOwn(state.importState.stored, 'unexpected'), false, 'unknown import fields must be dropped');
+  assert.ok(state.importState.stored.name.length <= 40, 'imported name length limit');
+  assert.ok(state.importState.stored.memo.length <= 240, 'imported memo length limit');
+  assert.match(state.importState.alertText, /1개 가져왔습니다/);
+
+  assert.equal(state.fetchSecurity.fetchApiType, 'function', 'allowlisted CORS fetch API missing');
+  assert.equal(state.fetchSecurity.disallowedHostRejected, true, 'non-allowlisted enrichment host was not rejected');
+  assert.equal(state.fetchSecurity.blockedFetchCalls, 1, 'only the allowlisted Wikipedia request may reach fetch');
+  assert.equal(state.fetchSecurity.scriptCreates, 0, 'online enrichment created a dynamic script element');
+
+  assert.ok(
+    contrastRatio(
+      state.savedContrast.foreground,
+      state.savedContrast.background,
+      state.savedContrast.canvas
+    ) >= 4.5,
+    `${width}px light saved-empty heading contrast is below 4.5:1`
+  );
+  const legacyGold = /rgb(?:a)?\(\s*(?:216\s*,\s*181\s*,\s*106|240\s*,\s*214\s*,\s*154|169\s*,\s*119\s*,\s*50)(?:\s*,[^)]*)?\)/i;
+  for (const color of [...state.fortuneColors, ...state.iconBorders]) {
+    assert.ok(!legacyGold.test(color), `${width}px visible legacy gold remains: ${color}`);
+  }
+  for (const content of state.flowDecorations) {
+    assert.ok(content === 'none' || content === 'normal' || content === '""', `${width}px flow title sparkle remains: ${content}`);
+  }
+}
+
+async function inspectCalendarCurrentYear(page, width) {
+  if (!runsCalendarCurrentYear() || width !== 390) return;
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  const state = await page.evaluate(async () => {
+    const readTitle = () => {
+      const title = document.getElementById('calTitle');
+      const match = title.textContent.match(/(\d+)년\s+(\d+)월/);
+      return {
+        year: Number(match && match[1]),
+        month: Number(match && match[2]),
+        ariaCurrent: title.getAttribute('aria-current'),
+        selectedClass: title.classList.contains('is-current-year'),
+        badge: title.querySelector('.cal-current-year')?.textContent || null,
+        color: getComputedStyle(title).color,
+        background: getComputedStyle(title).backgroundColor
+      };
+    };
+
+    window.__calendarNow = () => new Date(2034, 6, 15, 12, 0, 0);
+    document.querySelector('.tab[data-tab="calendar"]').click();
+    const initial = readTitle();
+    for (let index = 0; index < 6; index++) document.getElementById('calNext').click();
+    document.querySelector('.tab[data-tab="input"]').click();
+    document.querySelector('.tab[data-tab="calendar"]').click();
+    const reopened = readTitle();
+    return {
+      initializerType: typeof window.initializeCalendarSession,
+      initial,
+      reopened
+    };
+  });
+  await page.emulateMediaFeatures([]);
+
+  assert.equal(state.initializerType, 'function', `${width}px calendar session initializer missing`);
+  assert.deepEqual(
+    { year: state.initial.year, month: state.initial.month },
+    { year: 2034, month: 7 },
+    `${width}px first calendar opening must derive its local year and month from the injected clock`
+  );
+  assert.equal(state.initial.ariaCurrent, 'date', `${width}px current calendar year must expose aria-current`);
+  assert.equal(state.initial.selectedClass, true, `${width}px current calendar year must be visibly selected`);
+  assert.equal(state.initial.badge, '올해', `${width}px current calendar year badge`);
+  assert.equal(state.initial.color, 'rgb(10, 132, 255)', `${width}px current calendar year must use system blue`);
+  assert.notEqual(state.initial.background, 'rgba(0, 0, 0, 0)', `${width}px current calendar year selection needs a visible fill`);
+  assert.deepEqual(
+    { year: state.reopened.year, month: state.reopened.month },
+    { year: 2035, month: 1 },
+    `${width}px reopening the calendar in the same session must preserve user navigation`
+  );
+  assert.equal(state.reopened.ariaCurrent, null);
+  assert.equal(state.reopened.selectedClass, false);
+  assert.equal(state.reopened.badge, null);
 }
 
 function inspectReleaseContract() {
@@ -1266,6 +1540,16 @@ async function inspectWidth(browser, width) {
   console.log(`[ui] ${width}px: loaded`);
   await page.evaluate(() => document.body.classList.add('dark'));
 
+  await inspectCalendarCurrentYear(page, width);
+  if (TEST_GROUP === 'calendar-current-year') {
+    await page.close();
+    return;
+  }
+  if (!TEST_GROUP && width === 390) {
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
+  }
+
   if (width === 390) {
     const modalContract = await page.evaluate(() => ({
       open: typeof window.openAppModal,
@@ -1865,6 +2149,14 @@ async function inspectWidth(browser, width) {
 
   await fillAndCalculate(page);
 
+  if (runsGroup('final-security')) {
+    await inspectFinalSecurityRuntime(page, width);
+    if (TEST_GROUP === 'final-security') {
+      await page.close();
+      return;
+    }
+  }
+
   const metrics = await page.evaluate(() => {
     const rects = selector => [...document.querySelectorAll(selector)].map(element => {
       const rect = element.getBoundingClientRect();
@@ -1992,6 +2284,7 @@ async function inspectWidth(browser, width) {
 (async () => {
   if (runsGroup('android-backup')) inspectAndroidBackupPolicy();
   if (runsGroup('release-contract')) inspectReleaseContract();
+  if (runsGroup('final-security')) inspectFinalSecuritySourceContracts();
   if (TEST_GROUP === 'android-backup' || TEST_GROUP === 'release-contract') {
     console.log(`${TEST_GROUP} regression PASS`);
     return;

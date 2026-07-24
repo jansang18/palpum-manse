@@ -15,6 +15,7 @@
 - Use system blue `#007AFF` in light mode and `#0A84FF` in dark mode.
 - Render five-element Hanja and status text with the approved pastel palette only where they encode saju data; keep body copy neutral for contrast.
 - Preserve all calculation, storage, sharing, match, calendar, and back-button behavior.
+- Use `취명선 만세력` for every user-visible product name in the UI, HTML/PWA metadata, Android label, and share card while preserving the existing Android package ID and signing key.
 - Express a pretty, cute, and soft personality through rounded geometry, pastel element colors, calm spacing, and restrained motion; do not add mascots, decorative sparkles, or childish ornament.
 - All touch targets must be at least 44×44px.
 - CJK boxes must keep `aspect-ratio: 1 / 1`; width/height error must be at most 1px.
@@ -32,6 +33,7 @@
 - Modify `app/ui-regression.js`: automated Apple token, no-gold, alignment, square, contrast, overflow, and interaction checks.
 - Mirror `apple.css`, `index.html`, and `ui-regression.js` into `app/web`.
 - Modify `app/web/sw.js`: bump cache version and precache `apple.css`.
+- Modify PWA metadata, Android app label, and share-card branding to `취명선 만세력`.
 - Modify `app/web/scripts/build-protected.ps1`: include `apple.css` in the shared release inventory.
 - Create `backups/2026-07-24-before-apple/www`: immutable pre-redesign runtime backup.
 - Regenerate `app/shots/*_light.png` and `app/shots/*_dark.png`.

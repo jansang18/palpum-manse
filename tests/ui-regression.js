@@ -22,13 +22,70 @@ const UI_ROOT = process.env.UI_ROOT
   : path.join(APP_ROOT, 'www');
 const URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
 const TEST_GROUP = process.env.TEST_GROUP || '';
-const widths = TEST_GROUP ? [390] : [360, 390, 412, 768];
+const widths = TEST_GROUP === 'result-width-brand'
+  ? [1220]
+  : TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
 const runsSecondaryApple = () => !TEST_GROUP || TEST_GROUP === 'task-5' || TEST_GROUP === 'secondary-apple';
 const runsAppleMotion = () => !TEST_GROUP || TEST_GROUP === 'motion-contract';
 const runsCalendarCurrentYear = () => !TEST_GROUP || TEST_GROUP === 'calendar-current-year';
 const runsImportedFieldXss = () => !TEST_GROUP || TEST_GROUP === 'imported-fields-xss';
+const runsResultWidthBrand = () => TEST_GROUP === 'result-width-brand';
+
+async function inspectResultWidthAndBrand(page, width) {
+  const state = await page.evaluate(() => {
+    const bottomBar = document.getElementById('bottomBar').getBoundingClientRect();
+    const card = document.querySelector('.oguk-card').getBoundingClientRect();
+    const brand = getComputedStyle(document.querySelector('.top-bar .brand-main'));
+    const suffix = getComputedStyle(document.querySelector('.top-bar .title-sub'));
+    const typography = style => ({
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      fontWeight: style.fontWeight,
+      letterSpacing: style.letterSpacing
+    });
+    const pillars = [...document.querySelectorAll('.pillar-block')].map(block => {
+      const rect = block.getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(block.querySelector('.han'));
+      const glyph = range.getBoundingClientRect();
+      return {
+        width: rect.width,
+        height: rect.height,
+        glyphCenterY: Math.abs((glyph.top + glyph.bottom) / 2 - (rect.top + rect.bottom) / 2)
+      };
+    });
+    return {
+      bottomBar: { left: bottomBar.left, right: bottomBar.right, width: bottomBar.width },
+      card: { left: card.left, right: card.right, width: card.width },
+      viewportWidth: document.documentElement.clientWidth,
+      brand: typography(brand),
+      suffix: typography(suffix),
+      pillars
+    };
+  });
+
+  assert.ok(
+    Math.abs(state.bottomBar.width - state.card.width) <= 1,
+    `${width}px bottom bar width ${state.bottomBar.width}px must match natal card ${state.card.width}px`
+  );
+  assert.ok(
+    Math.abs(state.bottomBar.left - state.card.left) <= 1,
+    `${width}px bottom bar and natal card must share the same left edge`
+  );
+  assert.ok(
+    state.bottomBar.left >= 0 && state.bottomBar.right <= state.viewportWidth + 1,
+    `${width}px bottom bar overflows viewport`
+  );
+  assert.deepEqual(state.brand, state.suffix, `${width}px 취명선 and 만세력 typography must match`);
+  assert.equal(state.pillars.length, 8, `${width}px natal Hanja block count`);
+  for (const pillar of state.pillars) {
+    assert.ok(pillar.width >= 83 && pillar.width <= 85, `${width}px natal block must be about 84px, got ${pillar.width}px`);
+    assert.ok(Math.abs(pillar.width - pillar.height) <= 1, `${width}px natal block must stay square`);
+    assert.ok(pillar.glyphCenterY <= 2, `${width}px natal glyph vertical center delta ${pillar.glyphCenterY}px`);
+  }
+}
 
 function parseCssColor(value) {
   const match = String(value).match(/rgba?\(([^)]+)\)/i);
@@ -2282,6 +2339,12 @@ async function inspectWidth(browser, width) {
   assert.equal(inputPolish.collapsedErrorBorder, 'rgba(0, 0, 0, 0)', `${width}px collapsed error line`);
 
   await fillAndCalculate(page);
+
+  if (runsResultWidthBrand()) {
+    await inspectResultWidthAndBrand(page, width);
+    await page.close();
+    return;
+  }
 
   if (runsImportedFieldXss()) {
     await inspectImportedFieldDownstreamSafety(page, width);

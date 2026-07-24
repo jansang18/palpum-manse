@@ -1064,6 +1064,37 @@ body.dark .f-tips .f-tip {
   }
 }
 
+/* Result actions share the same visual measure as the natal chart card. */
+.bottom-bar {
+  left: 50% !important;
+  right: auto !important;
+  width: min(616px, calc(100vw - 12px)) !important;
+  max-width: none !important;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+}
+
+/* The full product name uses one system typeface and one optical rhythm. */
+.top-bar .title .brand-main,
+.top-bar .title .title-sub {
+  font-family: inherit !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  letter-spacing: -.025em !important;
+  font-style: normal !important;
+  filter: none !important;
+}
+
+/* Give the eight natal characters 20% more presence without losing the grid. */
+.result-left .pillars-4,
+.pillars-4 {
+  width: min(360px, 100%) !important;
+  max-width: 360px !important;
+  margin-inline: auto !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+
 /* Task 4: one square, optical-center system for natal and fortune Hanja. */
 .pillar-block,
 .pillar-col.calli-mode .pillar-block.empty,

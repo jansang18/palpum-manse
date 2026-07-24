@@ -1064,11 +1064,15 @@ body.dark .f-tips .f-tip {
   }
 }
 
-/* Result actions share the same visual measure as the natal chart card. */
+/* One shared horizontal measure keeps navigation, forms, charts, and actions aligned. */
+:root {
+  --apple-content-measure: min(616px, calc(100vw - 10px));
+}
+
 .bottom-bar {
   left: 50% !important;
   right: auto !important;
-  width: min(616px, calc(100vw - 10px)) !important;
+  width: var(--apple-content-measure) !important;
   max-width: none !important;
   box-sizing: border-box;
   transform: translateX(-50%);
@@ -1076,9 +1080,18 @@ body.dark .f-tips .f-tip {
 
 /* Align the primary navigation rail with the chart below it. */
 .tabs {
-  width: min(616px, calc(100vw - 10px)) !important;
+  width: var(--apple-content-measure) !important;
   max-width: none !important;
   margin-inline: auto !important;
+  box-sizing: border-box;
+}
+
+/* Remove the legacy nested horizontal padding that made input sections stagger. */
+#view-input {
+  width: var(--apple-content-measure) !important;
+  max-width: none !important;
+  margin-inline: auto !important;
+  padding-inline: 0 !important;
   box-sizing: border-box;
 }
 

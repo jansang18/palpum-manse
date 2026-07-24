@@ -22,7 +22,7 @@ const UI_ROOT = process.env.UI_ROOT
   : path.join(APP_ROOT, 'www');
 const URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
 const TEST_GROUP = process.env.TEST_GROUP || '';
-const widths = TEST_GROUP === 'result-width-brand'
+const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-width'
   ? [390, 1220]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -32,6 +32,41 @@ const runsAppleMotion = () => !TEST_GROUP || TEST_GROUP === 'motion-contract';
 const runsCalendarCurrentYear = () => !TEST_GROUP || TEST_GROUP === 'calendar-current-year';
 const runsImportedFieldXss = () => !TEST_GROUP || TEST_GROUP === 'imported-fields-xss';
 const runsResultWidthBrand = () => TEST_GROUP === 'result-width-brand';
+const runsShellWidth = () => TEST_GROUP === 'shell-width';
+
+async function inspectShellWidth(page, width) {
+  await page.click('.tab[data-tab="input"]');
+  await sleep(50);
+  const geometry = await page.evaluate(() => {
+    const box = selector => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width };
+    };
+    return {
+      viewport: document.documentElement.clientWidth,
+      tabs: box('.tabs'),
+      inputView: box('#view-input'),
+      search: box('.person-search-btn'),
+      card: box('.input-card'),
+      action: box('.primary-btn'),
+      note: box('#view-input .note-text')
+    };
+  });
+
+  const reference = geometry.tabs;
+  for (const [name, rect] of Object.entries(geometry)) {
+    if (name === 'viewport' || name === 'tabs') continue;
+    assert.ok(
+      Math.abs(rect.width - reference.width) <= 1,
+      `${width}px ${name} width ${rect.width}px must match tabs ${reference.width}px`
+    );
+    assert.ok(
+      Math.abs(rect.left - reference.left) <= 1,
+      `${width}px ${name} left ${rect.left}px must match tabs ${reference.left}px`
+    );
+  }
+  assert.ok(reference.left >= 0 && reference.right <= geometry.viewport + 1, `${width}px shared shell overflows viewport`);
+}
 
 async function inspectResultWidthAndBrand(page, width) {
   const state = await page.evaluate(() => {
@@ -2355,6 +2390,12 @@ async function inspectWidth(browser, width) {
   assert.ok(inputPolish.logoWidth <= 190, `${width}px intro logo is too large: ${inputPolish.logoWidth}`);
   assert.equal(inputPolish.cardBorder, 'rgba(255, 255, 255, 0.08)', `${width}px input card border`);
   assert.equal(inputPolish.collapsedErrorBorder, 'rgba(0, 0, 0, 0)', `${width}px collapsed error line`);
+
+  if (runsShellWidth()) {
+    await inspectShellWidth(page, width);
+    await page.close();
+    return;
+  }
 
   await fillAndCalculate(page);
 

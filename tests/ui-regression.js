@@ -419,12 +419,13 @@ async function collectHanjaGeometry(page) {
       return rect.width > 0 && rect.height > 0 &&
         style.display !== 'none' && style.visibility !== 'hidden';
     };
-    const measure = (selector, glyphSelector = '.han', centerWithinGlyph = false) =>
+    const measure = (selector, glyphSelector = '.han') =>
       [...document.querySelectorAll(selector)].filter(visible).map(element => {
         const rect = element.getBoundingClientRect();
         const glyph = element.querySelector(glyphSelector);
-        const glyphRect = glyph?.getBoundingClientRect();
-        const centerRect = centerWithinGlyph && glyphRect ? glyphRect : rect;
+        const range = document.createRange();
+        if (glyph) range.selectNodeContents(glyph);
+        const glyphRect = glyph ? range.getBoundingClientRect() : null;
         const inline = element.style;
         const glyphInline = glyph?.style;
         return {
@@ -433,8 +434,9 @@ async function collectHanjaGeometry(page) {
             width: rect.width, height: rect.height
           },
           center: glyphRect ? {
-            x: Math.abs((glyphRect.left + glyphRect.right) / 2 - (centerRect.left + centerRect.right) / 2),
-            y: Math.abs((glyphRect.top + glyphRect.bottom) / 2 - (centerRect.top + centerRect.bottom) / 2)
+            x: Math.abs((glyphRect.left + glyphRect.right) / 2 - (rect.left + rect.right) / 2),
+            y: Math.abs((glyphRect.top + glyphRect.bottom) / 2 - (rect.top + rect.bottom) / 2),
+            signedY: (glyphRect.top + glyphRect.bottom) / 2 - (rect.top + rect.bottom) / 2
           } : null,
           transform: glyph ? getComputedStyle(glyph).transform : 'none',
           inlineHack: Boolean(
@@ -449,8 +451,56 @@ async function collectHanjaGeometry(page) {
       daeun: measure('#daeunScroll .luck-block'),
       seun: measure('#seunScroll .luck-block'),
       wolun: measure('#woonScroll .luck-block'),
-      ilun: measure('#dayArea .day-item:not(.empty)', '.d-han', true)
+      ilun: measure('#dayArea .day-item:not(.empty)', '.d-han')
     };
+  });
+}
+
+async function collectLuckFlowReachability(page) {
+  return page.evaluate(() => {
+    const specs = {
+      daeun: ['#daeunScroll', '.luck-item'],
+      seun: ['#seunScroll', '.luck-item'],
+      wolun: ['#woonScroll', '.luck-item'],
+      ilun: ['#dayArea .day-grid', '.day-item']
+    };
+    const tolerance = 1;
+    const bounds = element => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width };
+    };
+
+    return Object.fromEntries(Object.entries(specs).map(([name, [containerSelector, itemSelector]]) => {
+      const container = document.querySelector(containerSelector);
+      const items = container ? [...container.querySelectorAll(itemSelector)] : [];
+      if (!container || items.length === 0) return [name, null];
+      const containerRect = bounds(container);
+      const first = items[0];
+      const last = items.at(-1);
+      const initialFirst = bounds(first);
+      const initialLast = bounds(last);
+      const initialScrollLeft = container.scrollLeft;
+      const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+      container.scrollLeft = maxScrollLeft;
+      const endFirst = bounds(first);
+      const endLast = bounds(last);
+      const reachedEnd = Math.abs(container.scrollLeft - maxScrollLeft) <= tolerance;
+      container.scrollLeft = initialScrollLeft;
+      const itemWidths = items.map(item => item.getBoundingClientRect().width);
+      return [name, {
+        clientWidth: container.clientWidth,
+        scrollWidth: container.scrollWidth,
+        itemCount: items.length,
+        minItemWidth: Math.min(...itemWidths),
+        initialFirst,
+        initialLast,
+        endFirst,
+        endLast,
+        containerRect,
+        maxScrollLeft,
+        reachedEnd
+      }];
+    }));
   });
 }
 
@@ -516,6 +566,7 @@ async function inspectAppleDesign(page, width) {
     await sleep(250);
     const resultInspection = await collectAppleInspection(page, resultSelectors);
     const hanjaGeometry = await collectHanjaGeometry(page);
+    const flowReachability = await collectLuckFlowReachability(page);
     const inspection = {
       accent: inputInspection.accent,
       overflow: Math.max(inputInspection.overflow, resultInspection.overflow),
@@ -643,7 +694,7 @@ async function inspectAppleDesign(page, width) {
         if (block.center) {
           assert.ok(
             block.center.x <= 2 && block.center.y <= 2,
-            `${width}px ${theme} ${group} Hanja is off-center: ${block.center.x}x${block.center.y}`
+            `${width}px ${theme} ${group} Hanja is off-center: ${block.center.x}x${block.center.y} (signedY ${block.center.signedY})`
           );
         }
         if (group !== 'ilun') transforms.add(block.transform);
@@ -658,6 +709,34 @@ async function inspectAppleDesign(page, width) {
       }
       if (group !== 'ilun') {
         assert.equal(transforms.size, 1, `${width}px ${theme} ${group} uses differing CJK transforms: ${[...transforms]}`);
+      }
+    }
+
+    for (const [group, flow] of Object.entries(flowReachability)) {
+      assert.ok(flow, `${width}px ${theme} ${group} flow container missing`);
+      const hasOverflow = flow.scrollWidth - flow.clientWidth > 1;
+      assert.ok(
+        flow.initialFirst.left >= flow.containerRect.left - 1 &&
+        flow.initialFirst.right <= flow.containerRect.right + 1,
+        `${width}px ${theme} ${group} first item is clipped initially`
+      );
+      if (!hasOverflow) {
+        assert.ok(
+          flow.initialLast.left >= flow.containerRect.left - 1 &&
+          flow.initialLast.right <= flow.containerRect.right + 1,
+          `${width}px ${theme} ${group} last item is clipped without overflow`
+        );
+      } else {
+        assert.ok(
+          flow.clientWidth / flow.itemCount < 25,
+          `${width}px ${theme} ${group} scrolls although all items can fit readably`
+        );
+        assert.ok(flow.reachedEnd, `${width}px ${theme} ${group} cannot reach its maximum scroll position`);
+        assert.ok(
+          flow.endLast.left >= flow.containerRect.left - 1 &&
+          flow.endLast.right <= flow.containerRect.right + 1,
+          `${width}px ${theme} ${group} last item is inaccessible at scroll end`
+        );
       }
     }
   }

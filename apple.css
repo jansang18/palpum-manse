@@ -10,7 +10,7 @@
   --apple-separator: rgba(60, 60, 67, .16);
   --apple-accent: #007aff;
   --apple-focus: rgba(0, 122, 255, .28);
-  --apple-cjk-offset: -.035em;
+  --apple-cjk-offset: -.023em;
   --apple-wood-surface: #ddf6e8;
   --apple-wood-foreground: #237a4b;
   --apple-fire-surface: #ffe3df;
@@ -561,13 +561,19 @@ body.dark {
 
 #woonScroll.woon-grid {
   display: grid !important;
-  grid-template-columns: repeat(12, minmax(25px, 1fr)) !important;
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
   gap: 3px !important;
   width: 100%;
   margin: 0 !important;
   padding: 0 0 8px !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
+}
+
+@media (max-width: 339px) {
+  #woonScroll.woon-grid {
+    grid-template-columns: repeat(12, minmax(25px, 1fr)) !important;
+  }
 }
 
 .luck-item .label,
@@ -614,8 +620,8 @@ body.dark {
 
 .day-item:not(.empty) {
   display: grid;
-  grid-template-rows: repeat(4, minmax(0, 1fr));
   place-items: center;
+  position: relative;
 }
 
 .day-item .d-num,
@@ -632,6 +638,22 @@ body.dark {
   place-items: center;
   line-height: 1 !important;
 }
+
+.day-item .d-han {
+  grid-area: 1 / 1;
+  transform: translateY(var(--apple-cjk-offset));
+}
+
+.day-item .d-num,
+.day-item .d-kor,
+.day-item .d-kor-t {
+  position: absolute;
+  left: 0;
+}
+
+.day-item .d-num { top: 3px; }
+.day-item .d-kor-t { bottom: 10px; }
+.day-item .d-kor { bottom: 2px; }
 
 .day-item .d-num { font-size: clamp(8px, 2.5vw, 11px) !important; }
 .day-item .d-han { font-size: clamp(10px, 3vw, 14px) !important; }

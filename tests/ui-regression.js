@@ -334,7 +334,9 @@ async function collectAppleComponentInspection(page) {
         content: computed.content,
         display: computed.display,
         opacity: computed.opacity,
-        color: computed.color
+        color: computed.color,
+        cursor: computed.cursor,
+        pointerEvents: computed.pointerEvents
       };
     };
 
@@ -352,6 +354,11 @@ async function collectAppleComponentInspection(page) {
     const input = document.querySelector('.input');
     input?.focus();
     const focusedInput = style('.input');
+    const primary = document.querySelector('.primary-btn');
+    const enabledPrimary = style('.primary-btn');
+    primary.disabled = true;
+    const disabledPrimary = style('.primary-btn');
+    primary.disabled = false;
     const elementColors = Object.fromEntries(
       ['wood', 'fire', 'earth', 'metal', 'water'].map(element => [
         element,
@@ -371,7 +378,10 @@ async function collectAppleComponentInspection(page) {
         segmented: rect('.segmented'),
         tabs: [...document.querySelectorAll('.tab')]
           .filter(element => element.getBoundingClientRect().width > 0)
-          .map(element => element.getBoundingClientRect().height),
+          .map(element => ({
+            width: element.getBoundingClientRect().width,
+            height: element.getBoundingClientRect().height
+          })),
         iconButtons: [...document.querySelectorAll('.icon-btn')]
           .filter(element => element.getBoundingClientRect().width > 0)
           .map(element => ({
@@ -380,7 +390,10 @@ async function collectAppleComponentInspection(page) {
           })),
         segmentedButtons: [...document.querySelectorAll('.segmented button')]
           .filter(element => element.getBoundingClientRect().width > 0)
-          .map(element => element.getBoundingClientRect().height)
+          .map(element => ({
+            width: element.getBoundingClientRect().width,
+            height: element.getBoundingClientRect().height
+          }))
       },
       radii: {
         input: style('.input').borderRadius,
@@ -388,7 +401,10 @@ async function collectAppleComponentInspection(page) {
         card: style('.input-card').borderRadius
       },
       primaryAfter: style('.primary-btn', '::after'),
+      enabledPrimary,
+      disabledPrimary,
       focusedInput,
+      focusColor: getComputedStyle(document.body).getPropertyValue('--apple-focus').trim(),
       elementColors,
       canvasColor
     };
@@ -462,23 +478,42 @@ async function inspectAppleDesign(page, width) {
     assert.ok(Math.abs(componentInspection.geometry.input.height - 52) <= 1, `${width}px ${theme} input height must be 52px`);
     assert.ok(Math.abs(componentInspection.geometry.primary.height - 54) <= 1, `${width}px ${theme} primary button height must be 54px`);
     assert.ok(componentInspection.geometry.primary.height >= 44, `${width}px ${theme} primary target is below 44px`);
-    for (const height of componentInspection.geometry.tabs) {
-      assert.ok(height >= 44, `${width}px ${theme} tab target is below 44px: ${height}px`);
+    assert.ok(componentInspection.geometry.tabs.length > 0, `${width}px ${theme} tab target collection is empty`);
+    for (const { width: targetWidth, height } of componentInspection.geometry.tabs) {
+      assert.ok(targetWidth >= 44 && height >= 44, `${width}px ${theme} tab target is below 44px: ${targetWidth}x${height}px`);
     }
+    assert.ok(componentInspection.geometry.iconButtons.length > 0, `${width}px ${theme} icon target collection is empty`);
     for (const { width: targetWidth, height } of componentInspection.geometry.iconButtons) {
       assert.ok(targetWidth >= 44 && height >= 44, `${width}px ${theme} icon target is below 44px: ${targetWidth}x${height}px`);
     }
-    for (const height of componentInspection.geometry.segmentedButtons) {
-      assert.ok(height >= 44, `${width}px ${theme} segmented target is below 44px: ${height}px`);
+    assert.ok(componentInspection.geometry.segmentedButtons.length > 0, `${width}px ${theme} segmented target collection is empty`);
+    for (const { width: targetWidth, height } of componentInspection.geometry.segmentedButtons) {
+      assert.ok(targetWidth >= 44 && height >= 44, `${width}px ${theme} segmented target is below 44px: ${targetWidth}x${height}px`);
     }
     assert.equal(componentInspection.radii.input, '12px', `${width}px ${theme} input radius`);
     assert.equal(componentInspection.radii.segmented, '14px', `${width}px ${theme} segmented radius`);
     assert.equal(componentInspection.radii.card, '18px', `${width}px ${theme} card radius`);
     assert.equal(componentInspection.primaryAfter.content, 'none', `${width}px ${theme} primary button must not render decorative pseudo-content`);
+    const focusOutline = parseCssColor(componentInspection.focusedInput.outlineColor);
+    const expectedFocus = parseCssColor(componentInspection.focusColor);
+    assert.notEqual(componentInspection.focusedInput.outlineStyle, 'none', `${width}px ${theme} focused input outline style`);
+    assert.ok(parseFloat(componentInspection.focusedInput.outlineWidth) > 0, `${width}px ${theme} focused input outline width`);
+    assert.ok(focusOutline.a > 0, `${width}px ${theme} focused input outline is transparent`);
+    assert.deepEqual(
+      [focusOutline.r, focusOutline.g, focusOutline.b],
+      [expectedFocus.r, expectedFocus.g, expectedFocus.b],
+      `${width}px ${theme} focused input outline must use the Apple focus color`
+    );
     assert.ok(
-      componentInspection.focusedInput.outlineStyle !== 'none' ||
-      componentInspection.focusedInput.boxShadow !== 'none',
-      `${width}px ${theme} focused input has no visible focus ring`
+      componentInspection.disabledPrimary.pointerEvents === 'none' &&
+      componentInspection.disabledPrimary.cursor === 'not-allowed',
+      `${width}px ${theme} disabled primary must block pointer interaction`
+    );
+    assert.ok(
+      Number(componentInspection.disabledPrimary.opacity) < Number(componentInspection.enabledPrimary.opacity) ||
+      componentInspection.disabledPrimary.backgroundColor !== componentInspection.enabledPrimary.backgroundColor ||
+      componentInspection.disabledPrimary.color !== componentInspection.enabledPrimary.color,
+      `${width}px ${theme} disabled primary is not visually distinguishable`
     );
     for (const [element, [surface, foreground]] of Object.entries(expectedPastels[theme])) {
       const actual = componentInspection.elementColors[element];
@@ -725,7 +760,7 @@ async function inspectWidth(browser, width) {
 
       assert.deepEqual({ semantics, aboutEntry, aboutTrappedId, aboutExit, saveEntryId, saveForwardTrapId, saveBackwardTrapId, saveExit }, {
         semantics: {
-          about: { role: 'dialog', ariaModal: 'true', name: '신의 음성 만세력' },
+          about: { role: 'dialog', ariaModal: 'true', name: '취명선 만세력' },
           save: { role: 'dialog', ariaModal: 'true', name: '명반 저장' }
         },
         aboutEntry: { activeId: 'aboutClose', inside: true, appInert: true, bottomBarInert: true },
@@ -1290,9 +1325,18 @@ async function inspectWidth(browser, width) {
 
   if (runsGroup('apple-design')) {
     const appleCss = fs.readFileSync(path.join(UI_ROOT, 'apple.css'), 'utf8');
+    const indexHtml = fs.readFileSync(path.join(UI_ROOT, 'index.html'), 'utf8');
+    const webManifest = JSON.parse(fs.readFileSync(path.join(WEB_ROOT, 'manifest.webmanifest'), 'utf8'));
     assert.match(appleCss, /--apple-accent:\s*#007aff/i);
     assert.match(appleCss, /body\.dark[\s\S]*--apple-accent:\s*#0a84ff/i);
     assert.doesNotMatch(appleCss, /#d8b56a|#f0d69a|#a97732/i);
+    assert.match(indexHtml, /<title>취명선 만세력<\/title>/, 'document title must use the current product name');
+    assert.match(indexHtml, /<meta name="apple-mobile-web-app-title" content="취명선 만세력">/, 'Apple web app title must use the current product name');
+    assert.deepEqual(
+      { name: webManifest.name, shortName: webManifest.short_name },
+      { name: '취명선 만세력', shortName: '취명선 만세력' },
+      'PWA manifest names must use the current product name'
+    );
   }
 
   const luxuryCss = fs.readFileSync(path.join(UI_ROOT, 'luxury.css'), 'utf8');

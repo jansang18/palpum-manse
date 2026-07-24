@@ -49,3 +49,21 @@ No `index.html`, manifest, or unrelated `.superpowers/sdd-tools/` file was modif
 - Byte identity checks
   - PASS for CSS and regression runner
 
+## Review Fixes
+
+The Task 3 review follow-up added and verified:
+
+- strict nonempty collections and minimum `44px × 44px` rendered geometry for tabs, icon buttons, and segmented buttons
+- a visually distinct `.primary-btn:disabled` state with blocked pointer interaction and `not-allowed` cursor
+- immediate, nontransparent system-blue focus outlines with positive outline width
+- the updated `취명선 만세력` dialog accessibility name
+- static document-title, Apple web-app-title, and PWA manifest naming contracts
+
+Follow-up verification:
+
+- `TEST_GROUP=apple-design node app/ui-regression.js`
+  - PASS: 390px
+- `TEST_GROUP=modal-a11y node app/ui-regression.js`
+  - PASS: 390px
+- `node app/ui-regression.js`
+  - PASS: 360px, 390px, 412px, 768px

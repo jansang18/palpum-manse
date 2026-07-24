@@ -261,6 +261,97 @@ async function fillAndCalculate(page) {
   await sleep(600);
 }
 
+async function inspectAppleDesign(page, width) {
+  const expectedAccents = { light: '#007aff', dark: '#0a84ff' };
+  const legacyGold = new Set(['rgb(216, 181, 106)', 'rgb(240, 214, 154)', 'rgb(169, 119, 50)']);
+
+  for (const [theme, accent] of Object.entries(expectedAccents)) {
+    const inspection = await page.evaluate(isDark => {
+      document.body.classList.toggle('dark', isDark);
+      const colorProperties = ['backgroundColor', 'borderTopColor', 'color', 'outlineColor'];
+      const styles = selector => [...document.querySelectorAll(selector)]
+        .filter(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
+        .map(element => {
+          const computed = getComputedStyle(element);
+          return Object.fromEntries(colorProperties.map(property => [property, computed[property]]));
+        });
+      const geometry = selector => [...document.querySelectorAll(selector)]
+        .filter(element => element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0)
+        .map(element => {
+          const rect = element.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const textRect = range.getBoundingClientRect();
+          return {
+            rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height },
+            textRect: { left: textRect.left, top: textRect.top, right: textRect.right, bottom: textRect.bottom },
+            textLines: range.getClientRects().length,
+            center: {
+              x: Math.abs((textRect.left + textRect.right) / 2 - (rect.left + rect.right) / 2),
+              y: Math.abs((textRect.top + textRect.bottom) / 2 - (rect.top + rect.bottom) / 2)
+            }
+          };
+        });
+      return {
+        accent: getComputedStyle(document.body).getPropertyValue('--apple-accent').trim(),
+        styles: {
+          topBar: styles('.top-bar'),
+          activeTab: styles('.tab.active'),
+          primaryButton: styles('.primary-btn'),
+          formFields: styles('.input'),
+          pillarBlocks: styles('.pillar-block'),
+          luckBlocks: styles('.luck-block')
+        },
+        geometry: {
+          pillarBlocks: geometry('.pillar-block'),
+          luckBlocks: geometry('.luck-block'),
+          segmentedButtons: geometry('.segmented button'),
+          tabs: geometry('.tab'),
+          primaryButtons: geometry('.primary-btn')
+        }
+      };
+    }, theme === 'dark');
+
+    assert.equal(inspection.accent, accent, `${width}px ${theme} --apple-accent`);
+    for (const [surface, elements] of Object.entries(inspection.styles)) {
+      assert.ok(elements.length > 0, `${width}px ${theme} ${surface} missing`);
+      for (const colors of elements) {
+        for (const [property, value] of Object.entries(colors)) {
+          assert.ok(!legacyGold.has(value), `${width}px ${theme} ${surface} ${property} retains legacy gold: ${value}`);
+        }
+      }
+    }
+
+    for (const [group, blocks] of Object.entries({
+      pillarBlocks: inspection.geometry.pillarBlocks,
+      luckBlocks: inspection.geometry.luckBlocks
+    })) {
+      assert.ok(blocks.length > 0, `${width}px ${theme} ${group} missing`);
+      for (const { rect } of blocks) {
+        assert.ok(Math.abs(rect.width - rect.height) <= 1, `${width}px ${theme} ${group} not square: ${rect.width}x${rect.height}`);
+      }
+    }
+
+    for (const [group, elements] of Object.entries(inspection.geometry)) {
+      assert.ok(elements.length > 0, `${width}px ${theme} ${group} missing`);
+      const rows = [];
+      for (const element of elements) {
+        const row = rows.find(candidate => Math.abs(candidate.top - element.rect.top) <= 1);
+        (row || rows[rows.push({ top: element.rect.top, heights: [] }) - 1]).heights.push(element.rect.height);
+        if (element.textLines === 1) {
+          assert.ok(element.center.x <= 2 && element.center.y <= 2, `${width}px ${theme} ${group} label is off-center: ${element.center.x}x${element.center.y}`);
+        }
+      }
+      for (const row of rows) {
+        const [first, ...rest] = row.heights;
+        for (const height of rest) {
+          assert.ok(Math.abs(height - first) <= 1, `${width}px ${theme} ${group} same-row heights differ: ${first}px vs ${height}px`);
+        }
+      }
+    }
+  }
+}
+
 async function inspectWidth(browser, width) {
   console.log(`[ui] ${width}px: opening page`);
   const page = await browser.newPage();
@@ -896,6 +987,12 @@ async function inspectWidth(browser, width) {
   assert.ok(metrics.overflow <= 1, `${width}px horizontal overflow: ${metrics.overflow}px`);
   assert.equal(metrics.pillars.length, 8, `${width}px pillar count`);
 
+  if (runsGroup('apple-design')) {
+    await inspectAppleDesign(page, width);
+    await page.close();
+    return;
+  }
+
   for (const [group, rects] of Object.entries({
     pillars: metrics.pillars,
     daeun: metrics.daeun,
@@ -994,6 +1091,13 @@ async function inspectWidth(browser, width) {
   if (TEST_GROUP === 'android-backup' || TEST_GROUP === 'release-contract') {
     console.log(`${TEST_GROUP} regression PASS`);
     return;
+  }
+
+  if (runsGroup('apple-design')) {
+    const appleCss = fs.readFileSync(path.join(UI_ROOT, 'apple.css'), 'utf8');
+    assert.match(appleCss, /--apple-accent:\s*#007aff/i);
+    assert.match(appleCss, /body\.dark[\s\S]*--apple-accent:\s*#0a84ff/i);
+    assert.doesNotMatch(appleCss, /#d8b56a|#f0d69a|#a97732/i);
   }
 
   const luxuryCss = fs.readFileSync(path.join(UI_ROOT, 'luxury.css'), 'utf8');

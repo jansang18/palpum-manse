@@ -264,8 +264,8 @@ async function fillAndCalculate(page) {
 async function inspectAppleDesign(page, width) {
   const expectedAccents = { light: '#007aff', dark: '#0a84ff' };
   const expectedAccentColors = { light: 'rgb(0, 122, 255)', dark: 'rgb(10, 132, 255)' };
+  const expectedAccentTints = { light: { r: 0, g: 122, b: 255 }, dark: { r: 10, g: 132, b: 255 } };
   const legacyGold = /#(?:d8b56a|f0d69a|a97732)\b|rgba?\(\s*(?:216\s*,\s*181\s*,\s*106|240\s*,\s*214\s*,\s*154|169\s*,\s*119\s*,\s*50)\b/i;
-  const includesColor = (style, color) => Object.values(style).some(value => String(value).includes(color));
 
   for (const [theme, accent] of Object.entries(expectedAccents)) {
     const inspection = await page.evaluate(isDark => {
@@ -348,11 +348,20 @@ async function inspectAppleDesign(page, width) {
 
     const activeTab = inspection.styles.activeTab[0];
     const expectedColor = expectedAccentColors[theme];
-    const activeTabSelection = Object.fromEntries(
-      ['background', 'backgroundColor', 'backgroundImage', 'color']
-        .map(property => [property, activeTab.base.values[property]])
+    const expectedTint = expectedAccentTints[theme];
+    const activeTabTint = parseCssColor(activeTab.base.values.backgroundColor);
+    assert.equal(activeTab.base.values.color, expectedColor, `${width}px ${theme} active tab text color`);
+    assert.ok(activeTabTint.a > 0.08, `${width}px ${theme} active tab capsule background is transparent: ${activeTab.base.values.backgroundColor}`);
+    assert.ok(
+      activeTabTint.b - activeTabTint.r >= 60 && activeTabTint.b - activeTabTint.g >= 60,
+      `${width}px ${theme} active tab capsule is not blue-tinted: ${activeTab.base.values.backgroundColor}`
     );
-    assert.ok(includesColor(activeTabSelection, expectedColor), `${width}px ${theme} active tab capsule/text does not render ${expectedColor}`);
+    assert.ok(
+      Math.abs(activeTabTint.r - expectedTint.r) <= 48 &&
+      Math.abs(activeTabTint.g - expectedTint.g) <= 48 &&
+      Math.abs(activeTabTint.b - expectedTint.b) <= 48,
+      `${width}px ${theme} active tab capsule is outside the system-blue family: ${activeTab.base.values.backgroundColor}`
+    );
 
     for (const [group, blocks] of Object.entries({
       pillarBlocks: inspection.geometry.pillarBlocks,

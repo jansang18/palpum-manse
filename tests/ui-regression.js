@@ -411,6 +411,49 @@ async function collectAppleComponentInspection(page) {
   });
 }
 
+async function collectHanjaGeometry(page) {
+  return page.evaluate(() => {
+    const visible = element => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 &&
+        style.display !== 'none' && style.visibility !== 'hidden';
+    };
+    const measure = (selector, glyphSelector = '.han', centerWithinGlyph = false) =>
+      [...document.querySelectorAll(selector)].filter(visible).map(element => {
+        const rect = element.getBoundingClientRect();
+        const glyph = element.querySelector(glyphSelector);
+        const glyphRect = glyph?.getBoundingClientRect();
+        const centerRect = centerWithinGlyph && glyphRect ? glyphRect : rect;
+        const inline = element.style;
+        const glyphInline = glyph?.style;
+        return {
+          rect: {
+            left: rect.left, top: rect.top,
+            width: rect.width, height: rect.height
+          },
+          center: glyphRect ? {
+            x: Math.abs((glyphRect.left + glyphRect.right) / 2 - (centerRect.left + centerRect.right) / 2),
+            y: Math.abs((glyphRect.top + glyphRect.bottom) / 2 - (centerRect.top + centerRect.bottom) / 2)
+          } : null,
+          transform: glyph ? getComputedStyle(glyph).transform : 'none',
+          inlineHack: Boolean(
+            inline.top || inline.marginTop || inline.transform ||
+            glyphInline?.top || glyphInline?.marginTop || glyphInline?.transform
+          )
+        };
+      });
+
+    return {
+      pillars: measure('.pillar-block'),
+      daeun: measure('#daeunScroll .luck-block'),
+      seun: measure('#seunScroll .luck-block'),
+      wolun: measure('#woonScroll .luck-block'),
+      ilun: measure('#dayArea .day-item:not(.empty)', '.d-han', true)
+    };
+  });
+}
+
 async function inspectAppleDesign(page, width) {
   const expectedAccents = { light: '#007aff', dark: '#0a84ff' };
   const expectedAccentColors = { light: 'rgb(0, 122, 255)', dark: 'rgb(10, 132, 255)' };
@@ -465,7 +508,14 @@ async function inspectAppleDesign(page, width) {
     const componentInspection = await collectAppleComponentInspection(page);
 
     await fillAndCalculate(page);
+    await page.evaluate(() => {
+      document.querySelector('#daeunScroll .luck-item')?.click();
+      document.querySelector('#seunScroll .luck-item')?.click();
+      document.querySelector('#woonScroll .luck-item')?.click();
+    });
+    await sleep(250);
     const resultInspection = await collectAppleInspection(page, resultSelectors);
+    const hanjaGeometry = await collectHanjaGeometry(page);
     const inspection = {
       accent: inputInspection.accent,
       overflow: Math.max(inputInspection.overflow, resultInspection.overflow),
@@ -577,6 +627,37 @@ async function inspectAppleDesign(page, width) {
         for (const height of rest) {
           assert.ok(Math.abs(height - first) <= 1, `${width}px ${theme} ${group} same-row heights differ: ${first}px vs ${height}px`);
         }
+      }
+    }
+
+    for (const [group, blocks] of Object.entries(hanjaGeometry)) {
+      assert.ok(blocks.length > 0, `${width}px ${theme} ${group} geometry missing`);
+      const transforms = new Set();
+      const rows = [];
+      for (const block of blocks) {
+        assert.ok(
+          Math.abs(block.rect.width - block.rect.height) <= 1,
+          `${width}px ${theme} ${group} block not square: ${block.rect.width}x${block.rect.height}`
+        );
+        assert.ok(!block.inlineHack, `${width}px ${theme} ${group} uses an inline alignment correction`);
+        if (block.center) {
+          assert.ok(
+            block.center.x <= 2 && block.center.y <= 2,
+            `${width}px ${theme} ${group} Hanja is off-center: ${block.center.x}x${block.center.y}`
+          );
+        }
+        if (group !== 'ilun') transforms.add(block.transform);
+        const row = rows.find(candidate => Math.abs(candidate.top - block.rect.top) <= 1);
+        (row || rows[rows.push({ top: block.rect.top, heights: [] }) - 1]).heights.push(block.rect.height);
+      }
+      for (const row of rows) {
+        assert.ok(
+          Math.max(...row.heights) - Math.min(...row.heights) <= 1,
+          `${width}px ${theme} ${group} row heights differ: ${row.heights.join(', ')}`
+        );
+      }
+      if (group !== 'ilun') {
+        assert.equal(transforms.size, 1, `${width}px ${theme} ${group} uses differing CJK transforms: ${[...transforms]}`);
       }
     }
   }

@@ -482,3 +482,171 @@ body.dark {
     border-color: var(--apple-label) !important;
   }
 }
+
+/* Task 4: one square, optical-center system for natal and fortune Hanja. */
+.pillar-block,
+.pillar-col.calli-mode .pillar-block.empty,
+.luck-block {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+}
+
+.pillar-block .han,
+.pillar-block.empty .han,
+.luck-block .han,
+#daeunScroll .luck-block .han,
+#seunScroll .luck-block .han,
+#woonScroll .luck-block .han {
+  position: static !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+  transform: translateY(var(--apple-cjk-offset)) !important;
+  transform-origin: center !important;
+}
+
+.pillar-col {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 18px 38px auto auto auto auto 18px;
+  justify-items: stretch;
+  text-align: center;
+}
+
+.pillar-title,
+.pillar-sipsin-top,
+.pillar-sipsin-bot,
+.calli-kor,
+.jijanggan {
+  justify-self: stretch;
+  text-align: center !important;
+}
+
+.luck-title,
+.sub-luck-label {
+  width: 100%;
+  text-align: center !important;
+}
+
+#daeunScroll,
+#seunScroll {
+  display: grid !important;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px !important;
+  width: 100%;
+  padding: 0 0 8px !important;
+  margin: 0 !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  justify-content: stretch !important;
+}
+
+#daeunScroll .luck-item,
+#seunScroll .luck-item,
+#woonScroll .luck-item {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 2px 0 !important;
+  display: grid;
+  grid-template-rows: 16px 17px auto auto 17px;
+  align-items: center;
+  justify-items: stretch;
+  text-align: center;
+}
+
+#woonScroll.woon-grid {
+  display: grid !important;
+  grid-template-columns: repeat(12, minmax(25px, 1fr)) !important;
+  gap: 3px !important;
+  width: 100%;
+  margin: 0 !important;
+  padding: 0 0 8px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+}
+
+.luck-item .label,
+.luck-item .sipsin-t,
+.luck-item .sipsin-b {
+  display: grid;
+  place-items: center;
+  min-height: 0 !important;
+  margin: 0 !important;
+  line-height: 1 !important;
+}
+
+.luck-block {
+  margin: 0 !important;
+  border-radius: 9px !important;
+}
+
+.luck-item.selected {
+  color: var(--apple-accent) !important;
+  background: color-mix(in srgb, var(--apple-accent) 10%, transparent) !important;
+  outline: 2px solid var(--apple-accent) !important;
+  outline-offset: -2px;
+  box-shadow: none !important;
+}
+
+.luck-item.selected .luck-block {
+  box-shadow: none !important;
+}
+
+/* Daily fortune keeps four readings in a compact square grid. */
+.day-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  align-items: start;
+}
+
+.day-item,
+.day-item.empty {
+  width: 100%;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: 1 / 1;
+  padding: 2px 1px !important;
+}
+
+.day-item:not(.empty) {
+  display: grid;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  place-items: center;
+}
+
+.day-item .d-num,
+.day-item .d-han,
+.day-item .d-kor,
+.day-item .d-kor-t {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 !important;
+  display: grid !important;
+  grid-auto-flow: column;
+  place-content: center;
+  place-items: center;
+  line-height: 1 !important;
+}
+
+.day-item .d-num { font-size: clamp(8px, 2.5vw, 11px) !important; }
+.day-item .d-han { font-size: clamp(10px, 3vw, 14px) !important; }
+.day-item .d-kor,
+.day-item .d-kor-t { font-size: clamp(7px, 2vw, 9px) !important; }
+
+@media (min-width: 768px) {
+  #daeunScroll,
+  #seunScroll {
+    grid-auto-columns: minmax(44px, 58px);
+    justify-content: center !important;
+  }
+
+  #woonScroll.woon-grid {
+    grid-template-columns: repeat(12, minmax(44px, 54px)) !important;
+    justify-content: center;
+  }
+}

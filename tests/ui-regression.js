@@ -742,6 +742,205 @@ async function inspectAppleDesign(page, width) {
   }
 }
 
+async function inspectAppleSecondaryScreens(page, width) {
+  if (!runsGroup('task-5')) return;
+
+  const legacyGold = /rgb(?:a)?\(\s*(?:216\s*,\s*181\s*,\s*106|240\s*,\s*214\s*,\s*154|169\s*,\s*119\s*,\s*50)(?:\s*,[^)]*)?\)/i;
+  const themes = ['light', 'dark'];
+  for (const theme of themes) {
+    const state = await page.evaluate(async ({ theme, width }) => {
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      document.body.classList.toggle('dark', theme === 'dark');
+
+      const css = element => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return {
+          background: style.backgroundColor,
+          color: style.color,
+          borderTop: style.borderTopColor,
+          outlineColor: style.outlineColor,
+          boxShadow: style.boxShadow,
+          animationName: style.animationName,
+          iterationCount: style.animationIterationCount,
+          transitionProperty: style.transitionProperty,
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          bottom: rect.bottom
+        };
+      };
+
+      document.querySelector('.tab[data-tab="match"]').click();
+      await wait(180);
+      const matchSlot = document.querySelector('.match-slot');
+      const matchControl = css(matchSlot);
+      const matchDecorations = [...document.querySelectorAll('.match-slot .plus, .match-slot .slot-ico')]
+        .flatMap(element => [getComputedStyle(element).color, getComputedStyle(element, '::before').color]);
+
+      document.querySelector('.tab[data-tab="calendar"]').click();
+      await wait(180);
+      const calendarCell = document.querySelector('.cal-day.clickable');
+      calendarCell.click();
+      const calendarSelected = css(document.querySelector('.cal-day.selected'));
+      const calendarToday = document.querySelector('.cal-day.today') ? css(document.querySelector('.cal-day.today')) : null;
+      const calendarDecorations = [...document.querySelectorAll('.cal-day')].map(css);
+      const calendarControl = css(document.getElementById('calNext'));
+
+      document.querySelector('.tab[data-tab="saved"]').click();
+      await wait(180);
+      const probe = document.createElement('article');
+      probe.className = 'saved-card';
+      probe.innerHTML = '<div class="row1"><strong class="sname">테스트</strong><button type="button" class="sdelete">삭제</button></div>';
+      document.body.appendChild(probe);
+      const savedCard = css(probe);
+      const savedControl = css(probe.querySelector('button'));
+
+      document.querySelector('.tab[data-tab="fortune"]').click();
+      await wait(180);
+      const fortuneProbe = document.createElement('article');
+      fortuneProbe.className = 'f-card';
+      fortuneProbe.textContent = '운세';
+      document.body.appendChild(fortuneProbe);
+      const fortuneCard = css(fortuneProbe);
+
+      const modalStates = [];
+      for (const modal of document.querySelectorAll('.modal-bg')) {
+        window.openAppModal(modal);
+        await wait(260);
+        const panel = modal.querySelector('.modal');
+        const grabber = getComputedStyle(panel, '::before');
+        const controls = [...panel.querySelectorAll('button')].filter(button => button.getClientRects().length).map(css);
+        modalStates.push({
+          id: modal.id,
+          backdrop: css(modal),
+          panel: css(panel),
+          grabber: {
+            content: grabber.content,
+            width: parseFloat(grabber.width),
+            height: parseFloat(grabber.height)
+          },
+          controls,
+          focusedInside: modal.contains(document.activeElement)
+        });
+        window.closeAppModal(modal);
+        await wait(230);
+      }
+
+      window.shareCard(window.currentSaju || currentSaju);
+      await wait(40);
+      const share = document.getElementById('shareCardModal');
+      const shareButtons = [...share.querySelectorAll('button')].map(css);
+      const sharePanel = share.querySelector('.share-card-sheet');
+      const shareState = {
+        shell: css(share),
+        hasPanel: !!sharePanel,
+        panel: sharePanel ? css(sharePanel) : null,
+        buttons: shareButtons,
+        focusedInside: share.contains(document.activeElement)
+      };
+      window.closeShareCardModal();
+
+      const activeView = document.querySelector('.view.active');
+      const surfaceProbe = document.createElement('div');
+      surfaceProbe.style.backgroundColor = 'var(--apple-surface)';
+      document.body.appendChild(surfaceProbe);
+      const result = {
+        surface: getComputedStyle(surfaceProbe).backgroundColor,
+        accent: getComputedStyle(document.documentElement).getPropertyValue('--apple-accent').trim(),
+        matchControl,
+        matchDecorations,
+        calendarSelected,
+        calendarToday,
+        calendarDecorations,
+        calendarControl,
+        savedCard,
+        savedControl,
+        fortuneCard,
+        modalStates,
+        shareState,
+        activeView: css(activeView),
+        viewportHeight: window.innerHeight,
+        width
+      };
+      probe.remove();
+      fortuneProbe.remove();
+      surfaceProbe.remove();
+      return result;
+    }, { theme, width });
+
+    for (const [name, surface] of Object.entries({
+      matchSlot: state.matchControl,
+      savedCard: state.savedCard,
+      fortuneCard: state.fortuneCard
+    })) {
+      assert.equal(surface.background, state.surface, `${width}px ${theme} ${name} must use the Apple grouped surface`);
+    }
+    for (const color of state.matchDecorations) {
+      assert.ok(!legacyGold.test(color), `${width}px ${theme} match decoration retains legacy gold: ${color}`);
+    }
+    assert.equal(
+      state.calendarSelected.borderTop.toLowerCase(),
+      theme === 'dark' ? 'rgb(10, 132, 255)' : 'rgb(0, 122, 255)',
+      `${width}px ${theme} selected calendar day must use system blue`
+    );
+    for (const value of [state.calendarSelected.outlineColor, state.calendarSelected.boxShadow]) {
+      assert.ok(!legacyGold.test(value), `${width}px ${theme} selected calendar retains legacy gold: ${value}`);
+    }
+    if (state.calendarToday) {
+      for (const value of [state.calendarToday.borderTop, state.calendarToday.outlineColor, state.calendarToday.boxShadow]) {
+        assert.ok(!legacyGold.test(value), `${width}px ${theme} today calendar retains legacy gold: ${value}`);
+      }
+    }
+    for (const cell of state.calendarDecorations) {
+      for (const value of [cell.borderTop, cell.outlineColor, cell.boxShadow]) {
+        assert.ok(!legacyGold.test(value), `${width}px ${theme} calendar cell retains legacy gold: ${value}`);
+      }
+      assert.equal(cell.boxShadow, 'none', `${width}px ${theme} calendar cells must not glow`);
+    }
+    for (const [name, control] of Object.entries({
+      matchSlot: state.matchControl,
+      calendarNext: state.calendarControl,
+      savedDelete: state.savedControl
+    })) {
+      assert.ok(control.width >= 43.5 && control.height >= 43.5, `${width}px ${theme} ${name} is below 44x44px: ${control.width}x${control.height}`);
+    }
+    for (const modal of state.modalStates) {
+      assert.equal(modal.panel.background, state.surface, `${width}px ${theme} ${modal.id} panel surface`);
+      assert.ok(modal.focusedInside, `${width}px ${theme} ${modal.id} must receive focus`);
+      assert.deepEqual(
+        { width: modal.grabber.width, height: modal.grabber.height },
+        { width: 36, height: 5 },
+        `${width}px ${theme} ${modal.id} grabber`
+      );
+      for (const control of modal.controls) {
+        assert.ok(control.width >= 43.5 && control.height >= 43.5, `${width}px ${theme} ${modal.id} control is below 44x44px`);
+      }
+      if (width < 768) {
+        assert.ok(Math.abs(modal.panel.bottom - state.viewportHeight) <= 1, `${width}px ${theme} ${modal.id} must be a bottom sheet`);
+      } else {
+        const center = modal.panel.top + modal.panel.height / 2;
+        assert.ok(Math.abs(center - state.viewportHeight / 2) <= 2, `${width}px ${theme} ${modal.id} must be centered`);
+      }
+    }
+    assert.ok(state.shareState.hasPanel, `${width}px ${theme} share dialog must expose an Apple sheet`);
+    assert.equal(state.shareState.panel.background, state.surface, `${width}px ${theme} share sheet surface`);
+    assert.ok(state.shareState.focusedInside, `${width}px ${theme} share dialog must receive focus`);
+    for (const control of state.shareState.buttons) {
+      assert.ok(control.width >= 43.5 && control.height >= 43.5, `${width}px ${theme} share control is below 44x44px`);
+    }
+    assert.equal(state.activeView.animationName, 'none', `${width}px ${theme} views must not auto-cascade`);
+    assert.notEqual(state.activeView.iterationCount, 'infinite', `${width}px ${theme} views must not loop`);
+    for (const [name, element] of Object.entries({
+      matchSlot: state.matchControl,
+      calendarDay: state.calendarSelected,
+      savedCard: state.savedCard
+    })) {
+      assert.notEqual(element.transitionProperty, 'all', `${width}px ${theme} ${name} must not animate all properties`);
+    }
+  }
+}
+
 async function inspectWidth(browser, width) {
   console.log(`[ui] ${width}px: opening page`);
   const page = await browser.newPage();
@@ -1377,8 +1576,9 @@ async function inspectWidth(browser, width) {
   assert.ok(metrics.overflow <= 1, `${width}px horizontal overflow: ${metrics.overflow}px`);
   assert.equal(metrics.pillars.length, 8, `${width}px pillar count`);
 
-  if (runsGroup('apple-design')) {
+  if (runsGroup('apple-design') || runsGroup('task-5')) {
     await inspectAppleDesign(page, width);
+    await inspectAppleSecondaryScreens(page, width);
     await page.close();
     return;
   }
@@ -1400,21 +1600,22 @@ async function inspectWidth(browser, width) {
     selectedOutline: getComputedStyle(document.querySelector('#daeunScroll .luck-item.selected')).outlineColor,
     bottomBarBackground: getComputedStyle(document.getElementById('bottomBar')).backgroundColor
   }));
-  assert.equal(resultPalette.selectedOutline, 'rgb(240, 214, 154)', `${width}px selected luck outline`);
+  assert.equal(resultPalette.selectedOutline, 'rgb(10, 132, 255)', `${width}px selected luck outline`);
   assert.equal(resultPalette.bottomBarBackground, 'rgba(7, 8, 13, 0.96)', `${width}px bottom bar background`);
 
   await page.evaluate(() => document.querySelector('.tab[data-tab="fortune"]').click());
   await sleep(200);
-  assert.equal(
-    await page.$eval('.fortune-head .year-tag', element => getComputedStyle(element).backgroundColor),
-    'rgb(216, 181, 106)'
-  );
+  const fortunePalette = await page.evaluate(() => ({
+    tag: getComputedStyle(document.querySelector('.fortune-head .year-tag')).backgroundColor,
+    inset: getComputedStyle(document.querySelector('.f-text')).backgroundColor
+  }));
+  assert.equal(fortunePalette.tag, fortunePalette.inset, `${width}px fortune tag must use the grouped inset surface`);
 
   await page.evaluate(() => document.querySelector('.tab[data-tab="match"]').click());
   await sleep(200);
   assert.equal(
     await page.$eval('.match-intro em', element => getComputedStyle(element).color),
-    'rgb(240, 214, 154)'
+    'rgb(10, 132, 255)'
   );
   await page.evaluate(() => document.querySelector('.tab[data-tab="result"]').click());
   await sleep(150);
@@ -1423,10 +1624,12 @@ async function inspectWidth(browser, width) {
   await sleep(150);
   const sharePreview = await page.evaluate(() => ({
     src: document.querySelector('#shareCardModal img')?.getAttribute('src') || '',
-    buttonBackground: getComputedStyle(document.getElementById('shareCardDo')).backgroundImage
+    buttonBackground: getComputedStyle(document.getElementById('shareCardDo')).backgroundImage,
+    buttonColor: getComputedStyle(document.getElementById('shareCardDo')).backgroundColor
   }));
   assert.ok(sharePreview.src.startsWith('data:image/png'), `${width}px share preview missing`);
-  assert.match(sharePreview.buttonBackground, /rgb\(216, 181, 106\)/, `${width}px share button is not gold`);
+  assert.equal(sharePreview.buttonBackground, 'none', `${width}px share button must not use a metallic gradient`);
+  assert.equal(sharePreview.buttonColor, 'rgb(10, 132, 255)', `${width}px share button must use system blue`);
   if (width === 390 && runsGroup('share-back')) {
     const overlayContract = await page.evaluate(() => ({
       closeShare: typeof window.closeShareCardModal,

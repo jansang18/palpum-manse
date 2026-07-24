@@ -172,14 +172,16 @@
     m.setAttribute('aria-modal', 'true');
     m.setAttribute('aria-labelledby', 'shareCardTitle');
     m.setAttribute('tabindex', '-1');
-    m.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.82);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;gap:16px;backdrop-filter:blur(4px)';
+    m.className = 'share-card-overlay';
     m.innerHTML =
-      '<div id="shareCardTitle" style="font-size:12px;font-weight:800;letter-spacing:2px;color:#f0d69a">✧ 공유 카드 미리보기</div>' +
-      '<img src="' + url + '" alt="사주 카드" style="max-width:88%;max-height:66vh;border-radius:18px;box-shadow:0 12px 40px rgba(0,0,0,0.6)">' +
-      '<div style="font-size:13px;color:rgba(255,255,255,0.7)">이미지를 길게 눌러 저장하거나 아래 버튼으로 공유하세요</div>' +
-      '<div style="display:flex;gap:10px;width:100%;max-width:420px">' +
-      '<button id="shareCardDo" style="flex:1;padding:15px;border:none;border-radius:14px;font-size:15px;font-weight:800;color:#161109;background:linear-gradient(135deg,#a97732,#d8b56a,#f0d69a);box-shadow:0 8px 24px rgba(185,135,58,0.28)">공유 / 저장</button>' +
-      '<button id="shareCardClose" style="padding:15px 20px;border:1px solid rgba(255,255,255,0.2);border-radius:14px;font-size:15px;font-weight:700;color:#fff;background:rgba(255,255,255,0.06)">닫기</button>' +
+      '<div class="share-card-sheet">' +
+      '<div id="shareCardTitle" class="share-card-title">공유 카드 미리보기</div>' +
+      '<img class="share-card-preview" src="' + url + '" alt="사주 카드">' +
+      '<div class="share-card-help">이미지를 길게 눌러 저장하거나 아래 버튼으로 공유하세요</div>' +
+      '<div class="share-card-actions">' +
+      '<button id="shareCardDo">공유 / 저장</button>' +
+      '<button id="shareCardClose">닫기</button>' +
+      '</div>' +
       '</div>';
     document.body.appendChild(m);
     if (typeof window.refreshAppOverlayAccessibility === 'function') window.refreshAppOverlayAccessibility();

@@ -13,7 +13,7 @@
 - Both light and dark themes must be complete.
 - No visible gold gradient, gold border, gold glow, or gold selection state may remain.
 - Use system blue `#007AFF` in light mode and `#0A84FF` in dark mode.
-- Preserve five-element colors only where they encode saju data.
+- Render five-element Hanja and status text with the approved pastel palette only where they encode saju data; keep body copy neutral for contrast.
 - Preserve all calculation, storage, sharing, match, calendar, and back-button behavior.
 - All touch targets must be at least 44×44px.
 - CJK boxes must keep `aspect-ratio: 1 / 1`; width/height error must be at most 1px.
@@ -108,6 +108,7 @@ Commit only the versioned test changes in `app/web` after mirroring the test run
 **Interfaces:**
 - Consumes: existing DOM class names and theme toggle using `body.dark`.
 - Produces: semantic tokens `--apple-bg`, `--apple-surface`, `--apple-surface-2`, `--apple-label`, `--apple-secondary`, `--apple-separator`, `--apple-accent`, `--apple-focus`, `--apple-cjk-offset`.
+- Produces pastel element tokens for wood/fire/earth/metal/water surfaces and foregrounds in both themes.
 
 - [ ] **Step 1: Load the final style layer**
 
@@ -152,6 +153,8 @@ body.dark {
 
 Override body backgrounds, remove radial/space gradients, remove gold text clipping, and render `main-logo.png` monochromatically with theme-sensitive CSS filters.
 
+Add the exact approved element tokens from the design spec. Light mode uses pastel surfaces with deeper matching foregrounds; dark mode uses deep tinted surfaces with bright pastel foregrounds. Do not apply these tokens to body copy, navigation, or generic cards.
+
 - [ ] **Step 3: Rebuild top bar and six-tab rail**
 
 Use sticky translucent surfaces, blur only on navigation chrome, 44px icon buttons, a capsule selected tab, and no underline/glow:
@@ -194,6 +197,7 @@ Commit `apple.css`, `index.html`, and test changes as `feat: add Apple system th
 - [ ] **Step 1: Add failing component style assertions**
 
 Assert 52px input height, 54px primary button height, 44px minimum interactive target, 12/14/18px radii, visible focus ring, and no decorative pseudo-element on `.primary-btn`.
+Assert that each element-colored Hanja resolves to its theme-specific pastel foreground/background pair and meets 3:1 contrast for large Hanja.
 
 - [ ] **Step 2: Verify RED**
 
@@ -361,4 +365,3 @@ Run the protected release script with output directory `outputs/2026-07-24-apple
 - [ ] **Step 6: Final verification and commit**
 
 Run syntax checks, `git diff --check`, mirror hash comparison, artifact `VerifyOnly`, and an independent final review. Commit final release-source changes as `release: prepare Apple redesign`.
-

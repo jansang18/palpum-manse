@@ -313,10 +313,108 @@ async function collectAppleInspection(page, selectors) {
   }, selectors);
 }
 
+async function collectAppleComponentInspection(page) {
+  return page.evaluate(() => {
+    const rect = selector => {
+      const element = document.querySelector(selector);
+      const bounds = element?.getBoundingClientRect();
+      return bounds ? { width: bounds.width, height: bounds.height } : null;
+    };
+    const style = (selector, pseudo = null) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const computed = getComputedStyle(element, pseudo);
+      return {
+        backgroundColor: computed.backgroundColor,
+        borderRadius: computed.borderRadius,
+        boxShadow: computed.boxShadow,
+        outlineColor: computed.outlineColor,
+        outlineStyle: computed.outlineStyle,
+        outlineWidth: computed.outlineWidth,
+        content: computed.content,
+        display: computed.display,
+        opacity: computed.opacity,
+        color: computed.color
+      };
+    };
+
+    const probeHost = document.createElement('div');
+    probeHost.id = 'apple-element-probes';
+    probeHost.style.cssText = 'position:fixed;left:-1000px;top:0;display:flex;gap:8px;';
+    for (const element of ['wood', 'fire', 'earth', 'metal', 'water']) {
+      const block = document.createElement('div');
+      block.className = `pillar-block el-${element}`;
+      block.innerHTML = '<span class="han">漢</span>';
+      probeHost.appendChild(block);
+    }
+    document.body.appendChild(probeHost);
+
+    const input = document.querySelector('.input');
+    input?.focus();
+    const focusedInput = style('.input');
+    const elementColors = Object.fromEntries(
+      ['wood', 'fire', 'earth', 'metal', 'water'].map(element => [
+        element,
+        {
+          surface: style(`#apple-element-probes .el-${element}`).backgroundColor,
+          foreground: style(`#apple-element-probes .el-${element} .han`).color
+        }
+      ])
+    );
+    const canvasColor = getComputedStyle(document.body).backgroundColor;
+    probeHost.remove();
+
+    return {
+      geometry: {
+        input: rect('.input'),
+        primary: rect('.primary-btn'),
+        segmented: rect('.segmented'),
+        tabs: [...document.querySelectorAll('.tab')]
+          .filter(element => element.getBoundingClientRect().width > 0)
+          .map(element => element.getBoundingClientRect().height),
+        iconButtons: [...document.querySelectorAll('.icon-btn')]
+          .filter(element => element.getBoundingClientRect().width > 0)
+          .map(element => ({
+            width: element.getBoundingClientRect().width,
+            height: element.getBoundingClientRect().height
+          })),
+        segmentedButtons: [...document.querySelectorAll('.segmented button')]
+          .filter(element => element.getBoundingClientRect().width > 0)
+          .map(element => element.getBoundingClientRect().height)
+      },
+      radii: {
+        input: style('.input').borderRadius,
+        segmented: style('.segmented').borderRadius,
+        card: style('.input-card').borderRadius
+      },
+      primaryAfter: style('.primary-btn', '::after'),
+      focusedInput,
+      elementColors,
+      canvasColor
+    };
+  });
+}
+
 async function inspectAppleDesign(page, width) {
   const expectedAccents = { light: '#007aff', dark: '#0a84ff' };
   const expectedAccentColors = { light: 'rgb(0, 122, 255)', dark: 'rgb(10, 132, 255)' };
   const expectedAccentTints = { light: { r: 0, g: 122, b: 255 }, dark: { r: 10, g: 132, b: 255 } };
+  const expectedPastels = {
+    light: {
+      wood: ['rgb(221, 246, 232)', 'rgb(35, 122, 75)'],
+      fire: ['rgb(255, 227, 223)', 'rgb(184, 68, 56)'],
+      earth: ['rgb(255, 241, 199)', 'rgb(122, 98, 0)'],
+      metal: ['rgb(236, 239, 244)', 'rgb(80, 91, 107)'],
+      water: ['rgb(226, 231, 255)', 'rgb(64, 84, 163)']
+    },
+    dark: {
+      wood: ['rgb(20, 54, 41)', 'rgb(123, 224, 168)'],
+      fire: ['rgb(65, 32, 29)', 'rgb(255, 154, 143)'],
+      earth: ['rgb(58, 48, 20)', 'rgb(242, 211, 111)'],
+      metal: ['rgb(43, 48, 56)', 'rgb(200, 208, 220)'],
+      water: ['rgb(32, 40, 74)', 'rgb(167, 180, 255)']
+    }
+  };
   const legacyGold = /#(?:d8b56a|f0d69a|a97732)\b|rgba?\(\s*(?:216\s*,\s*181\s*,\s*106|240\s*,\s*214\s*,\s*154|169\s*,\s*119\s*,\s*50)\b/i;
   const inputSelectors = {
     styleSelectors: {
@@ -348,6 +446,7 @@ async function inspectAppleDesign(page, width) {
     await page.waitForFunction(() => document.querySelector('#view-input')?.classList.contains('active'));
     await sleep(250);
     const inputInspection = await collectAppleInspection(page, inputSelectors);
+    const componentInspection = await collectAppleComponentInspection(page);
 
     await fillAndCalculate(page);
     const resultInspection = await collectAppleInspection(page, resultSelectors);
@@ -360,6 +459,35 @@ async function inspectAppleDesign(page, width) {
 
     assert.equal(inspection.accent, accent, `${width}px ${theme} --apple-accent`);
     assert.ok(inspection.overflow <= 1, `${width}px ${theme} horizontal overflow: ${inspection.overflow}px`);
+    assert.ok(Math.abs(componentInspection.geometry.input.height - 52) <= 1, `${width}px ${theme} input height must be 52px`);
+    assert.ok(Math.abs(componentInspection.geometry.primary.height - 54) <= 1, `${width}px ${theme} primary button height must be 54px`);
+    assert.ok(componentInspection.geometry.primary.height >= 44, `${width}px ${theme} primary target is below 44px`);
+    for (const height of componentInspection.geometry.tabs) {
+      assert.ok(height >= 44, `${width}px ${theme} tab target is below 44px: ${height}px`);
+    }
+    for (const { width: targetWidth, height } of componentInspection.geometry.iconButtons) {
+      assert.ok(targetWidth >= 44 && height >= 44, `${width}px ${theme} icon target is below 44px: ${targetWidth}x${height}px`);
+    }
+    for (const height of componentInspection.geometry.segmentedButtons) {
+      assert.ok(height >= 44, `${width}px ${theme} segmented target is below 44px: ${height}px`);
+    }
+    assert.equal(componentInspection.radii.input, '12px', `${width}px ${theme} input radius`);
+    assert.equal(componentInspection.radii.segmented, '14px', `${width}px ${theme} segmented radius`);
+    assert.equal(componentInspection.radii.card, '18px', `${width}px ${theme} card radius`);
+    assert.equal(componentInspection.primaryAfter.content, 'none', `${width}px ${theme} primary button must not render decorative pseudo-content`);
+    assert.ok(
+      componentInspection.focusedInput.outlineStyle !== 'none' ||
+      componentInspection.focusedInput.boxShadow !== 'none',
+      `${width}px ${theme} focused input has no visible focus ring`
+    );
+    for (const [element, [surface, foreground]] of Object.entries(expectedPastels[theme])) {
+      const actual = componentInspection.elementColors[element];
+      assert.deepEqual([actual.surface, actual.foreground], [surface, foreground], `${width}px ${theme} ${element} pastel pair`);
+      assert.ok(
+        contrastRatio(actual.foreground, actual.surface, componentInspection.canvasColor) >= 3,
+        `${width}px ${theme} ${element} Hanja contrast is below 3:1`
+      );
+    }
     for (const [surface, elements] of Object.entries(inspection.styles)) {
       assert.ok(elements.length > 0, `${width}px ${theme} ${surface} missing`);
       for (const element of elements) {

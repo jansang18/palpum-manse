@@ -13,6 +13,45 @@ function inspectRepositoryRootInference() {
   assert.match(source, /UI_ROOT[\s\S]*repoRoot/);
 }
 
+function inspectLegendSourceContracts() {
+  const html = fs.readFileSync(path.join(UI_ROOT, 'index.html'), 'utf8');
+  const tokens = fs.readFileSync(path.join(UI_ROOT, 'styles', 'legend-tokens.css'), 'utf8');
+  const layout = fs.readFileSync(path.join(UI_ROOT, 'styles', 'legend-layout.css'), 'utf8');
+  const motion = fs.readFileSync(path.join(UI_ROOT, 'styles', 'legend-motion.css'), 'utf8');
+
+  assert.match(html, /<title>취명선 전설의 만세력<\/title>/);
+  for (const stylesheet of [
+    'styles/legend-tokens.css',
+    'styles/legend-layout.css',
+    'styles/legend-motion.css'
+  ]) {
+    assert.match(html, new RegExp(`<link rel="stylesheet" href="${stylesheet}">`));
+  }
+  for (const asset of ['assets/legend-landscape.webp', 'assets/legend-seal.webp']) {
+    assert.match(html, new RegExp(asset.replace('.', '\\.')));
+    assert.ok(fs.statSync(path.join(UI_ROOT, asset)).size > 0, `${asset} must not be empty`);
+  }
+  for (const token of [
+    '--paper',
+    '--ink',
+    '--seal',
+    '--wood',
+    '--fire',
+    '--earth',
+    '--metal',
+    '--water'
+  ]) {
+    assert.match(tokens, new RegExp(token));
+  }
+  assert.match(layout, /env\(safe-area-inset-top\)/);
+  assert.match(layout, /env\(safe-area-inset-bottom\)/);
+  assert.match(layout, /min-(?:height|block-size):\s*(?:2\.75rem|44px)/);
+  assert.match(layout, /font-family:\s*(?:-apple-system|"?SF Pro)/);
+  assert.match(motion, /prefers-reduced-motion:\s*reduce/);
+  assert.match(motion, /prefers-reduced-transparency:\s*reduce/);
+  assert.match(motion, /prefers-contrast:\s*more/);
+}
+
 const puppeteer = require('puppeteer-core');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -2956,12 +2995,13 @@ async function inspectWidth(browser, width) {
 
 (async () => {
   if (runsGroup('repository-root')) inspectRepositoryRootInference();
+  if (runsGroup('legend-source')) inspectLegendSourceContracts();
   if (runsGroup('android-backup')) inspectAndroidBackupPolicy();
   if (runsAndroidSafeArea()) inspectAndroidSafeAreaContract();
   if (runsResultHeaderCompact()) inspectResultHeaderCompactContract();
   if (runsGroup('release-contract')) inspectReleaseContract();
   if (process.env.SKIP_SOURCE_CONTRACTS !== '1' && runsGroup('final-security')) inspectFinalSecuritySourceContracts();
-  if (TEST_GROUP === 'repository-root' || TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'result-header-compact' || TEST_GROUP === 'release-contract') {
+  if (TEST_GROUP === 'repository-root' || TEST_GROUP === 'legend-source' || TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'result-header-compact' || TEST_GROUP === 'release-contract') {
     console.log(`${TEST_GROUP} regression PASS`);
     return;
   }
@@ -2973,8 +3013,8 @@ async function inspectWidth(browser, width) {
     assert.match(appleCss, /--apple-accent:\s*#007aff/i);
     assert.match(appleCss, /body\.dark[\s\S]*--apple-accent:\s*#0a84ff/i);
     assert.doesNotMatch(appleCss, /#d8b56a|#f0d69a|#a97732/i);
-    assert.match(indexHtml, /<title>취명선 만세력<\/title>/, 'document title must use the current product name');
-    assert.match(indexHtml, /<meta name="apple-mobile-web-app-title" content="취명선 만세력">/, 'Apple web app title must use the current product name');
+    assert.match(indexHtml, /<title>취명선 전설의 만세력<\/title>/, 'document title must use the current product name');
+    assert.match(indexHtml, /<meta name="apple-mobile-web-app-title" content="전설의 만세력">/, 'Apple web app title must use the current product name');
     assert.deepEqual(
       { name: webManifest.name, shortName: webManifest.short_name },
       { name: '취명선 만세력', shortName: '취명선 만세력' },

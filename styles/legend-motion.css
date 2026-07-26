@@ -1,0 +1,100 @@
+@keyframes legend-mist-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.legend-hero,
+.legend-section,
+.legend-layer,
+.legend-story {
+  animation: legend-mist-in 440ms cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+.legend-layer:nth-child(2) { animation-delay: 35ms; }
+.legend-layer:nth-child(3) { animation-delay: 70ms; }
+.legend-layer:nth-child(4) { animation-delay: 105ms; }
+
+.legend-evidence-button,
+.legend-dialog-close,
+.legend-hour-item {
+  transform: translateZ(0);
+  transition:
+    transform 100ms ease-out,
+    background-color 160ms ease-out,
+    border-color 160ms ease-out;
+}
+
+.legend-evidence-button:active,
+.legend-dialog-close:active,
+.legend-hour-item:active {
+  transform: scale(0.97);
+  transition-duration: 70ms;
+}
+
+.legend-evidence-button:focus-visible,
+.legend-dialog-close:focus-visible,
+.legend-hour-item:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--seal) 72%, white);
+  outline-offset: 3px;
+}
+
+.legend-evidence-dialog[open] {
+  animation: legend-mist-in 260ms cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .legend-hero,
+  .legend-section,
+  .legend-layer,
+  .legend-story,
+  .legend-evidence-dialog[open] {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .legend-evidence-button,
+  .legend-dialog-close,
+  .legend-hour-item {
+    transition: opacity 100ms ease-out, background-color 100ms linear;
+    transform: none !important;
+  }
+
+  .legend-hour-list {
+    scroll-behavior: auto;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .legend-paper-panel,
+  .legend-evidence-dialog {
+    background: var(--paper-bright);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .legend-hero,
+  .legend-layer,
+  .legend-section,
+  .legend-story,
+  .legend-evidence-dialog,
+  .legend-evidence-button,
+  .legend-dialog-close,
+  .legend-hour-item {
+    border-color: var(--ink);
+  }
+
+  .legend-layer-detail,
+  .legend-story-body,
+  .legend-dialog-intro,
+  .legend-evidence-part p {
+    color: var(--ink);
+  }
+}

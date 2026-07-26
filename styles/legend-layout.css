@@ -1,0 +1,579 @@
+html {
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Noto Sans KR", sans-serif;
+}
+
+#view-legend {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 68rem);
+  max-width: 68rem;
+  margin-inline: auto;
+  padding:
+    max(0.75rem, env(safe-area-inset-top))
+    max(0.75rem, env(safe-area-inset-right))
+    calc(6rem + env(safe-area-inset-bottom))
+    max(0.75rem, env(safe-area-inset-left));
+  overflow: clip;
+  border-radius: 1.5rem 1.5rem 0 0;
+  background:
+    radial-gradient(circle at 14% 8%, rgb(255 255 255 / 0.62), transparent 24rem),
+    radial-gradient(circle at 83% 22%, rgb(158 62 50 / 0.055), transparent 22rem),
+    linear-gradient(115deg, transparent 48%, rgb(53 93 107 / 0.035)),
+    var(--paper);
+}
+
+#view-legend::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  pointer-events: none;
+  opacity: 0.34;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgb(32 35 31 / 0.08) 0 0.032rem, transparent 0.045rem),
+    radial-gradient(circle at 70% 65%, rgb(154 116 47 / 0.07) 0 0.024rem, transparent 0.038rem);
+  background-size: 0.55rem 0.6rem, 0.72rem 0.66rem;
+}
+
+.legend-shell {
+  display: grid;
+  gap: clamp(0.875rem, 2vw, 1.5rem);
+  width: 100%;
+  min-width: 0;
+}
+
+[data-legend-hero],
+.legend-hero {
+  position: relative;
+  min-height: clamp(23rem, 45vw, 34rem);
+  overflow: hidden;
+  padding:
+    clamp(2rem, 7vw, 5.25rem)
+    clamp(1.25rem, 6vw, 4.75rem)
+    clamp(1.5rem, 5vw, 4rem);
+  border: 1px solid var(--legend-line);
+  border-radius: clamp(1.25rem, 3vw, 2rem);
+  background:
+    linear-gradient(
+      90deg,
+      rgb(250 247 238 / 0.98) 0%,
+      rgb(250 247 238 / 0.94) 38%,
+      rgb(250 247 238 / 0.7) 59%,
+      rgb(250 247 238 / 0.14) 100%
+    ),
+    url("../assets/legend-landscape.webp") center right / cover no-repeat;
+  box-shadow: var(--legend-shadow);
+}
+
+[data-legend-hero]::after,
+.legend-seal {
+  position: absolute;
+  right: clamp(1.25rem, 4vw, 3rem);
+  bottom: clamp(1.25rem, 4vw, 3rem);
+  width: clamp(4.5rem, 10vw, 7.5rem);
+  aspect-ratio: 1;
+  content: "";
+  pointer-events: none;
+  background: url("../assets/legend-seal.webp") center / contain no-repeat;
+  filter: drop-shadow(0 0.35rem 0.6rem rgb(82 33 27 / 0.16));
+}
+
+.legend-eyebrow,
+.legend-layer-kicker {
+  color: var(--seal);
+  font-size: clamp(0.68rem, 0.65rem + 0.15vw, 0.78rem);
+  font-weight: 750;
+  line-height: 1.35;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.legend-hero h2 {
+  position: relative;
+  z-index: 1;
+  max-width: 12em;
+  margin: 0.65rem 0 0.75rem;
+  font-family: var(--legend-display);
+  font-size: clamp(2.25rem, 1.45rem + 4vw, 5rem);
+  font-weight: 700;
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.legend-hero-summary {
+  position: relative;
+  z-index: 1;
+  max-width: 34rem;
+  margin: 0;
+  color: color-mix(in srgb, var(--ink) 76%, var(--paper));
+  font-size: clamp(0.96rem, 0.9rem + 0.25vw, 1.12rem);
+  font-weight: 560;
+  line-height: 1.72;
+  word-break: keep-all;
+}
+
+.legend-score-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: clamp(1.5rem, 4vw, 2.75rem);
+}
+
+.legend-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgb(158 62 50 / 0.25);
+  border-radius: 999px;
+  color: var(--seal);
+  background: rgb(250 247 238 / 0.82);
+}
+
+.legend-score span {
+  font-size: 0.72rem;
+  font-weight: 720;
+  letter-spacing: 0.03em;
+}
+
+.legend-score strong {
+  font-family: var(--legend-display);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.legend-evidence-button,
+.legend-dialog-close,
+.legend-hour-item {
+  min-height: 2.75rem;
+  min-block-size: 2.75rem;
+  border: 1px solid var(--legend-line-strong);
+  color: var(--ink);
+  background: var(--paper-bright);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 720;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.legend-evidence-button,
+.legend-dialog-close {
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+}
+
+.legend-timeline,
+.legend-scroll,
+.legend-narrative {
+  display: grid;
+  gap: clamp(0.65rem, 1.5vw, 1rem);
+  width: min(100%, 54rem);
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.legend-layer,
+.legend-section,
+.legend-story {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--legend-line);
+  border-radius: var(--legend-radius-card);
+  background: rgb(250 247 238 / 0.86);
+  box-shadow: 0 0.55rem 1.8rem rgb(45 38 25 / 0.055);
+}
+
+.legend-layer {
+  display: grid;
+  grid-template:
+    "kicker kicker" auto
+    "value title" auto
+    "value detail" 1fr / minmax(10rem, 0.78fr) minmax(0, 1.22fr);
+  gap: 0.3rem clamp(1.25rem, 4vw, 3rem);
+  align-items: center;
+  min-height: 10rem;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.legend-layer:nth-child(even):not([data-time-layer="hour"]) {
+  grid-template:
+    "kicker kicker" auto
+    "title value" auto
+    "detail value" 1fr / minmax(0, 1.22fr) minmax(10rem, 0.78fr);
+}
+
+.legend-layer:nth-child(even):not([data-time-layer="hour"]) .legend-layer-value {
+  text-align: right;
+}
+
+.legend-layer-kicker {
+  grid-area: kicker;
+}
+
+.legend-layer-title {
+  grid-area: title;
+  margin: 0;
+  font-size: clamp(1.08rem, 1rem + 0.32vw, 1.35rem);
+  font-weight: 760;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.legend-layer-value {
+  grid-area: value;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-family: var(--legend-display);
+  font-size: clamp(1.6rem, 1.3rem + 1.4vw, 2.65rem);
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: -0.035em;
+}
+
+.legend-layer-detail {
+  grid-area: detail;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: clamp(0.8rem, 0.76rem + 0.18vw, 0.92rem);
+  line-height: 1.65;
+  word-break: keep-all;
+}
+
+.legend-layer[data-time-layer="cycle"]::before,
+.legend-layer[data-time-layer="yun"]::before {
+  position: absolute;
+  top: -2.75rem;
+  right: -1.5rem;
+  color: rgb(32 35 31 / 0.035);
+  font-family: var(--legend-display);
+  font-size: 11rem;
+  font-weight: 800;
+  line-height: 1;
+  content: "天";
+  pointer-events: none;
+}
+
+.legend-layer[data-time-layer="yun"]::before {
+  content: "運";
+}
+
+.legend-layer[data-time-layer="hour"] {
+  display: block;
+}
+
+.legend-layer[data-time-layer="hour"] .legend-layer-title {
+  margin-top: 0.35rem;
+}
+
+.legend-layer[data-time-layer="hour"] .legend-layer-value {
+  margin-top: 0.75rem;
+}
+
+.legend-layer[data-time-layer="hour"] .legend-layer-detail {
+  margin-top: 0.45rem;
+}
+
+.legend-hour-list {
+  display: grid;
+  grid-auto-columns: minmax(5.5rem, 1fr);
+  grid-auto-flow: column;
+  gap: 0.5rem;
+  margin: 1.25rem -0.25rem -0.25rem;
+  padding: 0.25rem;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.legend-hour-list::-webkit-scrollbar {
+  display: none;
+}
+
+.legend-hour-item {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 5.5rem;
+  padding: 0.65rem 0.4rem;
+  scroll-snap-align: start;
+  border-color: var(--legend-line);
+  border-radius: 0.9rem;
+  text-align: center;
+}
+
+.legend-hour-ganji {
+  display: block;
+  margin: 0.2rem 0;
+  font-family: var(--legend-display);
+  font-size: 1.45rem;
+  line-height: 1.15;
+}
+
+.legend-hour-time,
+.legend-hour-sipsin {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.legend-narrative {
+  margin-top: clamp(0.5rem, 2vw, 1.25rem);
+}
+
+.legend-story {
+  display: grid;
+  grid-template-columns: clamp(3.5rem, 9vw, 5.5rem) minmax(0, 1fr);
+  column-gap: clamp(1rem, 3vw, 2rem);
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.legend-story-mark {
+  grid-row: 1 / span 3;
+  color: var(--seal);
+  font-family: var(--legend-display);
+  font-size: clamp(2.75rem, 7vw, 5rem);
+  line-height: 0.95;
+  text-align: center;
+}
+
+.legend-story h3 {
+  margin: 0 0 0.45rem;
+  font-size: clamp(1.05rem, 1rem + 0.28vw, 1.3rem);
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+
+.legend-story-summary,
+.legend-story-body {
+  margin: 0;
+  word-break: keep-all;
+}
+
+.legend-story-summary {
+  color: var(--ink);
+  font-size: clamp(0.86rem, 0.82rem + 0.18vw, 0.96rem);
+  font-weight: 720;
+  line-height: 1.6;
+}
+
+.legend-story-body {
+  margin-top: 0.5rem;
+  color: var(--ink-muted);
+  font-size: clamp(0.79rem, 0.76rem + 0.15vw, 0.88rem);
+  line-height: 1.72;
+}
+
+.legend-empty {
+  min-height: 20rem;
+  padding: clamp(3rem, 10vw, 6rem) 1.25rem;
+  border: 1px solid var(--legend-line);
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(rgb(250 247 238 / 0.78), rgb(250 247 238 / 0.94)),
+    url("../assets/legend-landscape.webp") center / cover;
+  text-align: center;
+}
+
+.legend-empty h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--legend-display);
+  font-size: clamp(1.65rem, 1.4rem + 1.2vw, 2.4rem);
+  letter-spacing: -0.035em;
+}
+
+.legend-empty p {
+  max-width: 32rem;
+  margin-inline: auto;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+  line-height: 1.68;
+}
+
+.legend-evidence-dialog {
+  width: min(34rem, calc(100% - 1.5rem));
+  max-height: min(46rem, calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+  margin: auto;
+  overflow: auto;
+  border: 1px solid rgb(255 255 255 / 0.55);
+  border-radius: 1.5rem;
+  padding: 0;
+  color: var(--ink);
+  background: var(--legend-paper-glass);
+  box-shadow: 0 1.5rem 5rem rgb(20 18 14 / 0.3);
+  backdrop-filter: blur(1.5rem) saturate(145%);
+  -webkit-backdrop-filter: blur(1.5rem) saturate(145%);
+}
+
+.legend-evidence-dialog::backdrop {
+  background: rgb(24 24 20 / 0.42);
+}
+
+.legend-dialog-inner {
+  padding:
+    max(1.25rem, env(safe-area-inset-top))
+    max(1.25rem, env(safe-area-inset-right))
+    max(1.25rem, env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
+}
+
+.legend-dialog-inner h2 {
+  margin: 0;
+  font-family: var(--legend-display);
+  font-size: clamp(1.4rem, 1.25rem + 0.7vw, 1.85rem);
+  letter-spacing: -0.035em;
+}
+
+.legend-dialog-intro {
+  margin: 0.5rem 0 1rem;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.legend-evidence-part {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.75rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--legend-line);
+}
+
+.legend-evidence-part strong,
+.legend-evidence-part span {
+  font-size: 0.84rem;
+}
+
+.legend-evidence-part span {
+  color: var(--seal);
+  font-weight: 760;
+}
+
+.legend-evidence-part p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.legend-dialog-close {
+  width: 100%;
+  margin-top: 0.75rem;
+  color: var(--paper-bright);
+  border-color: var(--seal);
+  background: var(--seal);
+}
+
+.day-item[data-legend-day] {
+  position: relative;
+}
+
+.day-item.selected[data-legend-day] {
+  --selected-day-inset: 0px;
+  outline: 2px solid var(--seal);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 1px var(--bg-elev),
+    0 0 0 3px var(--seal);
+  transform: scale(0.985);
+}
+
+.day-item.selected[data-legend-day]::before,
+.day-item.selected[data-legend-day]::after {
+  content: none;
+}
+
+body.dark .day-item.selected[data-legend-day] {
+  outline-color: #df8c7f;
+  box-shadow:
+    0 0 0 1px var(--bg-elev),
+    0 0 0 3px #df8c7f;
+}
+
+@media (max-width: 40rem) {
+  #view-legend {
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding-inline: max(0.625rem, env(safe-area-inset-left));
+  }
+
+  [data-legend-hero],
+  .legend-hero {
+    min-height: 28rem;
+    padding: 2rem 1.25rem 1.5rem;
+    background:
+      linear-gradient(
+        180deg,
+        rgb(250 247 238 / 0.96) 0%,
+        rgb(250 247 238 / 0.88) 58%,
+        rgb(250 247 238 / 0.46) 100%
+      ),
+      url("../assets/legend-landscape.webp") 63% center / cover no-repeat;
+  }
+
+  [data-legend-hero]::after,
+  .legend-seal {
+    right: 1.25rem;
+    bottom: 1.2rem;
+    width: 4.75rem;
+  }
+
+  .legend-hero h2 {
+    max-width: 8.5em;
+    font-size: clamp(2.35rem, 11vw, 3.35rem);
+  }
+
+  .legend-hero-summary {
+    max-width: 24rem;
+    font-size: 0.93rem;
+  }
+
+  .legend-layer,
+  .legend-layer:nth-child(even):not([data-time-layer="hour"]) {
+    display: grid;
+    grid-template:
+      "kicker" auto
+      "value" auto
+      "title" auto
+      "detail" auto / minmax(0, 1fr);
+    gap: 0.45rem;
+    min-height: 0;
+    padding: 1.2rem;
+  }
+
+  .legend-layer:nth-child(even):not([data-time-layer="hour"]) .legend-layer-value {
+    text-align: left;
+  }
+
+  .legend-layer-value {
+    margin: 0.2rem 0 0.4rem;
+    font-size: clamp(1.75rem, 7.6vw, 2.35rem);
+  }
+
+  .legend-layer[data-time-layer="hour"] {
+    display: block;
+  }
+
+  .legend-story {
+    grid-template-columns: 3.25rem minmax(0, 1fr);
+    column-gap: 0.8rem;
+    padding: 1.2rem;
+  }
+
+  .legend-story-mark {
+    font-size: 3rem;
+  }
+}

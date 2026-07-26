@@ -1,0 +1,33 @@
+:root {
+  --paper: #f2ecdd;
+  --paper-bright: #faf7ee;
+  --ink: #20231f;
+  --ink-muted: #77786f;
+  --seal: #9e3e32;
+  --wood: #3e6b57;
+  --fire: #a94732;
+  --earth: #9a742f;
+  --metal: #6d7372;
+  --water: #355d6b;
+  --legend-line: rgb(32 35 31 / 0.14);
+  --legend-line-strong: rgb(32 35 31 / 0.28);
+  --legend-paper-glass: rgb(250 247 238 / 0.78);
+  --legend-radius: 2px;
+  --legend-radius-card: 1.125rem;
+  --legend-shadow: 0 18px 60px rgb(45 38 25 / 0.12);
+  --legend-display: "Iowan Old Style", "AppleMyungjo", "Nanum Myeongjo",
+    "Noto Serif KR", "Batang", serif;
+  --legend-ui: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+    "Noto Sans KR", "Malgun Gothic", sans-serif;
+}
+
+#view-legend {
+  color: var(--ink);
+  font-family: var(--legend-ui);
+  font-optical-sizing: auto;
+}
+
+#view-legend ::selection {
+  color: var(--paper-bright);
+  background: var(--seal);
+}

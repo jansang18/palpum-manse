@@ -1042,24 +1042,44 @@ async function inspectLegendFlow(page, width) {
   await page.$eval('#dayArea [data-legend-day="18"]', element => element.click());
   const selectedDay = await page.evaluate(() => {
     const selected = document.querySelector('#dayArea [data-legend-day="18"]');
-    const date = selected.querySelector('.d-num');
     const style = getComputedStyle(selected);
+    const before = getComputedStyle(selected, '::before');
     const after = getComputedStyle(selected, '::after');
     const selectedRect = selected.getBoundingClientRect();
-    const dateRect = date.getBoundingClientRect();
     const number = value => Number.parseFloat(value) || 0;
-    const cueWidth = number(after.width) + number(after.borderLeftWidth) + number(after.borderRightWidth);
-    const cueHeight = number(after.height) + number(after.borderTopWidth) + number(after.borderBottomWidth);
-    const cueLeft = selectedRect.left + number(after.left);
-    const cueTop = selectedRect.top + number(after.top);
-    const cueRect = {
-      left: cueLeft,
-      right: cueLeft + cueWidth,
-      top: cueTop,
-      bottom: cueTop + cueHeight
+    const pseudoRect = pseudo => {
+      if (pseudo.content === 'none' || pseudo.display === 'none') return null;
+      const width = number(pseudo.width) + number(pseudo.borderLeftWidth) + number(pseudo.borderRightWidth);
+      const height = number(pseudo.height) + number(pseudo.borderTopWidth) + number(pseudo.borderBottomWidth);
+      const left = selectedRect.left + number(pseudo.left);
+      const top = selectedRect.top + number(pseudo.top);
+      return { left, right: left + width, top, bottom: top + height };
     };
-    const overlapWidth = Math.max(0, Math.min(cueRect.right, dateRect.right) - Math.max(cueRect.left, dateRect.left));
-    const overlapHeight = Math.max(0, Math.min(cueRect.bottom, dateRect.bottom) - Math.max(cueRect.top, dateRect.top));
+    const cueRects = [
+      { name: 'before', rect: pseudoRect(before) },
+      { name: 'after', rect: pseudoRect(after) }
+    ].filter(cue => cue.rect);
+    const inset = number(style.getPropertyValue('--selected-day-inset'));
+    if (inset > 0) {
+      cueRects.push(
+        { name: 'inset-top', rect: { left: selectedRect.left, right: selectedRect.right, top: selectedRect.top, bottom: selectedRect.top + inset } },
+        { name: 'inset-right', rect: { left: selectedRect.right - inset, right: selectedRect.right, top: selectedRect.top, bottom: selectedRect.bottom } },
+        { name: 'inset-bottom', rect: { left: selectedRect.left, right: selectedRect.right, top: selectedRect.bottom - inset, bottom: selectedRect.bottom } },
+        { name: 'inset-left', rect: { left: selectedRect.left, right: selectedRect.left + inset, top: selectedRect.top, bottom: selectedRect.bottom } }
+      );
+    }
+    const textNodes = [...selected.querySelectorAll('.d-num, .d-s, .d-b, .d-kor-t, .d-kor')];
+    const intersections = [];
+    textNodes.forEach(node => {
+      const textRect = node.getBoundingClientRect();
+      cueRects.forEach(cue => {
+        const overlapWidth = Math.max(0, Math.min(cue.rect.right, textRect.right) - Math.max(cue.rect.left, textRect.left));
+        const overlapHeight = Math.max(0, Math.min(cue.rect.bottom, textRect.bottom) - Math.max(cue.rect.top, textRect.top));
+        if (overlapWidth * overlapHeight > 0) {
+          intersections.push({ text: node.className, cue: cue.name, area: overlapWidth * overlapHeight });
+        }
+      });
+    });
     const rgb = value => (value.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
     const luminance = value => {
       const [red, green, blue] = rgb(value).map(channel => {
@@ -1078,17 +1098,24 @@ async function inspectLegendFlow(page, width) {
       ariaPressed: selected.getAttribute('aria-pressed'),
       outlineStyle: style.outlineStyle,
       outlineWidth: parseFloat(style.outlineWidth),
-      cueWidth,
-      cueHeight,
-      overlapArea: overlapWidth * overlapHeight,
+      boxShadow: style.boxShadow,
+      transform: style.transform,
+      beforeContent: before.content,
+      afterContent: after.content,
+      textCount: textNodes.length,
+      intersections,
       contrast
     };
   });
   assert.equal(selectedDay.ariaPressed, 'true', `${width}px selected day aria state`);
   assert.equal(selectedDay.outlineStyle, 'solid', `${width}px selected day outline cue`);
   assert.ok(selectedDay.outlineWidth >= 2, `${width}px selected day outline width`);
-  assert.ok(selectedDay.cueWidth >= 12 && selectedDay.cueHeight >= 3, `${width}px selected day shape cue`);
-  assert.equal(selectedDay.overlapArea, 0, `${width}px selected cue must not obscure two-digit date`);
+  assert.ok(selectedDay.textCount >= 5, `${width}px selected day text descendants`);
+  assert.deepEqual(selectedDay.intersections, [], `${width}px selected cue intersects text`);
+  assert.notEqual(selectedDay.boxShadow, 'none', `${width}px selected day double boundary`);
+  assert.notEqual(selectedDay.transform, 'none', `${width}px selected day persistent shape cue`);
+  assert.equal(selectedDay.beforeContent, 'none', `${width}px selected day before overlay`);
+  assert.equal(selectedDay.afterContent, 'none', `${width}px selected day after overlay`);
   assert.ok(selectedDay.contrast >= 3, `${width}px selected day outline contrast ${selectedDay.contrast}`);
 
   await page.click('.tab[data-tab="legend"]');

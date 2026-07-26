@@ -44,6 +44,8 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [390, 520, 600, 700, 768, 1220]
   : TEST_GROUP === 'frontend-quality'
     ? [320, 768, 1440]
+  : TEST_GROUP === 'legend-flow'
+    ? [320, 390]
   : TEST_GROUP === 'repository-root'
     ? [390]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
@@ -1037,11 +1039,27 @@ async function inspectLegendFlow(page, width) {
   await sleep(60);
   await page.$eval('#woonScroll .luck-item', element => element.click());
   await sleep(60);
-  await page.click('#dayArea [data-legend-day="1"]');
+  await page.$eval('#dayArea [data-legend-day="18"]', element => element.click());
   const selectedDay = await page.evaluate(() => {
-    const selected = document.querySelector('#dayArea [data-legend-day="1"]');
+    const selected = document.querySelector('#dayArea [data-legend-day="18"]');
+    const date = selected.querySelector('.d-num');
     const style = getComputedStyle(selected);
     const after = getComputedStyle(selected, '::after');
+    const selectedRect = selected.getBoundingClientRect();
+    const dateRect = date.getBoundingClientRect();
+    const number = value => Number.parseFloat(value) || 0;
+    const cueWidth = number(after.width) + number(after.borderLeftWidth) + number(after.borderRightWidth);
+    const cueHeight = number(after.height) + number(after.borderTopWidth) + number(after.borderBottomWidth);
+    const cueLeft = selectedRect.left + number(after.left);
+    const cueTop = selectedRect.top + number(after.top);
+    const cueRect = {
+      left: cueLeft,
+      right: cueLeft + cueWidth,
+      top: cueTop,
+      bottom: cueTop + cueHeight
+    };
+    const overlapWidth = Math.max(0, Math.min(cueRect.right, dateRect.right) - Math.max(cueRect.left, dateRect.left));
+    const overlapHeight = Math.max(0, Math.min(cueRect.bottom, dateRect.bottom) - Math.max(cueRect.top, dateRect.top));
     const rgb = value => (value.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
     const luminance = value => {
       const [red, green, blue] = rgb(value).map(channel => {
@@ -1060,14 +1078,17 @@ async function inspectLegendFlow(page, width) {
       ariaPressed: selected.getAttribute('aria-pressed'),
       outlineStyle: style.outlineStyle,
       outlineWidth: parseFloat(style.outlineWidth),
-      afterContent: after.content,
+      cueWidth,
+      cueHeight,
+      overlapArea: overlapWidth * overlapHeight,
       contrast
     };
   });
   assert.equal(selectedDay.ariaPressed, 'true', `${width}px selected day aria state`);
   assert.equal(selectedDay.outlineStyle, 'solid', `${width}px selected day outline cue`);
   assert.ok(selectedDay.outlineWidth >= 2, `${width}px selected day outline width`);
-  assert.match(selectedDay.afterContent, /✓/, `${width}px selected day non-color check cue`);
+  assert.ok(selectedDay.cueWidth >= 12 && selectedDay.cueHeight >= 3, `${width}px selected day shape cue`);
+  assert.equal(selectedDay.overlapArea, 0, `${width}px selected cue must not obscure two-digit date`);
   assert.ok(selectedDay.contrast >= 3, `${width}px selected day outline contrast ${selectedDay.contrast}`);
 
   await page.click('.tab[data-tab="legend"]');

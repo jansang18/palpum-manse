@@ -4,7 +4,7 @@
   root.LegendCopy = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const ELEMENTS = Object.freeze(['목', '화', '토', '금', '수']);
-  const RELATIONS = Object.freeze(['동조', '생조', '표출', '압력', '제어']);
+  const RELATIONS = Object.freeze(['동조', '생조', '표출', '압력', '제어', '판단 보류']);
   const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff<>"'&/=`\\]/gu;
 
   const RELATION_COPY = Object.freeze({
@@ -37,6 +37,12 @@
       work: '책임과 자원을 다루는 자리에서 원칙을 세울수록 신뢰가 쌓입니다.',
       relation: '주도권을 쥐더라도 상대의 속도와 선택을 존중해 주세요.',
       action: '결정 기준 세 가지를 적고 그 기준에 맞는 선택부터 실행하세요.'
+    },
+    '판단 보류': {
+      tone: '비교에 필요한 정보가 부족해 시대와 개인의 관계를 판단하지 않습니다.',
+      work: '필요한 명식 정보가 갖춰지기 전에는 일의 방향을 시대 흐름과 연결해 단정하지 않습니다.',
+      relation: '관계 해석에 필요한 정보를 먼저 확인하고 실제 대화를 기준으로 판단하세요.',
+      action: '시대 오행과 일간 정보를 확인한 뒤 다시 해석하세요.'
     }
   });
 
@@ -69,27 +75,38 @@
     const symbol = sanitizePlainText(era.symbol, '흐름', 20);
     const element = ELEMENTS.includes(era.element) ? era.element : '화';
     const yun = Number.isInteger(era.yun) && era.yun >= 1 && era.yun <= 9 ? era.yun : 9;
-    const relation = RELATIONS.includes(resonance.relation) ? resonance.relation : '동조';
+    const relation = RELATIONS.includes(resonance.relation)
+      ? resonance.relation
+      : '판단 보류';
     const score = normalizeScore(resonance.score);
     const copy = RELATION_COPY[relation];
+    const isDeferred = relation === '판단 보류';
 
     return {
       heroTitle: `${symbol}의 시대에 선 ${name}`,
-      heroSummary: `${yun}운 ${element}의 흐름과 개인 명식의 관계는 ${relation}이며 공명도는 ${score}점입니다. ${copy.tone}`,
+      heroSummary: isDeferred
+        ? `${yun}운 ${element}의 흐름과 개인 명식의 관계는 판단 보류입니다. 시대 오행과 일간 정보를 확인하면 공명도를 계산할 수 있습니다.`
+        : `${yun}운 ${element}의 흐름과 개인 명식의 관계는 ${relation}이며 공명도는 ${score}점입니다. ${copy.tone}`,
       sections: [
         {
           key: 'era',
           hanja: '時',
           title: '시대와 나',
-          summary: `${symbol}을 상징하는 ${yun}운과 ${relation}의 관계를 이룹니다.`,
-          body: `${copy.tone} 시대의 기운은 배경이며 선택과 행동이 실제 방향을 만듭니다.`
+          summary: isDeferred
+            ? `${symbol}을 상징하는 ${yun}운의 시대 배경만 확인했습니다.`
+            : `${symbol}을 상징하는 ${yun}운과 ${relation}의 관계를 이룹니다.`,
+          body: isDeferred
+            ? `${copy.tone} 시대의 기운은 배경이며 필요한 정보 없이 개인의 흐름을 단정하지 않습니다.`
+            : `${copy.tone} 시대의 기운은 배경이며 선택과 행동이 실제 방향을 만듭니다.`
         },
         {
           key: 'work',
           hanja: '業',
           title: '일과 역할',
           summary: copy.work,
-          body: `지금은 공명도 ${score}점을 성패의 예언으로 보기보다 일의 방식과 우선순위를 점검하는 기준으로 활용할 때입니다.`
+          body: isDeferred
+            ? '필요한 명식 정보를 확인한 뒤 일의 방식과 우선순위를 점검하는 참고 자료로 활용하세요.'
+            : `지금은 공명도 ${score}점을 성패의 예언으로 보기보다 일의 방식과 우선순위를 점검하는 기준으로 활용할 때입니다.`
         },
         {
           key: 'wealth',

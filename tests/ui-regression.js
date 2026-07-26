@@ -999,6 +999,64 @@ async function fillAndCalculate(page) {
   await sleep(600);
 }
 
+async function inspectLegendFlow(page, width) {
+  await page.evaluate(() => {
+    document.getElementById('inputName').value = '전설<img src=x onerror="window.__legendXss=1">';
+    document.getElementById('inBirth').value = '19921024';
+    document.getElementById('inTime').value = '0530';
+    document.getElementById('calcBtn').click();
+  });
+  await sleep(500);
+  await page.click('.tab[data-tab="legend"]');
+  await sleep(100);
+
+  const state = await page.evaluate(() => ({
+    hero: document.querySelector('[data-legend-hero]')?.textContent,
+    layers: [...document.querySelectorAll('[data-time-layer]')]
+      .map(node => node.getAttribute('data-time-layer')),
+    hourlyCount: document.querySelectorAll('[data-hour-branch]').length,
+    evidenceButtons: document.querySelectorAll('[data-legend-evidence]').length,
+    unsafeElementCount: document.querySelectorAll('#legendContent img').length,
+    xss: window.__legendXss || 0,
+    hourlyApi: typeof window.getHourlyFortunes
+  }));
+  assert.match(state.hero, /시대/);
+  assert.deepEqual(
+    state.layers,
+    ['cycle', 'yun', 'natal', 'daeun', 'seun', 'month', 'day', 'hour'],
+    `${width}px legend time layers`
+  );
+  assert.equal(state.hourlyCount, 12, `${width}px hourly fortune count`);
+  assert.ok(state.evidenceButtons >= 1, `${width}px legend evidence trigger`);
+  assert.equal(state.unsafeElementCount, 0, `${width}px user name must remain plain text`);
+  assert.equal(state.xss, 0, `${width}px user name executed markup`);
+  assert.equal(state.hourlyApi, 'function', `${width}px hourly fortune API`);
+
+  await page.click('[data-legend-evidence]');
+  const evidence = await page.evaluate(() => ({
+    open: document.querySelector('[data-legend-evidence-dialog]')?.open,
+    partCount: document.querySelectorAll('[data-legend-evidence-part]').length
+  }));
+  assert.equal(evidence.open, true, `${width}px evidence dialog must open`);
+  assert.equal(evidence.partCount, 5, `${width}px evidence score part count`);
+
+  await page.evaluate(() => {
+    document.querySelector('[data-legend-evidence-dialog]')?.close();
+    document.querySelector('.tab[data-tab="input"]').click();
+    document.getElementById('inTime').value = '';
+    document.getElementById('calcBtn').click();
+  });
+  await sleep(500);
+  await page.click('.tab[data-tab="legend"]');
+  await sleep(100);
+  const unknownTime = await page.evaluate(() => ({
+    natal: document.querySelector('[data-time-layer="natal"]')?.textContent,
+    hourlyCount: document.querySelectorAll('[data-hour-branch]').length
+  }));
+  assert.match(unknownTime.natal, /시각 미상/);
+  assert.equal(unknownTime.hourlyCount, 12, `${width}px unknown natal time hourly choices`);
+}
+
 async function collectAppleInspection(page, selectors) {
   return page.evaluate(({ styleSelectors, geometrySelectors }) => {
     const visualProperties = [
@@ -2004,6 +2062,12 @@ async function inspectWidth(browser, width) {
   await page.goto(URL, { waitUntil: 'networkidle0' });
   console.log(`[ui] ${width}px: loaded`);
   await page.evaluate(() => document.body.classList.add('dark'));
+
+  if (TEST_GROUP === 'legend-flow') {
+    await inspectLegendFlow(page, width);
+    await page.close();
+    return;
+  }
 
   if (TEST_GROUP === 'frontend-quality') {
     await inspectFrontendQuality(page, width);

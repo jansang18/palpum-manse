@@ -1934,6 +1934,266 @@
     margin-top: 14px;
   }
 
+  /* 전설: iPhone의 명료한 위계와 잉크 두루마리의 정서를 결합한 독립 화면 */
+  #view-legend {
+    max-width: 960px;
+    margin: 0 auto;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  }
+  .legend-shell { display: grid; gap: 14px; padding-top: 8px; }
+  .legend-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 26px 22px 22px;
+    border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at 88% 14%, color-mix(in srgb, var(--fire) 18%, transparent), transparent 32%),
+      color-mix(in srgb, var(--bg-elev) 86%, transparent);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .12);
+    backdrop-filter: saturate(160%) blur(20px);
+    -webkit-backdrop-filter: saturate(160%) blur(20px);
+  }
+  .legend-hero::after {
+    content: "傳";
+    position: absolute;
+    right: 18px;
+    bottom: -24px;
+    color: color-mix(in srgb, var(--text) 5%, transparent);
+    font-family: "Songti SC", "Batang", serif;
+    font-size: clamp(104px, 25vw, 180px);
+    line-height: 1;
+    pointer-events: none;
+  }
+  .legend-eyebrow,
+  .legend-layer-kicker {
+    color: var(--text-sub);
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .legend-hero h2 {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    margin: 9px 0 8px;
+    font-family: "Songti SC", "Batang", serif;
+    font-size: clamp(28px, 7vw, 48px);
+    font-weight: 700;
+    line-height: 1.14;
+    letter-spacing: -.04em;
+  }
+  .legend-hero-summary {
+    position: relative;
+    z-index: 1;
+    max-width: 660px;
+    color: var(--text-sub);
+    font-size: 14px;
+    font-weight: 560;
+    line-height: 1.72;
+    word-break: keep-all;
+  }
+  .legend-score-row {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .legend-score {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 7%, transparent);
+    font-size: 13px;
+    font-weight: 750;
+  }
+  .legend-score strong { font-size: 20px; letter-spacing: -.03em; }
+  .legend-evidence-button,
+  .legend-dialog-close {
+    min-height: 44px;
+    border: 0;
+    border-radius: 999px;
+    padding: 0 16px;
+    color: white;
+    background: var(--apple-accent, #007aff);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 750;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: transform 100ms ease-out, opacity 120ms ease-out;
+  }
+  .legend-evidence-button:active,
+  .legend-dialog-close:active,
+  .legend-hour-item:active { transform: scale(.97); }
+  .legend-timeline {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .legend-layer {
+    min-width: 0;
+    padding: 17px;
+    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+    border-radius: 18px;
+    background: var(--bg-elev);
+  }
+  .legend-layer[data-time-layer="cycle"],
+  .legend-layer[data-time-layer="hour"] { grid-column: 1 / -1; }
+  .legend-layer-title {
+    margin-top: 5px;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -.025em;
+  }
+  .legend-layer-value {
+    margin-top: 8px;
+    color: var(--text);
+    font-family: "Songti SC", "Batang", serif;
+    font-size: 21px;
+    font-weight: 700;
+  }
+  .legend-layer-detail {
+    margin-top: 6px;
+    color: var(--text-sub);
+    font-size: 12px;
+    font-weight: 560;
+    line-height: 1.55;
+    word-break: keep-all;
+  }
+  .legend-hour-list {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(78px, 1fr);
+    gap: 8px;
+    overflow-x: auto;
+    margin: 14px -5px -3px;
+    padding: 3px 5px 10px;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+  .legend-hour-list::-webkit-scrollbar { display: none; }
+  .legend-hour-item {
+    min-height: 84px;
+    scroll-snap-align: start;
+    border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+    border-radius: 15px;
+    padding: 10px 7px;
+    color: var(--text);
+    background: color-mix(in srgb, var(--text) 4%, transparent);
+    font: inherit;
+    text-align: center;
+    transition: transform 100ms ease-out, background-color 160ms ease-out;
+  }
+  .legend-hour-ganji {
+    display: block;
+    margin: 4px 0;
+    font-family: "Songti SC", "Batang", serif;
+    font-size: 23px;
+    font-weight: 700;
+  }
+  .legend-hour-time,
+  .legend-hour-sipsin {
+    display: block;
+    color: var(--text-sub);
+    font-size: 10px;
+    font-weight: 650;
+  }
+  .legend-narrative {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .legend-story {
+    padding: 18px;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--bg-elev) 94%, var(--text) 2%);
+  }
+  .legend-story-mark {
+    color: var(--fire-deep);
+    font-family: "Songti SC", "Batang", serif;
+    font-size: 24px;
+  }
+  .legend-story h3 { margin: 5px 0 7px; font-size: 16px; letter-spacing: -.02em; }
+  .legend-story-summary { color: var(--text); font-size: 13px; font-weight: 700; line-height: 1.55; }
+  .legend-story-body { margin-top: 7px; color: var(--text-sub); font-size: 12px; line-height: 1.65; }
+  .legend-empty {
+    padding: 56px 22px;
+    border-radius: 22px;
+    background: var(--bg-elev);
+    text-align: center;
+  }
+  .legend-empty h2 { margin: 0 0 8px; font-size: 22px; }
+  .legend-empty p { color: var(--text-sub); font-size: 13px; line-height: 1.65; }
+  .legend-evidence-dialog {
+    width: min(520px, calc(100% - 24px));
+    max-height: min(720px, calc(100dvh - 36px));
+    margin: auto;
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+    border-radius: 24px;
+    padding: 0;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg-elev) 94%, transparent);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .32);
+    backdrop-filter: saturate(160%) blur(24px);
+    -webkit-backdrop-filter: saturate(160%) blur(24px);
+  }
+  .legend-evidence-dialog::backdrop {
+    background: rgba(0, 0, 0, .42);
+    backdrop-filter: blur(3px);
+  }
+  .legend-dialog-inner { padding: 24px; }
+  .legend-dialog-inner h2 { margin: 0; font-size: 21px; letter-spacing: -.03em; }
+  .legend-dialog-intro { margin: 7px 0 16px; color: var(--text-sub); font-size: 12px; line-height: 1.6; }
+  .legend-evidence-part {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    padding: 13px 0;
+    border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  }
+  .legend-evidence-part strong { font-size: 13px; }
+  .legend-evidence-part span { font-size: 13px; font-weight: 750; }
+  .legend-evidence-part p {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--text-sub);
+    font-size: 11px;
+    line-height: 1.55;
+  }
+  .legend-dialog-close { width: 100%; margin-top: 14px; }
+
+  @media (max-width: 520px) {
+    .legend-timeline,
+    .legend-narrative { grid-template-columns: 1fr; }
+    .legend-layer[data-time-layer="cycle"],
+    .legend-layer[data-time-layer="hour"] { grid-column: auto; }
+    .legend-hero { padding: 23px 18px 20px; border-radius: 21px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .legend-evidence-button,
+    .legend-dialog-close,
+    .legend-hour-item { transition: opacity 100ms ease-out; transform: none !important; }
+    .legend-hour-list { scroll-behavior: auto; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .legend-hero,
+    .legend-evidence-dialog { background: var(--bg-elev); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
+  @media (prefers-contrast: more) {
+    .legend-hero,
+    .legend-layer,
+    .legend-evidence-dialog { border-color: currentColor; }
+  }
+
   @media (min-width: 768px) {
     #view-fortune, #view-match { max-width: 720px; margin: 0 auto; }
     .overall-card { padding: 28px 24px; }
@@ -1986,6 +2246,7 @@
   <nav class="tabs" role="tablist" aria-label="주요 화면">
     <button type="button" class="tab active" id="tab-input" role="tab" aria-selected="true" aria-controls="view-input" data-tab="input">입력</button>
     <button type="button" class="tab" id="tab-result" role="tab" aria-selected="false" aria-controls="view-result" data-tab="result">원국</button>
+    <button type="button" class="tab" id="tab-legend" role="tab" aria-selected="false" aria-controls="view-legend" data-tab="legend">전설</button>
     <button type="button" class="tab" id="tab-fortune" role="tab" aria-selected="false" aria-controls="view-fortune" data-tab="fortune">풀이</button>
     <button type="button" class="tab" id="tab-match" role="tab" aria-selected="false" aria-controls="view-match" data-tab="match">궁합</button>
     <button type="button" class="tab" id="tab-calendar" role="tab" aria-selected="false" aria-controls="view-calendar" data-tab="calendar">만세력</button>
@@ -2047,6 +2308,10 @@
   </section>
 
   <section class="view" id="view-result" role="tabpanel" aria-labelledby="tab-result" hidden></section>
+
+  <section class="view" id="view-legend" role="tabpanel" aria-labelledby="tab-legend" hidden>
+    <div id="legendContent" aria-live="polite"></div>
+  </section>
 
   <section class="view" id="view-fortune" role="tabpanel" aria-labelledby="tab-fortune" hidden>
     <div id="fortuneContent"></div>
@@ -12680,6 +12945,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 let currentSaju = null;
 let selectedDaeun = null, selectedSeun = null, selectedWoon = null;
+let selectedLegendDay = null;
 
 function syncTabA11y(activeTab) {
   $$('.tab').forEach(tab => {
@@ -12720,6 +12986,7 @@ $$('.tab').forEach(t => {
   if (tab === 'saved') renderSaved();
   if (tab === 'fortune') renderFortune();
   if (tab === 'match') renderMatch();
+  if (tab === 'legend' && typeof window.renderLegend === 'function') window.renderLegend(currentSaju);
   });
 });
 syncTabA11y($('.tab.active'));
@@ -12826,7 +13093,7 @@ onTap($('#calcBtn'), () => {
     const saju = calcSaju({ year: y, month: m, day: d, hour: h, minute: mi, calendar, gender, unknown });
     saju.name = name || '이름 없음';
     currentSaju = saju;
-    selectedDaeun = null; selectedSeun = null; selectedWoon = null;
+    selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
     renderResult();
     $$('.tab').forEach(x => x.classList.remove('active'));
     $$('.tab')[1].classList.add('active');
@@ -12907,7 +13174,7 @@ function renderResult() {
   $$('#daeunScroll .luck-item').forEach(el => {
     el.addEventListener('click', () => {
       const idx = +el.dataset.idx;
-      selectedDaeun = idx; selectedSeun = null; selectedWoon = null;
+      selectedDaeun = idx; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
       $$('#daeunScroll .luck-item').forEach(x => x.classList.remove('selected'));
       el.classList.add('selected');
       renderSeun();
@@ -13167,7 +13434,7 @@ function renderSeun() {
   $$('#seunScroll .luck-item').forEach(el => {
     el.addEventListener('click', () => {
       const y = +el.dataset.year;
-      selectedSeun = y; selectedWoon = null;
+      selectedSeun = y; selectedWoon = null; selectedLegendDay = null;
       $$('#seunScroll .luck-item').forEach(x => x.classList.remove('selected'));
       el.classList.add('selected');
       renderWoon();
@@ -13203,7 +13470,7 @@ function renderWoon() {
   $$('#woonScroll .luck-item').forEach(el => {
     el.addEventListener('click', () => {
       const y = +el.dataset.year, m = +el.dataset.month;
-      selectedWoon = { y, m };
+      selectedWoon = { y, m }; selectedLegendDay = null;
       $$('#woonScroll .luck-item').forEach(x => x.classList.remove('selected'));
       el.classList.add('selected');
       renderDay();
@@ -13237,9 +13504,14 @@ function renderDay() {
     const sT = SIPSIN_KOR[getSipsin(s.dStem, g.stem)];
     const sB = SIPSIN_KOR[getSipsin(s.dStem, JIJANGAN[g.branch][0])];
     const isToday = isThisMonth && today.getDate() === d;
+    const isSelected = selectedLegendDay
+      && selectedLegendDay.y === y
+      && selectedLegendDay.m === m
+      && selectedLegendDay.d === d;
     const wdIdx = new Date(y, m - 1, d).getDay();
     const wdCls = wdIdx === 0 ? 'sun' : wdIdx === 6 ? 'sat' : '';
-    cells += `<div class="day-item ${wdCls} ${isToday?'today':''}">
+    cells += `<div class="day-item ${wdCls} ${isToday?'today':''} ${isSelected?'selected':''}"
+      data-legend-day="${d}" role="button" tabindex="0" aria-pressed="${isSelected ? 'true' : 'false'}">
       <div class="d-num">${d}</div>
       <div class="d-han">
         <span class="d-s ${EL_CLASS[sE]}">${STEM[g.stem]}</span>
@@ -13256,6 +13528,24 @@ function renderDay() {
       <div class="day-grid">${cells}</div>
     </div>
   `;
+
+  $$('#dayArea [data-legend-day]').forEach(el => {
+    const selectDay = () => {
+      selectedLegendDay = { y, m, d: +el.dataset.legendDay };
+      $$('#dayArea [data-legend-day]').forEach(dayEl => {
+        const selected = dayEl === el;
+        dayEl.classList.toggle('selected', selected);
+        dayEl.setAttribute('aria-pressed', String(selected));
+      });
+      if (typeof window.renderLegend === 'function') window.renderLegend(currentSaju);
+    };
+    el.addEventListener('click', selectDay);
+    el.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      selectDay();
+    });
+  });
 }
 
 function kvCell(k, v) {
@@ -13734,7 +14024,7 @@ async function renderSaved() {
       }
       if (rec) {
         currentSaju = rec;
-        selectedDaeun = null; selectedSeun = null; selectedWoon = null;
+        selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
         renderResult();
         $$('.tab').forEach(x => x.classList.remove('active'));
         $$('.tab')[1].classList.add('active');
@@ -13884,6 +14174,7 @@ async function findSimilarSaju() {
       const item = scored.find(x => x.rec.id === id);
       if (item) {
         currentSaju = item.rec;
+        selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
         renderResult(item.rec);
         window.closeAppModal($('#similarModal'));
         // 원국 탭으로
@@ -15622,6 +15913,10 @@ if ('serviceWorker' in navigator) {
    홈화면 추가 안내 — 제거됨
    ============================================ */
 </script>
+<script src="scripts/legend-era.js"></script>
+<script src="scripts/legend-resonance.js"></script>
+<script src="scripts/legend-copy.js"></script>
+<script src="scripts/legend-view.js"></script>
 <script src="share.js"></script>
 <script src="nav.js"></script>
 </body>

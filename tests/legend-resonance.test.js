@@ -85,6 +85,39 @@ test('uses natural Korean particles in score reasons', () => {
   assert.match(result.parts.short.reason, /토와 시대 오행 화의/);
 });
 
+test('defers the relation and identifies each missing required input', () => {
+  const missingEra = calculateResonance({
+    dayElement: '목',
+    usefulElement: '화',
+    elements: { 목: 1, 화: 1, 토: 1, 금: 1, 수: 1 },
+    daeunElement: '목',
+    shortElement: '토'
+  });
+  assert.equal(missingEra.relation, '판단 보류');
+  assert.match(missingEra.parts.useful.reason, /시대 오행 정보가 없어/);
+  assert.match(missingEra.parts.day.reason, /시대 오행 정보가 없어/);
+  assert.match(missingEra.parts.balance.reason, /시대 오행 정보가 없어/);
+  assert.match(missingEra.parts.daeun.reason, /시대 오행 정보가 없어/);
+  assert.match(missingEra.parts.short.reason, /시대 오행 정보가 없어/);
+  assert.ok(Object.values(missingEra.parts).every((part) => !part.reason.includes('동조')));
+
+  const missingDay = calculateResonance({
+    eraElement: '화',
+    usefulElement: '화',
+    elements: { 목: 1, 화: 1, 토: 1, 금: 1, 수: 1 },
+    daeunElement: '목',
+    shortElement: '토'
+  });
+  assert.equal(missingDay.relation, '판단 보류');
+  assert.match(missingDay.parts.day.reason, /일간 정보가 없어/);
+  assert.match(missingDay.parts.useful.reason, /관계는 동조/);
+
+  const missingBoth = calculateResonance({});
+  assert.equal(missingBoth.relation, '판단 보류');
+  assert.match(missingBoth.parts.day.reason, /시대 오행과 일간 정보가 없어/);
+  assert.match(missingBoth.parts.balance.reason, /시대 오행과 오행 분포 정보가 없어/);
+});
+
 test('clamps malformed and missing context to finite scores', () => {
   for (const context of [
     undefined,

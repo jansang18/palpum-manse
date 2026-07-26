@@ -57,13 +57,20 @@
     return clampScore(max * RELATION_RATIOS[relation], max);
   }
 
+  function missingInputsReason(labels, action) {
+    return `${labels.join('과 ')} 정보가 없어 ${action}`;
+  }
+
   function makeRelationPart(label, personalElement, eraElement, max) {
     const relation = relationToEra(personalElement, eraElement);
     if (!relation) {
+      const missing = [];
+      if (!eraElement) missing.push('시대 오행');
+      if (!personalElement) missing.push(label);
       return {
         score: 0,
         max,
-        reason: `${label} 정보가 없어 이 항목은 반영하지 않았습니다.`
+        reason: missingInputsReason(missing, '이 항목은 반영하지 않았습니다.')
       };
     }
     return {
@@ -80,11 +87,17 @@
 
   function makeBalancePart(elements, eraElement) {
     const max = 20;
-    if (!eraElement || !elements || typeof elements !== 'object' || Array.isArray(elements)) {
+    const hasElements = Boolean(
+      elements && typeof elements === 'object' && !Array.isArray(elements)
+    );
+    if (!eraElement || !hasElements) {
+      const missing = [];
+      if (!eraElement) missing.push('시대 오행');
+      if (!hasElements) missing.push('오행 분포');
       return {
         score: 0,
         max,
-        reason: '오행 분포 정보가 없어 균형 보완도를 반영하지 않았습니다.'
+        reason: missingInputsReason(missing, '균형 보완도를 반영하지 않았습니다.')
       };
     }
 
@@ -120,7 +133,7 @@
     const usefulElement = normalizeElement(source.usefulElement);
     const daeunElement = normalizeElement(source.daeunElement);
     const shortElement = normalizeElement(source.shortElement);
-    const relation = relationToEra(dayElement, eraElement) || '동조';
+    const relation = relationToEra(dayElement, eraElement) || '판단 보류';
 
     const parts = {
       useful: makeRelationPart('용신 후보', usefulElement, eraElement, 35),

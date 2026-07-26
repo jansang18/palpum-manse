@@ -12452,6 +12452,9 @@ function solarToLunar(y, m, d) {
 
 function calcSaju(opts) {
   let { year, month, day, hour, minute, calendar, gender, unknown } = opts;
+  if (calendar === 'lunar' && year < 1800) {
+    throw new RangeError('1800년 이전 음력 생년월일은 지원하지 않습니다. 양력으로 입력해주세요.');
+  }
   let lunar = null;
   let yi, mi, mStem, di;
   let hBranch = -1, hStem = -1;
@@ -12832,7 +12835,11 @@ onTap($('#calcBtn'), () => {
     syncTabA11y($$('.tab')[1]);
     $('#bottomBar').style.display = 'flex';
     window.scrollTo({top: 0, behavior: 'smooth'});
-  } catch (e) { console.error(e); alert('계산 오류: ' + e.message); }
+  } catch (e) {
+    console.error(e);
+    if (e instanceof RangeError) return showInErr(e.message, '#inBirth');
+    alert('계산 오류: ' + e.message);
+  }
 });
 
 function renderResult() {

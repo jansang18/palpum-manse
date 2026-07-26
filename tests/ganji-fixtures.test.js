@@ -172,3 +172,73 @@ test('browser calculation renders the precise KASI result contract', {
     await browser.close();
   }
 });
+
+test('browser rejects pre-1800 lunar dates but preserves solar legacy mode', {
+  skip: process.env.RUN_UI_GANJI !== '1'
+}, async () => {
+  const puppeteer = require('puppeteer-core');
+  const chrome = process.env.CHROME_PATH ||
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+  const browser = await puppeteer.launch({
+    executablePath: chrome,
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+
+  try {
+    const page = await browser.newPage();
+    await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
+      waitUntil: 'networkidle0'
+    });
+
+    const direct = await page.evaluate(() => {
+      let lunarError = null;
+      try {
+        calcSaju({
+          year: 1799, month: 1, day: 1, hour: 12, minute: 0,
+          calendar: 'lunar', gender: 'M', unknown: false
+        });
+      } catch (error) {
+        lunarError = { name: error.name, message: error.message };
+      }
+      const solar = calcSaju({
+        year: 1799, month: 1, day: 1, hour: 12, minute: 0,
+        calendar: 'solar', gender: 'M', unknown: false
+      });
+      return {
+        lunarError,
+        solarMode: solar.calculationMode,
+        solarDate: [solar.year, solar.month, solar.day]
+      };
+    });
+    assert.deepEqual(direct, {
+      lunarError: {
+        name: 'RangeError',
+        message: '1800년 이전 음력 생년월일은 지원하지 않습니다. 양력으로 입력해주세요.'
+      },
+      solarMode: 'legacy-approximate',
+      solarDate: [1799, 1, 1]
+    });
+
+    await page.evaluate(() => {
+      document.querySelector('#segCal [data-val="lunar"]').click();
+      document.getElementById('inBirth').value = '17990101';
+      document.getElementById('inTime').value = '1200';
+      document.getElementById('calcBtn').click();
+    });
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const userFacing = await page.evaluate(() => ({
+      message: document.getElementById('inErr').textContent.trim(),
+      inputActive: document.getElementById('view-input').classList.contains('active'),
+      birthInvalid: document.getElementById('inBirth').classList.contains('field-err')
+    }));
+    assert.deepEqual(userFacing, {
+      message: '1800년 이전 음력 생년월일은 지원하지 않습니다. 양력으로 입력해주세요.',
+      inputActive: true,
+      birthInvalid: true
+    });
+  } finally {
+    await browser.close();
+  }
+});

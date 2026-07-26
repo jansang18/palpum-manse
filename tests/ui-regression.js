@@ -5,23 +5,35 @@ const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const vm = require('node:vm');
+const TEST_GROUP = process.env.TEST_GROUP || '';
+
+function inspectRepositoryRootInference() {
+  const source = fs.readFileSync(__filename, 'utf8');
+  assert.match(source, /path\.join\(repoRoot,\s*'index\.html'\)/);
+  assert.match(source, /UI_ROOT[\s\S]*repoRoot/);
+}
+
 const puppeteer = require('puppeteer-core');
 
-const inferredAppRoot = fs.existsSync(path.join(__dirname, 'www', 'index.html'))
-  ? __dirname
-  : path.resolve(__dirname, '..', '..');
+const repoRoot = path.resolve(__dirname, '..');
+const inferredUiRoot = fs.existsSync(path.join(repoRoot, 'index.html'))
+  ? repoRoot
+  : path.join(path.resolve(__dirname, '..', '..'), 'www');
+const UI_ROOT = process.env.UI_ROOT
+  ? path.resolve(process.cwd(), process.env.UI_ROOT)
+  : inferredUiRoot;
 const APP_ROOT = process.env.APP_ROOT
   ? path.resolve(process.cwd(), process.env.APP_ROOT)
-  : inferredAppRoot;
+  : fs.existsSync(path.join(repoRoot, 'index.html'))
+    ? repoRoot
+    : path.resolve(__dirname, '..', '..');
 const WEB_ROOT = process.env.WEB_ROOT
   ? path.resolve(APP_ROOT, process.env.WEB_ROOT)
-  : path.join(APP_ROOT, 'web');
+  : fs.existsSync(path.join(repoRoot, 'index.html'))
+    ? repoRoot
+    : path.join(APP_ROOT, 'web');
 const CHROME = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const UI_ROOT = process.env.UI_ROOT
-  ? path.resolve(APP_ROOT, process.env.UI_ROOT)
-  : path.join(APP_ROOT, 'www');
 const URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
-const TEST_GROUP = process.env.TEST_GROUP || '';
 const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-width'
   ? [390, 1220]
   : TEST_GROUP === 'fold-layout'
@@ -32,6 +44,8 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [390, 520, 600, 700, 768, 1220]
   : TEST_GROUP === 'frontend-quality'
     ? [320, 768, 1440]
+  : TEST_GROUP === 'repository-root'
+    ? [390]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
@@ -2777,12 +2791,13 @@ async function inspectWidth(browser, width) {
 }
 
 (async () => {
+  if (runsGroup('repository-root')) inspectRepositoryRootInference();
   if (runsGroup('android-backup')) inspectAndroidBackupPolicy();
   if (runsAndroidSafeArea()) inspectAndroidSafeAreaContract();
   if (runsResultHeaderCompact()) inspectResultHeaderCompactContract();
   if (runsGroup('release-contract')) inspectReleaseContract();
   if (process.env.SKIP_SOURCE_CONTRACTS !== '1' && runsGroup('final-security')) inspectFinalSecuritySourceContracts();
-  if (TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'result-header-compact' || TEST_GROUP === 'release-contract') {
+  if (TEST_GROUP === 'repository-root' || TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'result-header-compact' || TEST_GROUP === 'release-contract') {
     console.log(`${TEST_GROUP} regression PASS`);
     return;
   }

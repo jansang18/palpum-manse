@@ -12219,6 +12219,8 @@ Sigrid Niehaus|19641229|F|
   </div>
 </div>
 
+<script src="scripts/vendor/manseryeok.browser.js"></script>
+<script src="scripts/manseryeok-adapter.js"></script>
 <script>
 /* 전역 에러 핸들러 — 콘솔에만 기록 (화면 오버레이는 iOS에서 인터랙션을 막을 수 있어 제거) */
 window.addEventListener('error', function(e) {
@@ -12451,19 +12453,50 @@ function solarToLunar(y, m, d) {
 function calcSaju(opts) {
   let { year, month, day, hour, minute, calendar, gender, unknown } = opts;
   let lunar = null;
-  if (calendar === 'lunar') {
-    const sol = lunarToSolar(year, month, day, false);
-    if (sol) { lunar = { y: year, m: month, d: day }; year = sol.y; month = sol.m; day = sol.d; }
-  } else lunar = solarToLunar(year, month, day);
+  let yi, mi, mStem, di;
+  let hBranch = -1, hStem = -1;
+  let daeun = null;
+  let calculationMode = 'legacy-approximate';
+
+  if (year >= 1800) {
+    if (!globalThis.LegendGanji || typeof globalThis.LegendGanji.calculate !== 'function') {
+      throw new Error('정밀 만세력 계산 모듈을 불러오지 못했습니다.');
+    }
+    const precise = globalThis.LegendGanji.calculate({
+      ...opts,
+      dayBoundary: opts.dayBoundary || 'midnight'
+    });
+    year = precise.year;
+    month = precise.month;
+    day = precise.day;
+    lunar = precise.lunar;
+    yi = { stem: precise.yStem, branch: precise.yBranch };
+    mi = { branch: precise.mBranch };
+    mStem = precise.mStem;
+    di = { stem: precise.dStem, branch: precise.dBranch };
+    hStem = precise.hStem;
+    hBranch = precise.hBranch;
+    daeun = precise.daeun;
+    calculationMode = precise.calculationMode;
+  } else {
+    if (calendar === 'lunar') {
+      const sol = lunarToSolar(year, month, day, false);
+      if (sol) { lunar = { y: year, m: month, d: day }; year = sol.y; month = sol.m; day = sol.d; }
+    } else lunar = solarToLunar(year, month, day);
+
+    const legacyJd = toJD(year, month, day) + (hour + minute/60) / 24;
+    yi = getYearStemBranch(legacyJd, year);
+    mi = getMonthBranch(legacyJd, year);
+    const refStem = ((yi.useYear - 4) % 10 + 10) % 10;
+    mStem = getMonthStem(refStem, mi.branch);
+    di = dayGanji(toJD(year, month, day));
+    if (!unknown) {
+      hBranch = hourToBranch(hour);
+      hStem = getHourStem(di.stem, hBranch);
+    }
+  }
 
   const jd = toJD(year, month, day) + (hour + minute/60) / 24;
-  const yi = getYearStemBranch(jd, year);
-  const mi = getMonthBranch(jd, year);
-  const refStem = ((yi.useYear - 4) % 10 + 10) % 10;
-  const mStem = getMonthStem(refStem, mi.branch);
-  const di = dayGanji(toJD(year, month, day));
-  let hBranch = -1, hStem = -1;
-  if (!unknown) { hBranch = hourToBranch(hour); hStem = getHourStem(di.stem, hBranch); }
 
   const sipsin = {
     year: getSipsin(di.stem, yi.stem),
@@ -12487,7 +12520,7 @@ function calcSaju(opts) {
   if (hBranch >= 0) branches.push(hBranch);
   const interactions = analyzeInter(branches, yi.stem, mStem, di.stem, hStem);
   const shinsal = calcShinsal(yi.branch, di.branch, branches, di.stem);
-  const daeun = calcDaeun(yi.stem, gender, mStem, mi.branch, jd, year);
+  if (!daeun) daeun = calcDaeun(yi.stem, gender, mStem, mi.branch, jd, year);
   const gongmang = calcGongmang(di.stem, di.branch);
 
   return {
@@ -12497,7 +12530,7 @@ function calcSaju(opts) {
     dStem: di.stem, dBranch: di.branch,
     hStem, hBranch,
     sipsin, sipsinJi, ohaeng, interactions, shinsal, daeun, gongmang,
-    unknown, gender, jd
+    unknown, gender, jd, calculationMode
   };
 }
 
@@ -12821,7 +12854,8 @@ function renderResult() {
       <div class="name">${escapeHtml(s.name)} <span class="age-inline">(만 ${age}세)</span></div>
       <div class="info">
         ${s.gender === 'M' ? '남성' : '여성'}<br>
-        양력 ${s.year}.${pad(s.month)}.${pad(s.day)}${s.lunar ? ` / 음력 ${s.lunar.y}.${pad(s.lunar.m)}.${pad(s.lunar.d)}` : ''}<br>
+        양력 ${s.year}.${pad(s.month)}.${pad(s.day)}${s.lunar ? ` / 음력 ${s.lunar.y}.${pad(s.lunar.m)}.${pad(s.lunar.d)}` : ''}
+        <span data-calculation-mode="${s.calculationMode}">${s.calculationMode === 'kasi-precise' ? '정밀 계산' : '역사 범위 근사 계산'}</span><br>
         ${s.unknown ? '시 모름' : `${BRANCH_KOR[s.hBranch]}시 (${pad(s.hour)}시 ${pad(s.minute)}분)`}
       </div>
     </div>

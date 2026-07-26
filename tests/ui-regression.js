@@ -1032,6 +1032,58 @@ async function inspectLegendFlow(page, width) {
   assert.equal(state.xss, 0, `${width}px user name executed markup`);
   assert.equal(state.hourlyApi, 'function', `${width}px hourly fortune API`);
 
+  await page.click('.tab[data-tab="result"]');
+  await page.$eval('#seunScroll .luck-item', element => element.click());
+  await sleep(60);
+  await page.$eval('#woonScroll .luck-item', element => element.click());
+  await sleep(60);
+  await page.click('#dayArea [data-legend-day="1"]');
+  const selectedDay = await page.evaluate(() => {
+    const selected = document.querySelector('#dayArea [data-legend-day="1"]');
+    const style = getComputedStyle(selected);
+    const after = getComputedStyle(selected, '::after');
+    const rgb = value => (value.match(/[\d.]+/g) || []).slice(0, 3).map(Number);
+    const luminance = value => {
+      const [red, green, blue] = rgb(value).map(channel => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045
+          ? normalized / 12.92
+          : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    };
+    const foreground = luminance(style.outlineColor);
+    const background = luminance(style.backgroundColor);
+    const contrast = (Math.max(foreground, background) + 0.05)
+      / (Math.min(foreground, background) + 0.05);
+    return {
+      ariaPressed: selected.getAttribute('aria-pressed'),
+      outlineStyle: style.outlineStyle,
+      outlineWidth: parseFloat(style.outlineWidth),
+      afterContent: after.content,
+      contrast
+    };
+  });
+  assert.equal(selectedDay.ariaPressed, 'true', `${width}px selected day aria state`);
+  assert.equal(selectedDay.outlineStyle, 'solid', `${width}px selected day outline cue`);
+  assert.ok(selectedDay.outlineWidth >= 2, `${width}px selected day outline width`);
+  assert.match(selectedDay.afterContent, /✓/, `${width}px selected day non-color check cue`);
+  assert.ok(selectedDay.contrast >= 3, `${width}px selected day outline contrast ${selectedDay.contrast}`);
+
+  await page.click('.tab[data-tab="legend"]');
+  const ownership = await page.evaluate(() => {
+    const trigger = document.querySelector('[data-legend-evidence]');
+    const dialog = document.querySelector('[data-legend-evidence-dialog]');
+    return {
+      controlledId: trigger?.getAttribute('aria-controls'),
+      dialogId: dialog?.id,
+      titleId: dialog?.querySelector('h2')?.id
+    };
+  });
+  assert.ok(ownership.dialogId, `${width}px evidence dialog id`);
+  assert.equal(ownership.controlledId, ownership.dialogId, `${width}px evidence dialog ownership`);
+  assert.notEqual(ownership.controlledId, ownership.titleId, `${width}px evidence trigger must not control the title`);
+
   await page.click('[data-legend-evidence]');
   const evidence = await page.evaluate(() => ({
     open: document.querySelector('[data-legend-evidence-dialog]')?.open,

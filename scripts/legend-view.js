@@ -139,6 +139,7 @@
 
   function evidenceDialog(resonance) {
     const dialog = element('dialog', 'legend-evidence-dialog');
+    dialog.id = 'legendEvidenceDialog';
     dialog.dataset.legendEvidenceDialog = '';
     dialog.setAttribute('aria-labelledby', 'legendEvidenceTitle');
 
@@ -186,7 +187,7 @@
     evidence.type = 'button';
     evidence.dataset.legendEvidence = '';
     evidence.setAttribute('aria-haspopup', 'dialog');
-    evidence.setAttribute('aria-controls', 'legendEvidenceTitle');
+    evidence.setAttribute('aria-controls', dialog.id);
     evidence.addEventListener('click', () => {
       if (typeof dialog.showModal === 'function') dialog.showModal();
       else dialog.setAttribute('open', '');

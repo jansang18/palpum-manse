@@ -20,7 +20,7 @@
 - Mark 1026-1799 results as `역사 범위 근사`.
 - Unknown birth time on a Palpum boundary must produce an uncertain two-candidate result rather than guessing.
 - Add no new runtime dependency.
-- Push and deploy only to the `legend` remote and `legend-manse` GitHub Pages site; never push this feature to `origin`.
+- Push and deploy only to a new `palpum` remote and `palpum-manse` GitHub Pages site; never push this feature to `origin` or the existing `legend` remote.
 
 ## File Map
 
@@ -736,14 +736,14 @@ git commit -m "feat: preserve Palpum results across saved and offline flows"
 
 ---
 
-### Task 8: Full Verification and Legend-Only Deployment
+### Task 8: Full Verification and Palpum-Only Deployment
 
 **Files:**
 - Verify only; update files only if a failing test requires a TDD fix.
 
 **Interfaces:**
-- Production URL: `https://jansang18.github.io/legend-manse/`
-- Deployment remote: `legend`
+- Production URL: `https://jansang18.github.io/palpum-manse/`
+- Deployment remote: `palpum`
 
 - [ ] **Step 1: Run all automated tests**
 
@@ -780,17 +780,17 @@ Run: `git diff --stat eabe5e0..HEAD`
 
 Expected: only intended source, test, plan, and spec changes; `artifacts/` remains untracked and unstaged.
 
-- [ ] **Step 5: Push only to the legend remote**
+- [ ] **Step 5: Push only to the new Palpum remote**
 
 ```bash
-git push legend feat/legend-manse-implementation:main
+git push palpum feat/legend-manse-implementation:main
 ```
 
-Never run `git push origin`.
+Never run `git push origin` or `git push legend`.
 
 - [ ] **Step 6: Verify GitHub Pages production**
 
-Open `https://jansang18.github.io/legend-manse/` with a cache-busting query, wait for the service worker update, and repeat the startup, calculation, period, and non-overlap checks against production.
+Open `https://jansang18.github.io/palpum-manse/` with a cache-busting query, wait for the service worker update, and repeat the startup, calculation, period, and non-overlap checks against production.
 
 - [ ] **Step 7: Record deployment commit**
 

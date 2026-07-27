@@ -695,7 +695,7 @@ test('browser persists the advanced day-boundary choice and explains calculation
     await page.goto(url, { waitUntil: 'networkidle0' });
     await openInputDestination(page);
     await page.evaluate(() => {
-      localStorage.removeItem('legend-saju:day-boundary');
+      localStorage.removeItem('palpum-manse:day-boundary');
     });
     await page.reload({ waitUntil: 'networkidle0' });
     await openInputDestination(page);
@@ -726,7 +726,7 @@ test('browser persists the advanced day-boundary choice and explains calculation
     await openResultDestination(page);
 
     const calculated = await page.evaluate(() => ({
-      preference: localStorage.getItem('legend-saju:day-boundary'),
+      preference: localStorage.getItem('palpum-manse:day-boundary'),
       dayBoundary: currentSaju?.dayBoundary,
       day: [currentSaju?.dStem, currentSaju?.dBranch],
       hour: [currentSaju?.hStem, currentSaju?.hBranch],

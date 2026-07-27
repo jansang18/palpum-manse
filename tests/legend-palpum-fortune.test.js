@@ -37,7 +37,9 @@ function fixtureInput(overrides = {}) {
       hBranch: 6,
       ohaeng: [2, 2, 2, 2, 0]
     },
-    daeun: { stem: 6, branch: 8 },
+    daeun: { stem: 0, branch: 2 },
+    annual: { year: 2026, stem: 2, branch: 6 },
+    monthly: null,
     target: { year: 2026, month: null, stem: 2, branch: 6 },
     era: { yun: 9, element: '화', symbol: '빛' },
     ...overrides
@@ -57,23 +59,37 @@ test('returns role-led sections and at least three distinct evidence layers', ()
   assert.equal(typeof result.preparation, 'string');
   assert.deepEqual(
     new Set(result.evidence.map(item => item.kind)),
-    new Set(['팔품', '시기', '시대'])
+    new Set(['팔품', '대운', '세운', '시대'])
   );
+  assert.doesNotMatch(JSON.stringify(result), /월운/);
+});
+
+test('explicit timing layers ignore the deprecated collapsed target', () => {
+  const first = composePalpumFortune(fixtureInput({
+    annual: { year: 2026, stem: 6, branch: 8 },
+    target: { year: 1900, month: 1, stem: 2, branch: 6 }
+  }));
+  const second = composePalpumFortune(fixtureInput({
+    annual: { year: 2026, stem: 6, branch: 8 },
+    target: { year: 2099, month: 12, stem: 0, branch: 2 }
+  }));
+
+  assert.deepEqual(first, second);
 });
 
 test('selects bounded states from ruler visibility, timing, and weak-era context', () => {
   const manifest = composePalpumFortune(fixtureInput({
-    target: { year: 2026, month: null, stem: 6, branch: 8 }
+    annual: { year: 2026, stem: 6, branch: 8 }
   }));
   const transition = composePalpumFortune(fixtureInput({
-    target: { year: 2026, month: null, stem: 2, branch: 6 }
+    annual: { year: 2026, stem: 2, branch: 6 }
   }));
   const adjust = composePalpumFortune(fixtureInput({
-    target: { year: 2026, month: null, stem: 0, branch: 2 },
+    annual: { year: 2026, stem: 0, branch: 2 },
     era: { yun: 9, element: '화', symbol: '빛' }
   }));
   const accumulate = composePalpumFortune(fixtureInput({
-    target: { year: 2026, month: null, stem: 0, branch: 2 },
+    annual: { year: 2026, stem: 0, branch: 2 },
     era: { yun: 8, element: '토', symbol: '산' }
   }));
 
@@ -96,7 +112,7 @@ test('does not call strong timing 발현 when the ruler is absent from the natal
       hBranch: 11,
       ohaeng: [2, 2, 2, 0, 2]
     },
-    target: { year: 2026, month: null, stem: 6, branch: 8 },
+    annual: { year: 2026, stem: 6, branch: 8 },
     era: { yun: 8, element: '토', symbol: '산' }
   }));
 
@@ -107,16 +123,16 @@ test('same-element opposite-polarity presence cannot satisfy the exact-ruler gat
   const result = composePalpumFortune(fixtureInput({
     saju: {
       yStem: 7,
-      yBranch: 9,
+      yBranch: 1,
       mStem: 4,
       mBranch: 10,
       dStem: 0,
-      dBranch: 2,
+      dBranch: 7,
       hStem: 2,
-      hBranch: 6,
+      hBranch: 0,
       ohaeng: [2, 2, 2, 2, 0]
     },
-    target: { year: 2026, month: null, stem: 6, branch: 8 },
+    annual: { year: 2026, stem: 6, branch: 8 },
     era: { yun: 8, element: '토', symbol: '산' }
   }));
   const palpumEvidence = result.evidence.find(item => item.kind === '팔품');
@@ -126,9 +142,89 @@ test('same-element opposite-polarity presence cannot satisfy the exact-ruler gat
   assert.match(palpumEvidence.detail, /같은 오행.*2/);
 });
 
+test('a ruler in a secondary hidden stem satisfies the exact-ruler gate once', () => {
+  const result = composePalpumFortune(fixtureInput({
+    saju: {
+      yStem: 0,
+      yBranch: 9,
+      mStem: 2,
+      mBranch: 0,
+      dStem: 4,
+      dBranch: 7,
+      hStem: 8,
+      hBranch: 11,
+      ohaeng: [2, 1, 2, 1, 2]
+    },
+    annual: { year: 2026, stem: 6, branch: 8 },
+    era: { yun: 8, element: '토', symbol: '산' }
+  }));
+  const palpumEvidence = result.evidence.find(item => item.kind === '팔품');
+
+  assert.equal(result.state, '발현');
+  assert.match(palpumEvidence.detail, /당령 흔적은 1곳/);
+});
+
+test('a ruler in a residual hidden stem satisfies the exact-ruler gate once', () => {
+  const result = composePalpumFortune(fixtureInput({
+    saju: {
+      yStem: 0,
+      yBranch: 5,
+      mStem: 2,
+      mBranch: 0,
+      dStem: 4,
+      dBranch: 7,
+      hStem: 8,
+      hBranch: 11,
+      ohaeng: [2, 2, 2, 1, 1]
+    },
+    annual: { year: 2026, stem: 6, branch: 8 },
+    era: { yun: 8, element: '토', symbol: '산' }
+  }));
+  const palpumEvidence = result.evidence.find(item => item.kind === '팔품');
+
+  assert.equal(result.state, '발현');
+  assert.match(palpumEvidence.detail, /당령 흔적은 1곳/);
+});
+
+for (const layer of [
+  { input: 'daeun', kind: '대운' },
+  { input: 'annual', kind: '세운' },
+  { input: 'monthly', kind: '월운' }
+]) {
+  test(`changing only ${layer.kind} changes its evidence and bounded state`, () => {
+    const neutral = { stem: 0, branch: 2 };
+    const supportive = { stem: 6, branch: 8 };
+    const burdensome = { stem: 2, branch: 6 };
+    const base = {
+      daeun: neutral,
+      annual: { year: 2026, ...neutral },
+      monthly: layer.input === 'monthly' ? { year: 2026, month: 8, ...neutral } : null,
+      era: { yun: 8, element: '토', symbol: '산' }
+    };
+    const withLayer = pillar => composePalpumFortune(fixtureInput({
+      ...base,
+      [layer.input]: layer.input === 'annual'
+        ? { year: 2026, ...pillar }
+        : layer.input === 'monthly'
+          ? { year: 2026, month: 8, ...pillar }
+          : pillar
+    }));
+    const supported = withLayer(supportive);
+    const burdened = withLayer(burdensome);
+    const supportedEvidence = supported.evidence.find(item => item.kind === layer.kind);
+    const burdenedEvidence = burdened.evidence.find(item => item.kind === layer.kind);
+
+    assert.equal(supported.state, '발현');
+    assert.equal(burdened.state, '전환');
+    assert.notEqual(supportedEvidence.detail, burdenedEvidence.detail);
+    assert.match(supportedEvidence.detail, /관계 신호 2/);
+    assert.match(burdenedEvidence.detail, /관계 신호 -2/);
+  });
+}
+
 test('changing only the era changes context evidence but not a strong timing state', () => {
   const strongTiming = {
-    target: { year: 2026, month: null, stem: 6, branch: 8 }
+    annual: { year: 2026, stem: 6, branch: 8 }
   };
   const fireEra = composePalpumFortune(fixtureInput({
     ...strongTiming,
@@ -168,6 +264,7 @@ test('uses shared language and asks for birth time at an uncertain Palpum bounda
   assert.equal(palpumEvidence.label, '자축품 · 인묘품 후보');
   assert.match(palpumEvidence.detail, /출생 시각.*확인/);
   assert.doesNotMatch(JSON.stringify(result), /당령 계수/);
+  assert.doesNotMatch(JSON.stringify(result), /대운/);
   assert.ok(result.tags.includes('자축품'));
   assert.ok(result.tags.includes('인묘품'));
 });

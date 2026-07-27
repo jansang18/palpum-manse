@@ -155,7 +155,7 @@
 
     // 푸터
     c.fillStyle = THEME.tertiary; c.font = '500 23px sans-serif';
-    c.fillText('취명선 전설의 만세력 · jansang18.github.io/legend-manse', W / 2, H - 72);
+    c.fillText('취명선 전설의 만세력 · jansang18.github.io/palpum-manse', W / 2, H - 72);
 
     return cv;
   }
@@ -229,7 +229,7 @@
       '일 경계 관법 · ' + boundary,
       '계산 시간 기준 · ' + calculationProvenance(s),
       pillars,
-      'jansang18.github.io/legend-manse'
+      'jansang18.github.io/palpum-manse'
     ].join('\n');
   }
 

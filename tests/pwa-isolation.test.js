@@ -5,8 +5,11 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync('index.html', 'utf8');
 const share = fs.readFileSync('share.js', 'utf8');
+const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const packageLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
 const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
 const serviceWorker = fs.readFileSync('sw.js', 'utf8');
+const storageSource = fs.readFileSync('scripts/legend-storage.js', 'utf8');
 const protectedBuild = fs.readFileSync('scripts/build-protected.ps1', 'utf8');
 const ganjiFixtures = fs.readFileSync('tests/ganji-fixtures.test.js', 'utf8');
 const uiRegression = fs.readFileSync('tests/ui-regression.js', 'utf8');
@@ -45,18 +48,133 @@ function escaped(path) {
   return new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 }
 
-test('uses legend-specific PWA identity and colors', () => {
+function response(label) {
+  return {
+    label,
+    clone() {
+      return response(label);
+    }
+  };
+}
+
+function createServiceWorkerHarness(options = {}) {
+  const origin = 'https://jansang18.github.io';
+  const scope = `${origin}/palpum-manse/`;
+  const handlers = new Map();
+  const deleted = [];
+  const events = [];
+  const cacheEntries = new Map(options.cacheEntries || []);
+  const fetchCalls = [];
+  let activeCache = '';
+  const caches = {
+    open(name) {
+      activeCache = name;
+      events.push({ type: 'open', name });
+      return Promise.resolve({
+        addAll(entries) {
+          events.push({ type: 'addAll', entries: [...entries] });
+          return Promise.resolve();
+        },
+        put(request, value) {
+          const url = new URL(typeof request === 'string' ? request : request.url, scope).href;
+          cacheEntries.set(url, value);
+          events.push({ type: 'put', cache: name, url });
+          return Promise.resolve();
+        }
+      });
+    },
+    keys() {
+      return Promise.resolve([
+        ...(options.cacheKeys || []),
+        activeCache
+      ].filter(Boolean));
+    },
+    delete(name) {
+      deleted.push(name);
+      events.push({ type: 'delete', name });
+      return Promise.resolve(true);
+    },
+    match(request) {
+      const url = new URL(typeof request === 'string' ? request : request.url, scope).href;
+      events.push({ type: 'match', url });
+      return Promise.resolve(cacheEntries.get(url));
+    }
+  };
+  const self = {
+    location: { origin, href: `${scope}sw.js` },
+    registration: { scope },
+    clients: {
+      claim() {
+        events.push({ type: 'claim' });
+        return Promise.resolve();
+      }
+    },
+    addEventListener(type, handler) {
+      handlers.set(type, handler);
+    },
+    skipWaiting() {
+      events.push({ type: 'skipWaiting' });
+      return Promise.resolve();
+    }
+  };
+  const fetch = (request, init) => {
+    fetchCalls.push({ request, init });
+    if (typeof options.fetch === 'function') return options.fetch(request, init);
+    return Promise.reject(new Error('network unavailable'));
+  };
+  vm.runInNewContext(serviceWorker, { self, caches, URL, fetch, Promise });
+
+  async function dispatchLifecycle(type) {
+    let lifetime;
+    handlers.get(type)({ waitUntil: promise => { lifetime = Promise.resolve(promise); } });
+    assert.ok(lifetime, `${type} must register lifecycle work`);
+    await lifetime;
+  }
+
+  async function dispatchFetch(request) {
+    let result;
+    handlers.get('fetch')({
+      request,
+      respondWith(promise) {
+        result = Promise.resolve(promise);
+      }
+    });
+    return result
+      ? { intercepted: true, value: await result }
+      : { intercepted: false, value: undefined };
+  }
+
+  return {
+    activeCache: () => activeCache,
+    cacheEntries,
+    deleted,
+    events,
+    fetchCalls,
+    dispatchLifecycle,
+    dispatchFetch
+  };
+}
+
+test('uses Palpum-specific package and PWA identity while preserving the visible brand', () => {
+  assert.equal(packageJson.name, 'palpum-manse');
+  assert.equal(packageLock.name, 'palpum-manse');
+  assert.equal(packageLock.packages[''].name, 'palpum-manse');
   assert.equal(manifest.name, '취명선 전설의 만세력');
   assert.equal(manifest.short_name, '전설의 만세력');
+  assert.equal(manifest.id, './');
   assert.equal(manifest.start_url, './');
   assert.equal(manifest.scope, './');
   assert.equal(manifest.background_color, '#F2ECDD');
   assert.equal(manifest.theme_color, '#F2ECDD');
-  assert.match(serviceWorker, /legend-manse-/);
-  assert.doesNotMatch(serviceWorker, /chwimyeongseon-manse-/);
+  assert.match(serviceWorker, /palpum-manse-/);
+  assert.doesNotMatch(serviceWorker, /CACHE_PREFIX\s*=\s*['"]legend-manse-/);
+  assert.match(share, /jansang18\.github\.io\/palpum-manse/);
+  assert.match(deploymentGuide, /jansang18\.github\.io\/palpum-manse/);
+  assert.match(deploymentGuide, /git remote add palpum/);
 });
 
 test('starts at Saju input and labels calculation as Palpum fortune', () => {
+  assert.match(html, /id="tab-legend"[^>]*aria-controls="view-input"/);
   assert.match(html, /<section class="view active" id="view-input"/);
   assert.match(html, /<section class="view" id="view-legend"[^>]*hidden/);
   assert.match(html, /id="calcBtn"[^>]*>팔품 운세 펼치기/);
@@ -79,9 +197,9 @@ test('routes successful calculation to this-year Palpum fortune', () => {
   assert.match(legendNav, /tabName === 'result'[\s\S]+window\.renderResult\(\)/);
 });
 
-test('keeps the current-era legend and PWA identity available', () => {
-  assert.match(serviceWorker, /const VERSION = 'v11-20260727-palpum-saved-offline'/);
-  assert.match(serviceWorker, /const CACHE_PREFIX = 'legend-manse-'/);
+test('keeps the current-era legend and isolated Palpum PWA identity available', () => {
+  assert.match(serviceWorker, /const VERSION = 'v12-20260728-final-review'/);
+  assert.match(serviceWorker, /const CACHE_PREFIX = 'palpum-manse-'/);
   assert.match(legendView, /id\s*=\s*['"]legendLanding['"]/);
   assert.match(legendView, /id\s*=\s*['"]legendStartButton['"]/);
   assert.match(legendView, /id\s*=\s*['"]legendPersonButton['"]/);
@@ -99,63 +217,112 @@ test('precaches every legend runtime asset for an offline first visit', () => {
 test('precaches Palpum modules without weakening cache isolation', () => {
   assert.match(serviceWorker, /scripts\/legend-palpum\.js/);
   assert.match(serviceWorker, /scripts\/legend-palpum-fortune\.js/);
-  assert.match(serviceWorker, /url\.origin !== self\.location\.origin/);
+  assert.match(serviceWorker, /url\.origin !== SCOPE_URL\.origin/);
+  assert.match(serviceWorker, /url\.pathname\.startsWith\(SCOPE_URL\.pathname\)/);
   assert.match(serviceWorker, /startsWith\(CACHE_PREFIX\)/);
 });
 
-test('activation preserves caches owned by other deployments', () => {
-  assert.match(serviceWorker, /startsWith\(CACHE_PREFIX\)/);
-  assert.doesNotMatch(serviceWorker, /sineum-manse-/);
-  assert.doesNotMatch(serviceWorker, /chwimyeongseon-manse-/);
-  assert.doesNotMatch(serviceWorker, /keys\.filter\(\s*\(?[a-z]\)?\s*=>\s*[a-z]\s*!==\s*CACHE\s*\)/);
+test('install precaches the complete Palpum runtime before taking control', async () => {
+  const harness = createServiceWorkerHarness();
+
+  await harness.dispatchLifecycle('install');
+
+  assert.match(harness.activeCache(), /^palpum-manse-/);
+  const addAll = harness.events.find(event => event.type === 'addAll');
+  assert.ok(addAll, 'install must precache the runtime');
+  assert.ok(addAll.entries.includes('./index.html'));
+  assert.ok(addAll.entries.includes('./scripts/legend-palpum-fortune.js'));
+  assert.deepEqual(
+    harness.events.filter(event => ['addAll', 'skipWaiting'].includes(event.type)).map(event => event.type),
+    ['addAll', 'skipWaiting']
+  );
 });
 
-test('activation deletes only stale legend caches', async () => {
-  const handlers = new Map();
-  const deleted = [];
-  let activeCache = '';
-  const caches = {
-    open(name) {
-      activeCache = name;
-      return Promise.resolve({ addAll: () => Promise.resolve(), put: () => Promise.resolve() });
-    },
-    keys() {
-      return Promise.resolve([
-        'legend-manse-previous',
-        'sineum-manse-previous',
-        'chwimyeongseon-manse-previous',
-        activeCache
-      ]);
-    },
-    delete(name) {
-      deleted.push(name);
-      return Promise.resolve(true);
-    },
-    match: () => Promise.resolve()
-  };
-  const self = {
-    location: { origin: 'https://example.test' },
-    clients: { claim: () => Promise.resolve() },
-    addEventListener: (type, handler) => handlers.set(type, handler),
-    skipWaiting: () => Promise.resolve()
-  };
-  vm.runInNewContext(serviceWorker, {
-    self,
-    caches,
-    URL,
-    fetch: () => Promise.reject(new Error('network unavailable')),
-    Promise
+test('Palpum activation deletes only stale Palpum caches and preserves every Legend cache', async () => {
+  const harness = createServiceWorkerHarness({
+    cacheKeys: [
+      'legend-manse-v10',
+      'legend-manse-v11',
+      'palpum-manse-stale',
+      'sineum-manse-previous'
+    ]
   });
-  const dispatch = async type => {
-    let lifetime;
-    handlers.get(type)({ waitUntil: promise => { lifetime = promise; } });
-    await lifetime;
-  };
 
-  await dispatch('install');
-  await dispatch('activate');
+  await harness.dispatchLifecycle('install');
+  await harness.dispatchLifecycle('activate');
 
-  assert.deepEqual(deleted, ['legend-manse-previous']);
+  assert.deepEqual(harness.deleted, ['palpum-manse-stale']);
+  assert.equal(harness.events.at(-1).type, 'claim');
+});
+
+test('fetch handles only same-origin Palpum paths and keeps network-first code fresh', async () => {
+  const network = response('network-code');
+  const harness = createServiceWorkerHarness({
+    fetch: () => Promise.resolve(network)
+  });
+  await harness.dispatchLifecycle('install');
+
+  const crossOrigin = await harness.dispatchFetch({
+    method: 'GET',
+    url: 'https://example.test/palpum-manse/index.html',
+    mode: 'navigate',
+    destination: 'document'
+  });
+  const legendPath = await harness.dispatchFetch({
+    method: 'GET',
+    url: 'https://jansang18.github.io/legend-manse/index.html',
+    mode: 'navigate',
+    destination: 'document'
+  });
+  const palpumCode = await harness.dispatchFetch({
+    method: 'GET',
+    url: 'https://jansang18.github.io/palpum-manse/scripts/legend-palpum.js',
+    mode: 'same-origin',
+    destination: 'script'
+  });
+  await Promise.resolve();
+
+  assert.equal(crossOrigin.intercepted, false);
+  assert.equal(legendPath.intercepted, false);
+  assert.equal(palpumCode.intercepted, true);
+  assert.equal(palpumCode.value.label, 'network-code');
+  assert.equal(harness.fetchCalls.length, 1);
+  assert.equal(harness.fetchCalls[0].init.cache, 'no-cache');
+  assert.equal(
+    harness.cacheEntries.get('https://jansang18.github.io/palpum-manse/scripts/legend-palpum.js').label,
+    'network-code'
+  );
+});
+
+test('fetch serves in-scope cached assets and the Palpum document fallback offline', async () => {
+  const cachedImage = response('cached-image');
+  const cachedDocument = response('cached-palpum-index');
+  const harness = createServiceWorkerHarness({
+    cacheEntries: [
+      ['https://jansang18.github.io/palpum-manse/assets/legend-seal.webp', cachedImage],
+      ['https://jansang18.github.io/palpum-manse/index.html', cachedDocument]
+    ]
+  });
+  await harness.dispatchLifecycle('install');
+
+  const image = await harness.dispatchFetch({
+    method: 'GET',
+    url: 'https://jansang18.github.io/palpum-manse/assets/legend-seal.webp',
+    mode: 'same-origin',
+    destination: 'image'
+  });
+  const document = await harness.dispatchFetch({
+    method: 'GET',
+    url: 'https://jansang18.github.io/palpum-manse/',
+    mode: 'navigate',
+    destination: 'document'
+  });
+
+  assert.equal(image.intercepted, true);
+  assert.equal(image.value.label, 'cached-image');
+  assert.equal(document.intercepted, true);
+  assert.equal(document.value.label, 'cached-palpum-index');
+  assert.equal(harness.fetchCalls.length, 1, 'only the network-first document should try the offline network');
 });
 
 test('protects every legend runtime asset in the release inventory', () => {
@@ -169,14 +336,98 @@ test('protects every legend runtime asset in the release inventory', () => {
   }
 });
 
-test('isolates live records in the legend storage namespace', () => {
-  assert.match(html, /const\s+LEGEND_STORAGE_PREFIX\s*=\s*['"]legend-saju:['"]/);
-  assert.match(html, /const\s+LEGEND_RECORD_PREFIX\s*=\s*['"]legend-saju:record:['"]/);
-  assert.match(html, /const\s+LEGEND_FALLBACK_KEY\s*=\s*['"]legend-saju:records['"]/);
-  assert.match(html, /const\s+LEGEND_THEME_KEY\s*=\s*['"]legend-saju:theme['"]/);
+test('isolates all mutable browser state in the Palpum storage namespace', () => {
+  assert.match(html, /const\s+PALPUM_STORAGE_PREFIX\s*=\s*['"]palpum-manse:['"]/);
+  assert.match(html, /const\s+PALPUM_RECORD_PREFIX\s*=\s*['"]palpum-manse:record:['"]/);
+  assert.match(html, /const\s+PALPUM_FALLBACK_KEY\s*=\s*['"]palpum-manse:records['"]/);
+  assert.match(html, /const\s+PALPUM_THEME_KEY\s*=\s*['"]palpum-manse:theme['"]/);
+  assert.match(html, /const\s+PALPUM_DAY_BOUNDARY_KEY\s*=\s*['"]palpum-manse:day-boundary['"]/);
+  assert.match(html, /const\s+testKey\s*=\s*['"]palpum-manse:test['"]/);
+  assert.doesNotMatch(html, /(?:setItem|removeItem)\(\s*['"]legend-saju:/);
   assert.doesNotMatch(html, /window\.storage\.(?:get|set|delete|list)\(\s*['"`]saju:/);
   assert.doesNotMatch(html, /localStorage\.(?:getItem|setItem|removeItem)\(\s*['"]saju_list['"]/);
   assert.doesNotMatch(html, /saju_theme/);
+});
+
+test('copies legacy Legend records once and mutates only Palpum-owned keys afterward', async () => {
+  const {
+    createRecordStore,
+    RECORD_PREFIX,
+    FALLBACK_KEY,
+    LEGACY_RECORD_PREFIX,
+    LEGACY_FALLBACK_KEY,
+    LEGACY_COPY_KEY
+  } = require('../scripts/legend-storage.js');
+  assert.equal(RECORD_PREFIX, 'palpum-manse:record:');
+  assert.equal(FALLBACK_KEY, 'palpum-manse:records');
+  assert.equal(LEGACY_RECORD_PREFIX, 'legend-saju:record:');
+  assert.equal(LEGACY_FALLBACK_KEY, 'legend-saju:records');
+  assert.equal(LEGACY_COPY_KEY, 'palpum-manse:legacy-copy-v1');
+
+  const legacyPrimary = JSON.stringify({ id: 'legacy-primary', name: '기존 원본', fav: false });
+  const legacyFallback = JSON.stringify([{ id: 'legacy-fallback', name: '기존 보조', fav: false }]);
+  const primary = new Map([
+    [`${LEGACY_RECORD_PREFIX}legacy-primary`, legacyPrimary]
+  ]);
+  const fallback = new Map([
+    [LEGACY_FALLBACK_KEY, legacyFallback]
+  ]);
+  const writes = [];
+  const deletions = [];
+  const storage = {
+    list: async prefix => ({ keys: [...primary.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async (key, value) => {
+      writes.push(key);
+      primary.set(key, value);
+    },
+    delete: async key => {
+      deletions.push(key);
+      primary.delete(key);
+    }
+  };
+  const fallbackStorage = {
+    getItem: key => fallback.get(key) ?? null,
+    setItem: (key, value) => {
+      writes.push(key);
+      fallback.set(key, value);
+    }
+  };
+  const recordStore = createRecordStore(storage, fallbackStorage);
+
+  const discovered = await recordStore.listRecords();
+  assert.deepEqual(
+    discovered.map(record => record.id).sort(),
+    ['legacy-fallback', 'legacy-primary']
+  );
+  assert.equal(primary.get(`${LEGACY_RECORD_PREFIX}legacy-primary`), legacyPrimary);
+  assert.equal(fallback.get(LEGACY_FALLBACK_KEY), legacyFallback);
+  assert.equal(
+    primary.get(`${RECORD_PREFIX}legacy-primary`),
+    legacyPrimary
+  );
+  assert.equal(
+    primary.get(`${RECORD_PREFIX}legacy-fallback`),
+    JSON.stringify({ id: 'legacy-fallback', name: '기존 보조', fav: false })
+  );
+  assert.equal(primary.get(LEGACY_COPY_KEY), '1');
+
+  await recordStore.updateRecord('legacy-primary', { fav: true });
+  await recordStore.deleteRecord('legacy-primary');
+
+  assert.equal(primary.get(`${LEGACY_RECORD_PREFIX}legacy-primary`), legacyPrimary);
+  assert.equal(fallback.get(LEGACY_FALLBACK_KEY), legacyFallback);
+  assert.equal(primary.has(`${RECORD_PREFIX}legacy-primary`), false);
+  assert.ok(writes.every(key => key.startsWith('palpum-manse:')), `unexpected writes: ${writes}`);
+  assert.ok(deletions.every(key => key.startsWith('palpum-manse:')), `unexpected deletes: ${deletions}`);
+  assert.doesNotMatch(
+    storageSource,
+    /storage\.(?:set|delete)\(\s*(?:LEGACY_RECORD_PREFIX|LEGACY_FALLBACK_KEY)/
+  );
+  assert.doesNotMatch(
+    storageSource,
+    /fallbackStorage\.setItem\(\s*(?:LEGACY_RECORD_PREFIX|LEGACY_FALLBACK_KEY)/
+  );
 });
 
 test('record listing ignores theme and fallback configuration keys', async () => {
@@ -531,17 +782,18 @@ test('post-rollback verification reports write-then-throw residual values', asyn
   assert.equal(primary.has(`${RECORD_PREFIX}write-then-throw`), true);
 });
 
-test('exports exact product schema and rule metadata', () => {
-  assert.match(html, /product:\s*['"]legend-manse['"]/);
+test('exports exact Palpum product schema and rule metadata', () => {
+  assert.match(html, /product:\s*['"]palpum-manse['"]/);
   assert.match(html, /schemaVersion:\s*2/);
-  assert.match(html, /ruleVersion:\s*['"]legend-1['"]/);
+  assert.match(html, /ruleVersion:\s*['"]palpum-1['"]/);
   assert.match(html, /exportedAt:\s*new Date\(\)\.toISOString\(\)/);
   assert.match(html, /\brecords:\s*list\b/);
 });
 
-test('normalizes validated legacy backups into the legend namespace', () => {
+test('normalizes validated Palpum and read-only legacy backups into the Palpum namespace', () => {
   assert.match(html, /function\s+normalizeImportedBackup\(/);
   assert.match(html, /function\s+normalizeImportedRecord\(/);
+  assert.match(html, /data\.product\s*===\s*['"]palpum-manse['"]/);
   assert.match(html, /data\.product\s*===\s*['"]legend-manse['"]/);
   assert.match(html, /data\.schemaVersion\s*===\s*2/);
   assert.match(html, /data\.version\s*===\s*1/);

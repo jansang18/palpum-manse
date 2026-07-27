@@ -1,9 +1,10 @@
 // 취명선 전설의 만세력 서비스워커
 // 전략: HTML/CSS/JS = 네트워크 우선(항상 최신 디자인), 이미지/아이콘 = 캐시 우선(빠름).
 // 오프라인일 때만 캐시로 폴백한다. 배포 시 VERSION만 올리면 옛 캐시는 자동 삭제됨.
-const VERSION = 'v11-20260727-palpum-saved-offline';
-const CACHE_PREFIX = 'legend-manse-';
+const VERSION = 'v12-20260728-final-review';
+const CACHE_PREFIX = 'palpum-manse-';
 const CACHE = CACHE_PREFIX + VERSION;
+const SCOPE_URL = new URL(self.registration.scope);
 
 // 오프라인 첫 진입에도 동작하도록 핵심 자원을 미리 캐시(이후 온라인이면 네트워크본으로 갱신)
 const PRECACHE = [
@@ -62,7 +63,10 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // 외부(위키백과·네이버 등)는 SW가 개입하지 않음
+  if (
+    url.origin !== SCOPE_URL.origin ||
+    !url.pathname.startsWith(SCOPE_URL.pathname)
+  ) return; // Never intercept sibling deployments on the same origin.
 
   const path = url.pathname;
   const isDoc = req.mode === 'navigate' || req.destination === 'document'

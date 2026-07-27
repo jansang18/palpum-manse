@@ -11,7 +11,7 @@ test('advanced input exposes and persists all three day-boundary conventions', (
   for (const value of ['midnight', 'jasi', 'splitJasi']) {
     assert.match(html, new RegExp(`data-val=["']${value}["']`));
   }
-  assert.match(html, /legend-saju:day-boundary/);
+  assert.match(html, /palpum-manse:day-boundary/);
   assert.match(html, /dayBoundary:\s*getSelectedDayBoundary\(\)/);
   assert.match(
     html,

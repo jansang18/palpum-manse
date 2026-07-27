@@ -135,7 +135,22 @@
   const BRANCH_ELEMENTS = Object.freeze([
     '수', '토', '목', '목', '토', '화', '화', '토', '금', '금', '토', '수'
   ]);
-  const BRANCH_MAIN_STEMS = Object.freeze([9, 5, 0, 1, 4, 2, 3, 5, 6, 7, 4, 8]);
+  const BRANCH_HIDDEN_STEMS = Object.freeze([
+    Object.freeze([9, 8]),
+    Object.freeze([5, 9, 7]),
+    Object.freeze([0, 2, 4]),
+    Object.freeze([1, 0]),
+    Object.freeze([4, 1, 9]),
+    Object.freeze([2, 4, 6]),
+    Object.freeze([3, 5, 2]),
+    Object.freeze([5, 3, 1]),
+    Object.freeze([6, 4, 8]),
+    Object.freeze([7, 6]),
+    Object.freeze([4, 7, 3]),
+    Object.freeze([8, 0, 4])
+  ]);
+  const STEM_HANJA = Object.freeze(['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸']);
+  const BRANCH_HANJA = Object.freeze(['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']);
   const ELEMENTS = Object.freeze(['목', '화', '토', '금', '수']);
   const GENERATES = Object.freeze({
     목: '화',
@@ -175,7 +190,10 @@
       .filter(key => chart[key] === info.stem)
       .length;
     const branchCount = ['yBranch', 'mBranch', 'dBranch', 'hBranch']
-      .filter(key => BRANCH_MAIN_STEMS[chart[key]] === info.stem)
+      .filter(key => {
+        const hiddenStems = BRANCH_HIDDEN_STEMS[chart[key]];
+        return Array.isArray(hiddenStems) && hiddenStems.includes(info.stem);
+      })
       .length;
     return stemCount + branchCount;
   }
@@ -218,7 +236,9 @@
   function selectState(signal) {
     if (signal.timingSupport >= 2 && signal.rulerVisible > 0) return '발현';
     if (signal.timingSupport <= -2) return '전환';
-    if (signal.eraPressure < 0) return '조율';
+    if (signal.timingSupport < 0 || (signal.timingSupport === 0 && signal.eraPressure < 0)) {
+      return '조율';
+    }
     return '축적';
   }
 
@@ -232,8 +252,28 @@
     return headlines[state];
   }
 
-  function targetLabel(target) {
-    return target.month ? `${target.year}년 ${target.month}월` : `${target.year}년`;
+  function isPillar(pillar) {
+    return pillar && Number.isInteger(pillar.stem) && Number.isInteger(pillar.branch);
+  }
+
+  function pillarLabel(kind, pillar) {
+    const ganji = `${STEM_HANJA[pillar.stem] || '?'}${BRANCH_HANJA[pillar.branch] || '?'}`;
+    if (kind === '월운') return `${pillar.year}년 ${pillar.month}월 · ${ganji}`;
+    if (kind === '세운') return `${pillar.year}년 · ${ganji}`;
+    return ganji;
+  }
+
+  function timingEvidence(kind, pillar, support) {
+    const layerDescription = {
+      대운: '10년 개인 흐름',
+      세운: '연간 흐름',
+      월운: '월간 흐름'
+    }[kind];
+    return Object.freeze({
+      kind,
+      label: pillarLabel(kind, pillar),
+      detail: `${layerDescription}과 당령의 관계 신호 ${support}를 이 층에만 반영합니다.`
+    });
   }
 
   function eraEvidence(era, eraPressure) {
@@ -266,9 +306,9 @@
           detail: `출생 시각을 확인해야 두 후보 중 하나를 판정할 수 있어 단일 팔품을 확정하지 않습니다.${accuracyDetail}`
         }),
         Object.freeze({
-          kind: '시기',
-          label: targetLabel(input.target),
-          detail: '출생 팔품을 확인한 뒤 선택 운과 대운의 관계를 비교합니다.'
+          kind: '확인',
+          label: '출생 시각 확인 필요',
+          detail: '시간이 확인되기 전에는 후보에 따라 달라질 수 있는 원국과 개인 흐름을 판정하지 않습니다.'
         }),
         Object.freeze({
           kind: '시대',
@@ -292,14 +332,35 @@
     }
     const copy = PALPUM_COPY[input.palpum.type];
     if (!copy) throw new RangeError('unknown Palpum type');
+    const timingLayers = [
+      isPillar(input.daeun)
+        ? { kind: '대운', pillar: input.daeun, support: relationScore(input.palpum.ruler, input.daeun) }
+        : null,
+      isPillar(input.annual)
+        ? { kind: '세운', pillar: input.annual, support: relationScore(input.palpum.ruler, input.annual) }
+        : null,
+      isPillar(input.monthly)
+        ? { kind: '월운', pillar: input.monthly, support: relationScore(input.palpum.ruler, input.monthly) }
+        : null
+    ].filter(Boolean);
     const signal = Object.freeze({
       rulerVisible: countRulerPresence(input.saju, input.palpum.ruler),
       sameElementVisible: countSameElementPresence(input.saju, input.palpum.ruler),
-      timingSupport: relationScore(input.palpum.ruler, input.target),
-      daeunSupport: relationScore(input.palpum.ruler, input.daeun),
+      timingSupport: timingLayers.reduce((sum, layer) => sum + layer.support, 0),
       eraPressure: eraRelationScore(input.palpum.ruler, input.era)
     });
     const state = selectState(signal);
+    const evidence = [
+      Object.freeze({
+        kind: '팔품',
+        label: `${input.palpum.type} · 당령 ${input.palpum.ruler}${
+          input.palpum.accuracy === 'historical-approximation' ? ' · 역사 범위 근사' : ''
+        }`,
+        detail: `${copy.scene}. ${copy.role}로 읽으며, 원국의 정확한 당령 흔적은 ${signal.rulerVisible}곳이고 같은 오행 분포는 ${signal.sameElementVisible}입니다.`
+      }),
+      ...timingLayers.map(layer => timingEvidence(layer.kind, layer.pillar, layer.support)),
+      eraEvidence(input.era, signal.eraPressure)
+    ];
 
     return Object.freeze({
       version: 'palpum-v1',
@@ -309,21 +370,7 @@
       burden: copy.burden,
       preparation: copy.preparation,
       areas: copy.areas,
-      evidence: Object.freeze([
-        Object.freeze({
-          kind: '팔품',
-          label: `${input.palpum.type} · 당령 ${input.palpum.ruler}${
-            input.palpum.accuracy === 'historical-approximation' ? ' · 역사 범위 근사' : ''
-          }`,
-          detail: `${copy.scene}. ${copy.role}로 읽으며, 원국의 정확한 당령 흔적은 ${signal.rulerVisible}곳이고 같은 오행 분포는 ${signal.sameElementVisible}입니다.`
-        }),
-        Object.freeze({
-          kind: '시기',
-          label: targetLabel(input.target),
-          detail: `선택 운 관계 ${signal.timingSupport}, 대운 관계 ${signal.daeunSupport}의 범위가 정해진 신호를 함께 봅니다.`
-        }),
-        eraEvidence(input.era, signal.eraPressure)
-      ]),
+      evidence: Object.freeze(evidence),
       tags: Object.freeze([
         input.palpum.type,
         state,

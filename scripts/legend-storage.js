@@ -3,10 +3,13 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.LegendStorage = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  const STORAGE_PREFIX = 'legend-saju:';
-  const RECORD_PREFIX = 'legend-saju:record:';
-  const FALLBACK_KEY = 'legend-saju:records';
-  const THEME_KEY = 'legend-saju:theme';
+  const STORAGE_PREFIX = 'palpum-manse:';
+  const RECORD_PREFIX = 'palpum-manse:record:';
+  const FALLBACK_KEY = 'palpum-manse:records';
+  const THEME_KEY = 'palpum-manse:theme';
+  const LEGACY_RECORD_PREFIX = 'legend-saju:record:';
+  const LEGACY_FALLBACK_KEY = 'legend-saju:records';
+  const LEGACY_COPY_KEY = 'palpum-manse:legacy-copy-v1';
 
   function validRecord(record) {
     return record && typeof record === 'object' && !Array.isArray(record) &&
@@ -31,10 +34,10 @@
   }
 
   function createRecordStore(storage, fallbackStorage) {
-    function readFallbackRecords() {
+    function readFallbackRecordsAt(key, strict) {
       let value;
       try {
-        value = fallbackStorage.getItem(FALLBACK_KEY);
+        value = fallbackStorage.getItem(key);
       } catch (error) {
         throw storageUnavailable(error);
       }
@@ -44,8 +47,13 @@
         if (!Array.isArray(records)) throw new TypeError('Fallback records must be an array.');
         return records.filter(validRecord);
       } catch (error) {
+        if (!strict) return [];
         throw storageUnavailable(error);
       }
+    }
+
+    function readFallbackRecords() {
+      return readFallbackRecordsAt(FALLBACK_KEY, true);
     }
 
     function writeFallbackRecords(records) {
@@ -65,7 +73,93 @@
       writeFallbackRecords(records);
     }
 
+    let legacyCopyPromise = null;
+
+    async function copyLegacyRecordsOnce() {
+      let marker;
+      try {
+        marker = await storage.get(LEGACY_COPY_KEY);
+      } catch (error) {
+        throw storageUnavailable(error);
+      }
+      let fallbackMarker;
+      try {
+        fallbackMarker = fallbackStorage.getItem(LEGACY_COPY_KEY);
+      } catch (error) {
+        throw storageUnavailable(error);
+      }
+      if ((marker && marker.value === '1') || fallbackMarker === '1') return;
+
+      let legacyKeys;
+      try {
+        const result = await storage.list(LEGACY_RECORD_PREFIX);
+        legacyKeys = result && Array.isArray(result.keys) ? result.keys : [];
+      } catch (error) {
+        throw storageUnavailable(error);
+      }
+
+      const discovered = new Map();
+      for (const key of legacyKeys) {
+        if (!key.startsWith(LEGACY_RECORD_PREFIX)) continue;
+        let stored;
+        try {
+          stored = await storage.get(key);
+        } catch (error) {
+          throw storageUnavailable(error);
+        }
+        const record = stored && parseRecord(stored.value);
+        if (record) discovered.set(record.id, record);
+      }
+      for (const record of readFallbackRecordsAt(LEGACY_FALLBACK_KEY, false)) {
+        discovered.set(record.id, record);
+      }
+      if (discovered.size === 0) return;
+
+      const fallbackIds = new Set(readFallbackRecords().map(record => record.id));
+      for (const record of discovered.values()) {
+        const key = RECORD_PREFIX + record.id;
+        let existing;
+        try {
+          existing = await storage.get(key);
+        } catch (error) {
+          throw storageUnavailable(error);
+        }
+        if ((existing && parseRecord(existing.value)) || fallbackIds.has(record.id)) continue;
+        try {
+          await storage.set(key, JSON.stringify(record));
+        } catch (primaryError) {
+          try {
+            upsertFallbackRecord(record);
+            fallbackIds.add(record.id);
+          } catch (fallbackError) {
+            throw storageUnavailable(fallbackError);
+          }
+        }
+      }
+
+      try {
+        await storage.set(LEGACY_COPY_KEY, '1');
+      } catch (primaryError) {
+        try {
+          fallbackStorage.setItem(LEGACY_COPY_KEY, '1');
+        } catch (fallbackError) {
+          throw storageUnavailable(fallbackError);
+        }
+      }
+    }
+
+    function ensureLegacyRecordsCopied() {
+      if (!legacyCopyPromise) {
+        legacyCopyPromise = copyLegacyRecordsOnce().catch(error => {
+          legacyCopyPromise = null;
+          throw error;
+        });
+      }
+      return legacyCopyPromise;
+    }
+
     async function listRecords() {
+      await ensureLegacyRecordsCopied();
       const merged = new Map();
       let result;
       try {
@@ -215,6 +309,9 @@
     RECORD_PREFIX,
     FALLBACK_KEY,
     THEME_KEY,
+    LEGACY_RECORD_PREFIX,
+    LEGACY_FALLBACK_KEY,
+    LEGACY_COPY_KEY,
     createRecordStore
   });
 });

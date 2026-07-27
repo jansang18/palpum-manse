@@ -81,6 +81,9 @@
       if (selected) selectedTab = tab;
     });
     if (!selectedTab) return false;
+    if (groupName === 'legend') {
+      selectedTab.setAttribute('aria-controls', 'view-' + tabName);
+    }
 
     all('.view').forEach(function (view) {
       var selected = view.id === 'view-' + tabName;

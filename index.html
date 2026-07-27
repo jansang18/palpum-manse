@@ -2010,7 +2010,7 @@
   </header>
 
   <nav class="tabs" role="tablist" aria-label="주요 화면">
-    <button type="button" class="tab active" id="tab-legend" role="tab" aria-selected="true" aria-controls="view-legend" data-tab="legend">전설사주</button>
+    <button type="button" class="tab active" id="tab-legend" role="tab" aria-selected="true" aria-controls="view-input" data-tab="legend">전설사주</button>
     <button type="button" class="tab" id="tab-fortune" role="tab" aria-selected="false" aria-controls="view-fortune" data-tab="fortune">운의 흐름</button>
     <button type="button" class="tab" id="tab-match" role="tab" aria-selected="false" aria-controls="view-match" data-tab="match">인연궁합</button>
     <button type="button" class="tab" id="tab-calendar" role="tab" aria-selected="false" aria-controls="view-calendar" data-tab="calendar">만세력</button>
@@ -2111,6 +2111,7 @@
   </section>
 
   <section class="view" id="view-fortune" role="tabpanel" aria-labelledby="tab-fortune" hidden>
+    <div id="fortuneUpdateStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
     <div id="fortuneContent"></div>
   </section>
 
@@ -12355,7 +12356,7 @@ window.addEventListener('unhandledrejection', function(e) {
   if (!window.storage || typeof window.storage.get !== 'function') {
     try {
       // localStorage 사용 가능 여부 확인
-      const testKey = 'legend-saju:test';
+      const testKey = 'palpum-manse:test';
       localStorage.setItem(testKey, '1');
       localStorage.removeItem(testKey);
       window.storage = {
@@ -12384,11 +12385,11 @@ window.addEventListener('unhandledrejection', function(e) {
   }
 })();
 
-const LEGEND_STORAGE_PREFIX = 'legend-saju:';
-const LEGEND_RECORD_PREFIX = 'legend-saju:record:';
-const LEGEND_FALLBACK_KEY = 'legend-saju:records';
-const LEGEND_THEME_KEY = 'legend-saju:theme';
-const LEGEND_DAY_BOUNDARY_KEY = 'legend-saju:day-boundary';
+const PALPUM_STORAGE_PREFIX = 'palpum-manse:';
+const PALPUM_RECORD_PREFIX = 'palpum-manse:record:';
+const PALPUM_FALLBACK_KEY = 'palpum-manse:records';
+const PALPUM_THEME_KEY = 'palpum-manse:theme';
+const PALPUM_DAY_BOUNDARY_KEY = 'palpum-manse:day-boundary';
 const DAY_BOUNDARY_LABELS = Object.freeze({
   midnight: '자정 기준',
   jasi: '자시 기준',
@@ -12660,7 +12661,7 @@ function calculateSajuInternal(opts, allowPalpumProvisional) {
     di = { stem: precise.dStem, branch: precise.dBranch };
     hStem = unknown ? -1 : precise.hStem;
     hBranch = unknown ? -1 : precise.hBranch;
-    daeun = precise.daeun;
+    daeun = palpumProvisional ? null : precise.daeun;
     calculationMode = precise.calculationMode;
     timeStandard = precise.timeStandard;
     trueSolarCorrection = precise.trueSolarCorrection;
@@ -12711,7 +12712,9 @@ function calculateSajuInternal(opts, allowPalpumProvisional) {
   if (hBranch >= 0) branches.push(hBranch);
   const interactions = analyzeInter(branches, yi.stem, mStem, di.stem, hStem);
   const shinsal = calcShinsal(yi.branch, di.branch, branches, di.stem);
-  if (!daeun) daeun = calcDaeun(yi.stem, gender, mStem, mi.branch, jd, year);
+  if (!daeun && !palpumProvisional) {
+    daeun = calcDaeun(yi.stem, gender, mStem, mi.branch, jd, year);
+  }
   const gongmang = calcGongmang(di.stem, di.branch);
 
   return {
@@ -12930,7 +12933,7 @@ function getSelectedDayBoundary() {
 function restoreDayBoundaryPreference() {
   let saved = 'midnight';
   try {
-    const value = localStorage.getItem(LEGEND_DAY_BOUNDARY_KEY);
+    const value = localStorage.getItem(PALPUM_DAY_BOUNDARY_KEY);
     if (DAY_BOUNDARY_LABELS[value]) saved = value;
   } catch (error) {
     // The calculation still has a deterministic default when preferences are blocked.
@@ -12962,7 +12965,7 @@ function bindSegmented(root) {
         if (seg.id === 'mnfCal') syncMatchLunarMonthType();
         if (seg.id === 'segDayBoundary') {
           try {
-            localStorage.setItem(LEGEND_DAY_BOUNDARY_KEY, b.dataset.val);
+            localStorage.setItem(PALPUM_DAY_BOUNDARY_KEY, b.dataset.val);
           } catch (error) {
             window.showAppToast('관법 설정을 저장하지 못했지만 이번 계산에는 적용합니다.');
           }
@@ -14287,6 +14290,10 @@ function normalizeImportedBackup(data) {
     throw new Error('지원하지 않는 백업 형식입니다.');
   }
 
+  const isPalpumBackup =
+    data.product === 'palpum-manse' &&
+    data.schemaVersion === 2 &&
+    data.ruleVersion === 'palpum-1';
   const isLegendBackup =
     data.product === 'legend-manse' &&
     data.schemaVersion === 2 &&
@@ -14301,7 +14308,7 @@ function normalizeImportedBackup(data) {
     typeof data.app === 'string' &&
     legacyProducts.has(data.app);
 
-  if (!isLegendBackup && !isLegacyBackup) {
+  if (!isPalpumBackup && !isLegendBackup && !isLegacyBackup) {
     throw new Error('지원하지 않는 백업 버전입니다.');
   }
   return data.records;
@@ -14316,9 +14323,9 @@ function bindSavedToolbar(list) {
   expBtn.addEventListener('click', () => {
     if (!list.length) { alert('내보낼 명반이 없습니다.'); return; }
     const payload = {
-      product: 'legend-manse',
+      product: 'palpum-manse',
       schemaVersion: 2,
-      ruleVersion: 'legend-1',
+      ruleVersion: 'palpum-1',
       exportedAt: new Date().toISOString(),
       records: list
     };
@@ -14580,7 +14587,7 @@ function applyTheme(theme) {
 }
 (function initTheme() {
   let saved = null;
-  try { saved = localStorage.getItem(LEGEND_THEME_KEY); } catch (e) {}
+  try { saved = localStorage.getItem(PALPUM_THEME_KEY); } catch (e) {}
   if (!saved) {
     try {
       saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -14590,7 +14597,7 @@ function applyTheme(theme) {
   // window.storage도 체크 (polyfill 기준이지만 혹시 다른 값 있을 때)
   (async () => {
     try {
-      const r = await window.storage.get(LEGEND_THEME_KEY);
+      const r = await window.storage.get(PALPUM_THEME_KEY);
       if (r && r.value && r.value !== saved) applyTheme(r.value);
     } catch (e) {}
   })();
@@ -14935,16 +14942,19 @@ function calcYearFortune(saju, targetYear = new Date().getFullYear()) {
   const seunStemSipsin = getSipsin(ilgan, seun.stem);
   const seunBranchSipsin = getSipsin(ilgan, JIJANGAN[seun.branch][0]);
 
-  // 현재 대운
+  // 현재 대운. 출생 시각 경계가 미확정이면 이 층을 계산에 넣지 않는다.
   const age = thisYear - saju.year;
-  let curDaeun = saju.daeun.list[0];
-  for (let i = 0; i < saju.daeun.list.length; i++) {
-    const d = saju.daeun.list[i];
-    const na = i < saju.daeun.list.length - 1 ? saju.daeun.list[i+1].age : 999;
+  const daeunList = Array.isArray(saju.daeun?.list) ? saju.daeun.list : [];
+  let curDaeun = daeunList[0] || null;
+  for (let i = 0; i < daeunList.length; i++) {
+    const d = daeunList[i];
+    const na = i < daeunList.length - 1 ? daeunList[i+1].age : 999;
     if (age >= d.age && age < na) { curDaeun = d; break; }
   }
-  const daeunStemSipsin = getSipsin(ilgan, curDaeun.stem);
-  const daeunBranchSipsin = getSipsin(ilgan, JIJANGAN[curDaeun.branch][0]);
+  const daeunStemSipsin = curDaeun ? getSipsin(ilgan, curDaeun.stem) : -1;
+  const daeunBranchSipsin = curDaeun
+    ? getSipsin(ilgan, JIJANGAN[curDaeun.branch][0])
+    : -1;
 
   const yongsinInfo = getYongsin(saju);
   const inter = interactionBonus(saju, seun);
@@ -14955,8 +14965,9 @@ function calcYearFortune(saju, targetYear = new Date().getFullYear()) {
     let base = 55;
     // 세운 (가중치 ×2)
     base += (weightArr[seunStemSipsin] + weightArr[seunBranchSipsin]) * 1.3;
-    // 대운 (가중치 ×1.5)
-    base += (weightArr[daeunStemSipsin] + weightArr[daeunBranchSipsin]) * 1.0;
+    if (curDaeun) {
+      base += (weightArr[daeunStemSipsin] + weightArr[daeunBranchSipsin]) * 1.0;
+    }
     // 용신 오행이 세운에 오면 +
     if (STEM_EL[seun.stem] === yongsinInfo.yongsin) base += 8;
     if (BRANCH_EL[seun.branch] === yongsinInfo.yongsin) base += 5;
@@ -14989,8 +15000,10 @@ function calcYearFortune(saju, targetYear = new Date().getFullYear()) {
   let loveScore = 55;
   loveScore += sipsinLoveWeight(seunStemSipsin, saju.gender) * 1.3;
   loveScore += sipsinLoveWeight(seunBranchSipsin, saju.gender) * 1.3;
-  loveScore += sipsinLoveWeight(daeunStemSipsin, saju.gender) * 1.0;
-  loveScore += sipsinLoveWeight(daeunBranchSipsin, saju.gender) * 1.0;
+  if (curDaeun) {
+    loveScore += sipsinLoveWeight(daeunStemSipsin, saju.gender) * 1.0;
+    loveScore += sipsinLoveWeight(daeunBranchSipsin, saju.gender) * 1.0;
+  }
   loveScore += inter.harmony * 2;
   loveScore -= inter.conflict * 1.5;
   // 도화
@@ -15214,9 +15227,48 @@ function moveFortunePeriod(direction) {
   renderFortune();
 }
 
+function captureFortuneFocus() {
+  const active = document.activeElement;
+  const content = document.getElementById('fortuneContent');
+  if (!active || !content?.contains(active)) return null;
+  if (active.dataset.palpumPeriod) {
+    return { type: 'period', value: active.dataset.palpumPeriod };
+  }
+  if (active.dataset.palpumMonth) {
+    return { type: 'month', value: active.dataset.palpumMonth };
+  }
+  if (active.id === 'fortunePeriodPrev' || active.id === 'fortunePeriodNext') {
+    return { type: 'id', value: active.id };
+  }
+  return null;
+}
+
+function restoreFortuneFocus(identity) {
+  if (!identity) return;
+  let target = null;
+  if (identity.type === 'id') {
+    target = document.getElementById(identity.value);
+  } else {
+    const attribute = identity.type === 'period' ? 'palpumPeriod' : 'palpumMonth';
+    target = [...document.querySelectorAll(`[data-${identity.type === 'period' ? 'palpum-period' : 'palpum-month'}]`)]
+      .find(element => element.dataset[attribute] === identity.value);
+  }
+  if (!target) return;
+  try { target.focus({ preventScroll: true }); }
+  catch (error) { target.focus(); }
+}
+
+function announceFortuneUpdate(periodTitle, periodSubtitle) {
+  const status = document.getElementById('fortuneUpdateStatus');
+  if (status) {
+    status.textContent = `${periodTitle} ${periodSubtitle} 팔품 운세가 업데이트되었습니다.`;
+  }
+}
+
 function renderFortune() {
+  const focusIdentity = captureFortuneFocus();
   try {
-    _renderFortuneInner();
+    _renderFortuneInner(focusIdentity);
   } catch (e) {
     console.error('풀이 렌더링 에러:', e);
     const box = document.getElementById('fortuneContent');
@@ -15226,10 +15278,12 @@ function renderFortune() {
         <p>풀이 생성 중 오류가 발생했습니다<br><span style="font-size:12px;color:var(--text-light)">${escapeHtml(e.message || String(e))}</span></p>
       </div>`;
     }
+    const status = document.getElementById('fortuneUpdateStatus');
+    if (status) status.textContent = '팔품 운세를 업데이트하지 못했습니다.';
   }
 }
 
-function _renderFortuneInner() {
+function _renderFortuneInner(focusIdentity) {
   if (!currentSaju) {
     $('#fortuneContent').innerHTML = `<div class="fortune-empty">
       <div class="ico">命</div>
@@ -15247,19 +15301,30 @@ function _renderFortuneInner() {
   if (currentPalpumSignature !== classificationSignature) {
     rebuildCurrentPalpum(s);
   }
-  const target = {
-    year: fortune.year,
-    ...(isMonth ? { month: fortune.month } : {}),
-    stem: fortune.seun.stem,
-    branch: fortune.seun.branch
-  };
-  const interpretation = globalThis.LegendPalpumFortune.composePalpumFortune({
+  const annualFortune = isMonth ? fortune.annual : fortune;
+  const composerInput = {
     palpum: currentPalpum,
     saju: s,
-    target,
-    daeun: fortune.curDaeun,
+    annual: {
+      year: annualFortune.year,
+      stem: annualFortune.seun.stem,
+      branch: annualFortune.seun.branch
+    },
+    monthly: isMonth ? {
+      year: fortune.year,
+      month: fortune.month,
+      stem: fortune.seun.stem,
+      branch: fortune.seun.branch
+    } : null,
     era: globalThis.LegendEra.getLegendEra(fortune.year)
-  });
+  };
+  if (!s.palpumProvisional && fortune.curDaeun) {
+    composerInput.daeun = {
+      stem: fortune.curDaeun.stem,
+      branch: fortune.curDaeun.branch
+    };
+  }
+  const interpretation = globalThis.LegendPalpumFortune.composePalpumFortune(composerInput);
   const ga = STEM_KOR[fortune.seun.stem] + BRANCH_KOR[fortune.seun.branch];
   const seunClsS = EL_CLASS[STEM_EL[fortune.seun.stem]].replace('el-', 'gj-s-');
   const seunClsB = EL_CLASS[BRANCH_EL[fortune.seun.branch]].replace('el-', 'gj-b-');
@@ -15282,6 +15347,25 @@ function _renderFortuneInner() {
     : currentPalpum.boundaryUncertain
       ? { kind: 'time-required', text: '출생 시간을 알려주시면 팔품 후보를 하나로 확인할 수 있습니다.' }
       : { kind: 'hour-excluded', text: '시주 제외로 팔품을 계산했습니다.' };
+  const timingSummary = s.palpumProvisional
+    ? `${isMonth ? '월운' : '세운'} ${STEM[fortune.seun.stem]}${BRANCH[fortune.seun.branch]} · 출생 시간 확인 전 관계 판정 보류`
+    : [
+        `${isMonth ? '월운' : '세운'} 천간 ${SIPSIN_KOR[fortune.seunStemSipsin]} · 지지 ${SIPSIN_KOR[fortune.seunBranchSipsin]}`,
+        ...(isMonth ? [
+          `세운 ${STEM[annualFortune.seun.stem]}${BRANCH[annualFortune.seun.branch]}(${SIPSIN_KOR[annualFortune.seunStemSipsin]})`
+        ] : []),
+        ...(fortune.curDaeun ? [
+          `현재 대운 ${STEM[fortune.curDaeun.stem]}${BRANCH[fortune.curDaeun.branch]}(${SIPSIN_KOR[fortune.daeunStemSipsin]})`
+        ] : [])
+      ].join(' · ');
+  const evidenceKinds = new Set(interpretation.evidence.map(item => item.kind));
+  const composedLayerText = [
+    '팔품',
+    ...(evidenceKinds.has('대운') ? ['대운'] : []),
+    ...(evidenceKinds.has('세운') ? ['세운'] : []),
+    ...(evidenceKinds.has('월운') ? ['월운'] : []),
+    ...(evidenceKinds.has('시대') ? ['삼원구운'] : [])
+  ].join('·');
   const areaDefinitions = [
     { key: 'relationship', title: '관계', seal: '緣' },
     { key: 'career', title: '직업', seal: '業' },
@@ -15344,8 +15428,7 @@ function _renderFortuneInner() {
         <span style="font-family:'Noto Sans KR'; font-size:14px; font-weight:700; color:var(--text-sub); margin-left:4px;">(${ga})</span>
       </div>
       <div class="ganji-sub">
-        ${isMonth ? '월운' : '세운'} 천간 ${SIPSIN_KOR[fortune.seunStemSipsin]} · 지지 ${SIPSIN_KOR[fortune.seunBranchSipsin]} ·
-        현재 대운 ${STEM[fortune.curDaeun.stem]}${BRANCH[fortune.curDaeun.branch]}(${SIPSIN_KOR[fortune.daeunStemSipsin]})
+        ${timingSummary}
       </div>
     </div>
 
@@ -15390,7 +15473,7 @@ function _renderFortuneInner() {
     </details>
 
     <div class="fortune-disclaimer">
-      본 풀이는 팔품을 중심으로 ${isMonth ? '월운·세운' : '세운'}·대운·삼원구운을 구분해 살피는 비공식 참고용 창작 해석입니다. 건강 내용은 생활 관리 참고이며 진단이 아니고, 재물 내용은 수익이나 손실을 보장하지 않습니다.
+      본 풀이는 실제로 구성한 ${composedLayerText} 층만 구분해 살피는 비공식 참고용 창작 해석입니다. 건강 내용은 생활 관리 참고이며 진단이 아니고, 재물 내용은 수익이나 손실을 보장하지 않습니다.
     </div>
   `;
 
@@ -15405,6 +15488,8 @@ function _renderFortuneInner() {
       renderFortune();
     });
   });
+  restoreFortuneFocus(focusIdentity);
+  announceFortuneUpdate(periodTitle, periodSubtitle);
 }
 
 

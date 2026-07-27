@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
+const { pathToFileURL, URL: NodeURL } = require('node:url');
 const vm = require('node:vm');
 const grepIndex = process.argv.indexOf('--grep');
 const TEST_GREP = grepIndex >= 0 ? process.argv[grepIndex + 1] : '';
@@ -13,6 +13,7 @@ const GREP_GROUPS = {
   'Palpum result rendering': 'palpum-result-rendering',
   'Palpum period boundaries': 'palpum-period-boundaries',
   'legacy saved chart derives Palpum': 'task-7',
+  'Palpum period accessibility': 'palpum-period-accessibility',
   'Palpum ink wash': 'palpum-layout',
   'navigation never covers': 'palpum-layout',
   'Palpum ink wash|navigation never covers': 'palpum-layout'
@@ -59,7 +60,7 @@ function inspectLegendSourceContracts() {
   );
   assert.doesNotMatch(shareSource, /취명선 만세력|sineum-manse/);
   assert.match(shareSource, /취명선 전설의 만세력/);
-  assert.match(shareSource, /jansang18\.github\.io\/legend-manse/);
+  assert.match(shareSource, /jansang18\.github\.io\/palpum-manse/);
   assert.deepEqual(
     { name: manifest.name, shortName: manifest.short_name },
     { name: '취명선 전설의 만세력', shortName: '전설의 만세력' }
@@ -148,6 +149,11 @@ const WEB_ROOT = process.env.WEB_ROOT
   : fs.existsSync(path.join(repoRoot, 'index.html'))
     ? repoRoot
     : path.join(APP_ROOT, 'web');
+const UI_BASE_PATH = (() => {
+  const value = String(process.env.UI_BASE_PATH || '/').trim();
+  const trimmed = value.replace(/^\/+|\/+$/g, '');
+  return trimmed ? `/${trimmed}/` : '/';
+})();
 
 function findChromeExecutable() {
   if (process.env.CHROME_PATH) {
@@ -249,7 +255,14 @@ function startStaticServer(root) {
   const normalizedRoot = path.resolve(root);
   const server = http.createServer((request, response) => {
     const pathname = decodeURIComponent(new globalThis.URL(request.url, 'http://127.0.0.1').pathname);
-    const relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+    if (UI_BASE_PATH !== '/' && !pathname.startsWith(UI_BASE_PATH)) {
+      response.writeHead(404).end('Not found');
+      return;
+    }
+    const mountedPath = UI_BASE_PATH === '/'
+      ? pathname
+      : pathname.slice(UI_BASE_PATH.length - 1);
+    const relativePath = mountedPath === '/' ? 'index.html' : mountedPath.replace(/^\/+/, '');
     const filePath = path.resolve(normalizedRoot, relativePath);
     if (filePath !== normalizedRoot && !filePath.startsWith(`${normalizedRoot}${path.sep}`)) {
       response.writeHead(403).end('Forbidden');
@@ -272,7 +285,7 @@ function startStaticServer(root) {
     server.once('error', reject);
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();
-      resolve({ server, url: `http://127.0.0.1:${address.port}/index.html` });
+      resolve({ server, url: `http://127.0.0.1:${address.port}${UI_BASE_PATH}` });
     });
   });
 }
@@ -723,7 +736,9 @@ function createServiceWorkerHarness(source, addAllFailure = null) {
     keys() {
       return Promise.resolve([
         'sineum-manse-previous',
-        'legend-manse-previous',
+        'legend-manse-v10',
+        'legend-manse-v11',
+        'palpum-manse-previous',
         openedCache
       ].filter(Boolean));
     },
@@ -735,7 +750,11 @@ function createServiceWorkerHarness(source, addAllFailure = null) {
     match() { return Promise.resolve(undefined); }
   };
   const self = {
-    location: { origin: 'https://example.test' },
+    location: {
+      origin: 'https://example.test',
+      href: 'https://example.test/palpum-manse/sw.js'
+    },
+    registration: { scope: 'https://example.test/palpum-manse/' },
     clients: {
       claim() {
         events.push({ type: 'claim' });
@@ -751,7 +770,7 @@ function createServiceWorkerHarness(source, addAllFailure = null) {
   vm.runInNewContext(source, {
     self,
     caches,
-    URL,
+    URL: NodeURL,
     fetch: () => Promise.reject(new Error('fetch is outside this lifecycle test')),
     Promise
   }, { filename: 'sw.js' });
@@ -792,7 +811,7 @@ async function inspectServiceWorkerInstall(source) {
     'skipWaiting must follow successful addAll'
   );
   await successfulInstall.dispatch('activate');
-  assert.deepEqual(successfulInstall.deletedCaches, ['legend-manse-previous']);
+  assert.deepEqual(successfulInstall.deletedCaches, ['palpum-manse-previous']);
   assert.equal(successfulInstall.events.at(-1).type, 'claim');
 }
 
@@ -899,7 +918,7 @@ async function inspectFinalSecurityRuntime(page, width) {
   const state = await page.evaluate(async () => {
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const listSavedKeys = async () => {
-      const result = await window.storage.list('legend-saju:record:');
+      const result = await window.storage.list('palpum-manse:record:');
       return result && Array.isArray(result.keys) ? result.keys : [];
     };
 
@@ -1037,7 +1056,7 @@ async function inspectFinalSecurityRuntime(page, width) {
   assert.equal(state.importState.executableNodes, 0, `${width}px imported markup became executable DOM`);
   assert.equal(state.importState.keys.length, 1, `${width}px invalid imported schemas must be rejected`);
   assert.ok(uuid.test(state.importState.stored.id), `${width}px imported id is not a UUID: ${state.importState.stored.id}`);
-  assert.equal(state.importState.keys[0], `legend-saju:record:${state.importState.stored.id}`);
+  assert.equal(state.importState.keys[0], `palpum-manse:record:${state.importState.stored.id}`);
   assert.deepEqual(state.importState.cardIds, [state.importState.stored.id]);
   assert.match(state.importState.cardText[0], /<img src=x onerror=/, 'malicious display text must remain inert text');
   assert.equal(Object.hasOwn(state.importState.stored, 'unexpected'), false, 'unknown import fields must be dropped');
@@ -1126,7 +1145,7 @@ async function inspectImportedFieldDownstreamSafety(page, width) {
   const state = await page.evaluate(async () => {
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const listKeys = async () => {
-      const result = await window.storage.list('legend-saju:record:');
+      const result = await window.storage.list('palpum-manse:record:');
       return result && Array.isArray(result.keys) ? result.keys : [];
     };
     const attackerNodes = root => [
@@ -1374,6 +1393,14 @@ async function inspectPalpumQuickPeriods(page, width) {
 
   await page.click('[data-palpum-period="next-month"]');
   assert.equal(await selectedQuickPeriod(page), 'next-month', `${width}px next-month period`);
+  assert.deepEqual(
+    new Set(await page.$$eval(
+      '[data-palpum-evidence-kind]',
+      elements => elements.map(element => element.dataset.palpumEvidenceKind)
+    )),
+    new Set(['팔품', '대운', '세운', '월운', '시대']),
+    `${width}px monthly timing evidence layers`
+  );
 
   await page.click('[data-palpum-period="monthly"]');
   assert.equal(
@@ -1494,8 +1521,12 @@ async function inspectPalpumResultRendering(page, width) {
   assert.ok(result.role, `${width}px Palpum role`);
   assert.deepEqual(result.triad, ['기회', '부담', '준비'], `${width}px opportunity triad`);
   assert.deepEqual(result.areas, ['관계', '직업', '재물', '건강'], `${width}px result areas`);
-  assert.deepEqual(new Set(result.evidence), new Set(['팔품', '시기', '시대']), `${width}px evidence layers`);
-  assert.ok(result.evidence.length >= 3, `${width}px evidence count`);
+  assert.deepEqual(
+    new Set(result.evidence),
+    new Set(['팔품', '대운', '세운', '시대']),
+    `${width}px annual evidence layers`
+  );
+  assert.ok(result.evidence.length >= 4, `${width}px evidence count`);
   assert.equal(result.evidenceSummary, '왜 이렇게 보나요?', `${width}px evidence summary`);
   assert.equal(result.sourceSummary, '해석 기준과 출처', `${width}px source summary`);
   assert.match(result.sourceText, /취명선 창작 해석/, `${width}px creative attribution disclosure`);
@@ -1523,6 +1554,15 @@ async function inspectHistoricalPalpumDisclosure(page, width) {
     true,
     `${width}px historical approximation disclosure`
   );
+  await calculateFixture(page, { birth: '10260219', time: '1430' });
+  assert.equal(
+    await page.$eval(
+      '[data-palpum-accuracy="historical-approximation"]',
+      element => element.textContent.trim()
+    ),
+    '역사 범위 근사',
+    `${width}px exact 1026 lower-bound disclosure`
+  );
 }
 
 async function inspectUnknownTimePalpumBoundary(page, width) {
@@ -1539,6 +1579,15 @@ async function inspectUnknownTimePalpumBoundary(page, width) {
     candidates: ['자축품', '인묘품'],
     disclosure: true
   }, `${width}px unknown-time boundary candidates`);
+  const provisionalTiming = await page.evaluate(() => ({
+    daeun: currentSaju?.daeun ?? null,
+    evidence: [...document.querySelectorAll('[data-palpum-evidence-kind]')]
+      .map(element => element.dataset.palpumEvidenceKind),
+    text: document.getElementById('fortuneContent')?.textContent.replace(/\s+/g, ' ').trim()
+  }));
+  assert.equal(provisionalTiming.daeun, null, `${width}px provisional chart must not retain one noon Daeun`);
+  assert.equal(provisionalTiming.evidence.includes('대운'), false, `${width}px uncertain result must omit Daeun evidence`);
+  assert.doesNotMatch(provisionalTiming.text, /현재 대운|대운 관계/, `${width}px uncertain result must not assert one Daeun`);
 
   const provisionalGuard = await page.evaluate(() => {
     const provisional = currentSaju?.palpumProvisional === true;
@@ -1750,7 +1799,9 @@ async function inspectSavedChartPalpumStates(page, width) {
     version: currentPalpum?.version,
     type: currentPalpum?.type,
     ruler: currentPalpum?.ruler,
-    stored: (await window.storage.get('legend-saju:record:legacy-pre-palpum'))?.value
+    legacyStored: (await window.storage.get('legend-saju:record:legacy-pre-palpum'))?.value,
+    palpumStored: (await window.storage.get('palpum-manse:record:legacy-pre-palpum'))?.value,
+    copied: (await window.storage.get('palpum-manse:legacy-copy-v1'))?.value
   }));
   assert.deepEqual({
     destination: savedResult.destination,
@@ -1763,7 +1814,14 @@ async function inspectSavedChartPalpumStates(page, width) {
     type: '인묘품',
     ruler: '갑목'
   }, `${width}px legacy saved chart derives Palpum`);
-  assert.equal(savedResult.stored, legacyRecord, `${width}px saved source record remains unchanged`);
+  assert.equal(savedResult.legacyStored, legacyRecord, `${width}px saved source record remains unchanged`);
+  assert.equal(savedResult.palpumStored, legacyRecord, `${width}px legacy record is copied into Palpum storage`);
+  assert.equal(savedResult.copied, '1', `${width}px legacy copy marker`);
+  await page.evaluate(async () => {
+    await window.storage.delete('legend-saju:record:legacy-pre-palpum');
+    await window.storage.delete('palpum-manse:record:legacy-pre-palpum');
+    await window.storage.delete('palpum-manse:legacy-copy-v1');
+  });
 
   await calculateFixture(page, { birth: '19860219', time: '' });
   assert.deepEqual(await page.evaluate(() => ({
@@ -1923,6 +1981,68 @@ async function inspectPalpumPeriodBoundaries(page, width) {
     selected: '12',
     chart: chartBefore
   }, `${width}px month selection preserves current chart`);
+}
+
+async function inspectPalpumPeriodAccessibility(page, width) {
+  await calculateFixture(page, { birth: '19860219', time: '1430' });
+  const liveContract = await page.evaluate(() => {
+    const status = document.getElementById('fortuneUpdateStatus');
+    return {
+      exists: Boolean(status),
+      role: status?.getAttribute('role'),
+      live: status?.getAttribute('aria-live'),
+      atomic: status?.getAttribute('aria-atomic'),
+      stable: status ? !document.getElementById('fortuneContent').contains(status) : false
+    };
+  });
+  assert.deepEqual(liveContract, {
+    exists: true,
+    role: 'status',
+    live: 'polite',
+    atomic: 'true',
+    stable: true
+  }, `${width}px stable fortune live-region contract`);
+
+  await page.focus('[data-palpum-period="next-month"]');
+  await page.keyboard.press('Enter');
+  await sleep(80);
+  assert.deepEqual(await page.evaluate(() => ({
+    focused: document.activeElement?.dataset?.palpumPeriod,
+    announcement: document.getElementById('fortuneUpdateStatus')?.textContent.trim()
+  })), {
+    focused: 'next-month',
+    announcement: await page.$eval(
+      '.fortune-period-title strong',
+      element => `${element.textContent.trim()} 월운 팔품 운세가 업데이트되었습니다.`
+    )
+  }, `${width}px keyboard quick-period focus and announcement`);
+
+  await page.click('[data-palpum-period="monthly"]');
+  await sleep(80);
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.dataset?.palpumPeriod),
+    'monthly',
+    `${width}px pointer quick-period focus continuity`
+  );
+
+  await page.click('#fortunePeriodNext');
+  await sleep(80);
+  const yearNavigation = await page.evaluate(() => ({
+    focused: document.activeElement?.id,
+    year: fortuneCursorYear,
+    announcement: document.getElementById('fortuneUpdateStatus')?.textContent.trim()
+  }));
+  assert.equal(yearNavigation.focused, 'fortunePeriodNext', `${width}px year-navigation focus continuity`);
+  assert.match(yearNavigation.announcement, new RegExp(`${yearNavigation.year}년.*업데이트`));
+
+  await page.click('[data-palpum-month="8"]');
+  await sleep(80);
+  const monthNavigation = await page.evaluate(() => ({
+    focused: document.activeElement?.dataset?.palpumMonth,
+    announcement: document.getElementById('fortuneUpdateStatus')?.textContent.trim()
+  }));
+  assert.equal(monthNavigation.focused, '8', `${width}px month focus continuity`);
+  assert.match(monthNavigation.announcement, /8월.*업데이트/);
 }
 
 async function inspectExactReleaseAssertions(page, width) {
@@ -2116,7 +2236,7 @@ async function inspectLunarMonthInput(page, width) {
     HTMLAnchorElement.prototype.click = function () {};
     document.getElementById('savedExportBtn').click();
     const payload = JSON.parse(await window.__lunarExportBlob.text());
-    const keys = (await window.storage.list('legend-saju:record:')).keys;
+    const keys = (await window.storage.list('palpum-manse:record:')).keys;
     for (const key of keys) await window.storage.delete(key);
     return {
       saved: records.map(record => ({
@@ -2164,7 +2284,7 @@ async function inspectLunarMonthInput(page, width) {
 
 async function inspectLegacyBackupImport(page) {
   const state = await page.evaluate(async () => {
-    const existing = (await window.storage.list('legend-saju:record:')).keys;
+    const existing = (await window.storage.list('palpum-manse:record:')).keys;
     for (const key of existing) await window.storage.delete(key);
     const sample = {
       id: 'legacy-id',
@@ -2211,7 +2331,7 @@ async function inspectLegacyBackupImport(page) {
       }
     }
     const records = await recordStore.listRecords();
-    const keys = (await window.storage.list('legend-saju:record:')).keys;
+    const keys = (await window.storage.list('palpum-manse:record:')).keys;
     for (const key of keys) await window.storage.delete(key);
     return {
       arrayResult,
@@ -2236,7 +2356,7 @@ async function inspectLegacyBackupImport(page) {
   assert.equal(state.rejected.length, 4);
   assert.ok(state.rejected.every(message => /지원하지 않는 백업/.test(message)));
   assert.equal(state.keys.length, 3);
-  assert.ok(state.keys.every(key => key.startsWith('legend-saju:record:')));
+  assert.ok(state.keys.every(key => key.startsWith('palpum-manse:record:')));
   assert.equal(state.records.length, 3);
   assert.ok(state.records.every(record => (
     record.id !== 'legacy-id' &&
@@ -2590,9 +2710,9 @@ async function inspectLegendNavigation(page, width) {
   }));
   assert.equal(source.activate, 'function');
   assert.equal(source.evidence, 'function');
-  assert.deepEqual(source.primary, ['input', 'result', 'legend', 'calendar', 'saved']);
-  assert.deepEqual(source.more, ['match', 'about']);
-  assert.deepEqual(source.secondary, [{ tab: 'fortune', role: 'menuitem' }]);
+  assert.deepEqual(source.primary, ['legend', 'fortune', 'match', 'calendar', 'saved']);
+  assert.deepEqual(source.more, ['result', 'about']);
+  assert.deepEqual(source.secondary, [{ tab: 'input', role: 'menuitem' }]);
   source.targets.forEach(target => {
     assert.equal(target.controls, `view-${target.tab}`);
     if (width < 768) assert.ok(target.height >= 44, `${target.tab} mobile target is ${target.height}px`);
@@ -2600,11 +2720,25 @@ async function inspectLegendNavigation(page, width) {
   assert.equal(source.primaryDisplay === 'none', width >= 768, `${width}px mobile navigation visibility`);
   assert.equal(source.topDisplay === 'none', width < 768, `${width}px desktop tab visibility`);
 
-  await page.evaluate(() => window.activateLegendDestination('legend'));
+  const groupedControls = await page.evaluate(() => {
+    const tab = document.querySelector('.tab[data-tab="legend"]');
+    const controls = {};
+    for (const destination of ['input', 'result', 'legend']) {
+      window.activateLegendDestination(destination);
+      controls[destination] = tab.getAttribute('aria-controls');
+    }
+    return controls;
+  });
+  assert.deepEqual(groupedControls, {
+    input: 'view-input',
+    result: 'view-result',
+    legend: 'view-legend'
+  }, `${width}px grouped top-level tab must control the active Saju panel`);
   await sleep(100);
   const synchronized = await page.evaluate(() => ({
     top: document.querySelector('.tab.active')?.dataset.tab,
     topSelected: document.querySelector('.tab[data-tab="legend"]')?.getAttribute('aria-selected'),
+    topControls: document.querySelector('.tab[data-tab="legend"]')?.getAttribute('aria-controls'),
     bottom: document.querySelector('[data-legend-primary-nav][aria-current="page"]')?.dataset.tab,
     panel: document.querySelector('.view.active')?.id,
     hidden: document.getElementById('view-legend')?.hidden
@@ -2612,6 +2746,7 @@ async function inspectLegendNavigation(page, width) {
   assert.deepEqual(synchronized, {
     top: 'legend',
     topSelected: 'true',
+    topControls: 'view-legend',
     bottom: 'legend',
     panel: 'view-legend',
     hidden: false
@@ -2657,7 +2792,7 @@ async function inspectLegendNavigation(page, width) {
     expanded: 'true',
     hidden: false,
     role: 'menu',
-    focused: 'fortune',
+    focused: 'input',
     anchored: true
   });
   await page.keyboard.press('Escape');
@@ -2670,34 +2805,38 @@ async function inspectLegendNavigation(page, width) {
   assert.deepEqual(menuClosed, { expanded: 'false', hidden: true, focus: 'legendMoreButton' });
 
   await page.click(moreButton);
-  await page.focus('[data-legend-more-nav][data-tab="match"]');
+  await page.focus('[data-legend-more-nav][data-tab="result"]');
   await page.keyboard.press('Enter');
   await sleep(100);
-  const matchDestination = await page.evaluate(() => ({
+  const resultDestination = await page.evaluate(() => ({
     active: document.querySelector('.tab.active')?.dataset.tab,
+    panel: document.querySelector('.view.active')?.id,
     current: document.getElementById('legendMoreButton')?.getAttribute('aria-current'),
     focused: document.activeElement?.id || document.activeElement?.dataset?.tab || ''
   }));
-  assert.deepEqual(matchDestination, {
-    active: 'match',
-    current: 'page',
-    focused: width < 768 ? 'legendMoreButton' : 'tab-match'
-  }, `${width}px more-menu match destination`);
+  assert.deepEqual(resultDestination, {
+    active: 'legend',
+    panel: 'view-result',
+    current: null,
+    focused: width < 768 ? 'legend' : 'tab-legend'
+  }, `${width}px more-menu result destination`);
 
   await page.click(moreButton);
-  await page.focus('[data-legend-secondary-nav][data-tab="fortune"]');
+  await page.focus('[data-legend-secondary-nav][data-tab="input"]');
   await page.keyboard.press('Enter');
   await sleep(100);
-  const fortuneDestination = await page.evaluate(() => ({
+  const inputDestination = await page.evaluate(() => ({
     active: document.querySelector('.tab.active')?.dataset.tab,
+    panel: document.querySelector('.view.active')?.id,
     current: document.getElementById('legendMoreButton')?.getAttribute('aria-current'),
     focused: document.activeElement?.id || document.activeElement?.dataset?.tab || ''
   }));
-  assert.deepEqual(fortuneDestination, {
-    active: 'fortune',
-    current: 'page',
-    focused: width < 768 ? 'legendMoreButton' : 'tab-fortune'
-  }, `${width}px mobile fortune destination`);
+  assert.deepEqual(inputDestination, {
+    active: 'legend',
+    panel: 'view-input',
+    current: null,
+    focused: width < 768 ? 'legend' : 'tab-legend'
+  }, `${width}px mobile input destination`);
   await page.evaluate(() => window.activateLegendDestination('legend'));
 
   const evidenceTrigger = '[data-legend-evidence]';
@@ -2782,9 +2921,10 @@ async function inspectLegendNavigation(page, width) {
   await sleep(260);
   const shareBack = await page.evaluate(() => ({
     open: !!document.getElementById('shareCardModal'),
-    active: document.querySelector('.tab.active')?.dataset.tab
+    active: document.querySelector('.tab.active')?.dataset.tab,
+    panel: document.querySelector('.view.active')?.id
   }));
-  assert.deepEqual(shareBack, { open: false, active: 'result' });
+  assert.deepEqual(shareBack, { open: false, active: 'legend', panel: 'view-result' });
 
   await page.evaluate(() => {
     window.activateLegendDestination('legend');
@@ -3464,7 +3604,7 @@ async function inspectAppleSecondaryScreens(page, width) {
 
       document.querySelector('.tab[data-tab="saved"]').click();
       const savedId = `task5-${theme}`;
-      await window.storage.set(`legend-saju:record:${savedId}`, JSON.stringify({
+      await window.storage.set(`palpum-manse:record:${savedId}`, JSON.stringify({
         ...currentSaju,
         id: savedId,
         name: `실제저장-${theme}`,
@@ -3596,7 +3736,7 @@ async function inspectAppleSecondaryScreens(page, width) {
         viewportHeight: window.innerHeight,
         width
       };
-      await window.storage.delete(`legend-saju:record:${savedId}`);
+      await window.storage.delete(`palpum-manse:record:${savedId}`);
       surfaceProbe.remove();
       solidSurfaceProbe.remove();
       return result;
@@ -4569,6 +4709,16 @@ async function inspectWidth(browser, width) {
     await page.evaluate(() => document.body.classList.add('dark'));
   }
 
+  if (TEST_GROUP === 'palpum-period-accessibility' || (!TEST_GROUP && width === 390)) {
+    await inspectPalpumPeriodAccessibility(page, width);
+    if (TEST_GROUP === 'palpum-period-accessibility') {
+      await closeCleanPage(page, width, pageIssues);
+      return;
+    }
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
+  }
+
   if (TEST_GROUP === 'lunar-input' || (!TEST_GROUP && width === 390)) {
     await inspectLunarMonthInput(page, width);
     if (TEST_GROUP === 'lunar-input') {
@@ -4986,12 +5136,12 @@ async function inspectWidth(browser, width) {
       let alerts = 0;
       window.alert = () => { alerts++; };
       try {
-        const before = new Set((await window.storage.list('legend-saju:record:')).keys || []);
+        const before = new Set((await window.storage.list('palpum-manse:record:')).keys || []);
         document.getElementById('saveBtn').click();
         document.getElementById('saveConfirm').click();
         await new Promise(resolve => setTimeout(resolve, 100));
         const toast = document.getElementById('appToast');
-        const after = await window.storage.list('legend-saju:record:');
+        const after = await window.storage.list('palpum-manse:record:');
         await Promise.all((after.keys || [])
           .filter(key => !before.has(key))
           .map(key => window.storage.delete(key)));

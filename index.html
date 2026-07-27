@@ -12596,7 +12596,7 @@ function solarToLunar(y, m, d) {
   return { y: ly, m: lm, d: off + 1, isLeap: isL };
 }
 
-function calcSaju(opts) {
+function calculateSajuInternal(opts, allowPalpumProvisional) {
   let { year, month, day, hour, minute, calendar, gender, unknown, isLeapMonth } = opts;
   const dayBoundary = DAY_BOUNDARY_LABELS[opts.dayBoundary] ? opts.dayBoundary : 'midnight';
   const inputYear = year;
@@ -12616,6 +12616,7 @@ function calcSaju(opts) {
   let calculationMode = 'legacy-approximate';
   let timeStandard = 'legacy-approximate';
   let trueSolarCorrection = false;
+  let palpumProvisional = false;
 
   if (year >= 1800) {
     if (!globalThis.LegendGanji || typeof globalThis.LegendGanji.calculate !== 'function') {
@@ -12632,7 +12633,8 @@ function calcSaju(opts) {
         ? globalThis.Manseryeok.lunarToSolar(year, month, day, isLeapMonth)
         : { year, month, day };
       if (
-        !unknown
+        allowPalpumProvisional !== true
+        || !unknown
         || dayBoundary !== 'midnight'
         || error?.code !== 'LEGEND_SOLAR_TERM_TIME_REQUIRED'
         || !palpumBoundaryIntersectsDay(boundaryDate.year, boundaryDate.month, boundaryDate.day)
@@ -12646,6 +12648,7 @@ function calcSaju(opts) {
         unknown: false,
         dayBoundary
       });
+      palpumProvisional = true;
     }
     year = precise.year;
     month = precise.month;
@@ -12721,8 +12724,17 @@ function calcSaju(opts) {
     sipsin, sipsinJi, ohaeng, interactions, shinsal, daeun, gongmang,
     unknown, gender, jd, calculationMode, dayBoundary,
     timeStandard,
-    trueSolarCorrection
+    trueSolarCorrection,
+    palpumProvisional
   };
+}
+
+function calcSaju(opts) {
+  return calculateSajuInternal(opts, false);
+}
+
+function calcPalpumSaju(opts) {
+  return calculateSajuInternal(opts, true);
 }
 
 function calcShinsal(yB, dB, all, dS) {
@@ -12868,7 +12880,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 let currentSaju = null;
 let currentPalpum = null;
-let currentPalpumSource = null;
+let currentPalpumSignature = null;
 let selectedDaeun = null, selectedSeun = null, selectedWoon = null;
 let selectedLegendDay = null;
 
@@ -12885,8 +12897,8 @@ function syncTabA11y(activeTab) {
 }
 
 syncTabA11y($('.tab.active'));
-window.hasCurrentSaju = () => !!currentSaju;
-window.getCurrentSaju = () => currentSaju;
+window.hasCurrentSaju = () => !!currentSaju && currentSaju.palpumProvisional !== true;
+window.getCurrentSaju = () => window.hasCurrentSaju() ? currentSaju : null;
 
 function syncLunarMonthType() {
   const field = $('#lunarMonthTypeField');
@@ -13042,7 +13054,7 @@ onTap($('#calcBtn'), () => {
   }
   clearInErr();
   try {
-    const saju = calcSaju({
+    const saju = calcPalpumSaju({
       year: y,
       month: m,
       day: d,
@@ -13057,11 +13069,10 @@ onTap($('#calcBtn'), () => {
     saju.name = name || '이름 없음';
     currentSaju = saju;
     if (typeof buildCurrentPalpum === 'function') {
-      currentPalpum = buildCurrentPalpum(saju);
-      currentPalpumSource = saju;
+      rebuildCurrentPalpum(saju);
     } else {
       currentPalpum = null;
-      currentPalpumSource = null;
+      currentPalpumSignature = null;
     }
     selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
     setFortuneQuickPeriod('this-year', { render: false });
@@ -13174,43 +13185,38 @@ function renderResult() {
   const hourEl = document.getElementById('hourPillar');
   if (hourEl) {
     hourEl.addEventListener('click', () => {
-      const s = currentSaju;
-      if (s.unknown) {
-        // 시간 모름 → 자시부터 시작
-        s.unknown = false;
-        s.hBranch = 0;
-      } else {
-        s.hBranch = (s.hBranch + 1) % 12;
+      const previous = currentSaju;
+      const nextBranch = previous.unknown ? 0 : (previous.hBranch + 1) % 12;
+      const nextHour = nextBranch === 0 ? 23 : (nextBranch * 2 - 1);
+      try {
+        const recalculated = calcSaju({
+          year: previous.inputYear ?? previous.year,
+          month: previous.inputMonth ?? previous.month,
+          day: previous.inputDay ?? previous.day,
+          hour: nextHour,
+          minute: 0,
+          calendar: previous.calendar || 'solar',
+          isLeapMonth: previous.isLeapMonth === true,
+          gender: previous.gender,
+          unknown: false,
+          dayBoundary: previous.dayBoundary || 'midnight'
+        });
+        ['id', 'name', 'memo', 'fav', 'savedAt'].forEach(key => {
+          if (previous[key] !== undefined) recalculated[key] = previous[key];
+        });
+        currentSaju = recalculated;
+        rebuildCurrentPalpum(recalculated);
+        selectedDaeun = null;
+        selectedSeun = null;
+        selectedWoon = null;
+        selectedLegendDay = null;
+        renderResult();
+      } catch (error) {
+        console.error(error);
+        window.showAppToast('시주를 다시 계산하지 못했습니다. 입력값을 확인해 주세요.');
       }
-      // 오서둔법에 따른 시간 천간 재계산
-      s.hStem = getHourStem(s.dStem, s.hBranch);
-      // 해당 시진의 대표 시각으로 hour/minute 업데이트 (시주 표시용)
-      // 자시는 23시, 나머지는 2*branch - 1 (축=1, 인=3, …)
-      s.hour = s.hBranch === 0 ? 23 : (s.hBranch * 2 - 1);
-      s.minute = 0;
-      // 십신/오행/합충/신살 재계산을 위해 사주 다시 계산
-      recomputeSipsinAndOhaeng(s);
-      renderResult();
     });
   }
-}
-
-// 시주 변경 시 십신·오행·합충 등 재계산
-function recomputeSipsinAndOhaeng(s) {
-  s.sipsin.hour = s.hStem >= 0 ? getSipsin(s.dStem, s.hStem) : -1;
-  s.sipsinJi.hour = s.hBranch >= 0 ? getSipsin(s.dStem, JIJANGAN[s.hBranch][0]) : -1;
-
-  // 오행 재계산
-  s.ohaeng = [0,0,0,0,0];
-  s.ohaeng[STEM_EL[s.yStem]]++; s.ohaeng[STEM_EL[s.mStem]]++; s.ohaeng[STEM_EL[s.dStem]]++;
-  if (s.hStem >= 0) s.ohaeng[STEM_EL[s.hStem]]++;
-  s.ohaeng[BRANCH_EL[s.yBranch]]++; s.ohaeng[BRANCH_EL[s.mBranch]]++; s.ohaeng[BRANCH_EL[s.dBranch]]++;
-  if (s.hBranch >= 0) s.ohaeng[BRANCH_EL[s.hBranch]]++;
-
-  const branches = [s.yBranch, s.mBranch, s.dBranch];
-  if (s.hBranch >= 0) branches.push(s.hBranch);
-  s.interactions = analyzeInter(branches, s.yStem, s.mStem, s.dStem, s.hStem);
-  s.shinsal = calcShinsal(s.yBranch, s.dBranch, branches, s.dStem);
 }
 
 function renderCol(title, sipT, stem, branch, sipB, unknown, isDay, isHour, hap, stemHap, isGeok) {
@@ -14244,7 +14250,11 @@ function normalizeImportedRecord(input) {
       dayBoundary
     });
   } catch (error) {
-    if (error instanceof RangeError || error instanceof TypeError) return null;
+    if (
+      error instanceof RangeError
+      || error instanceof TypeError
+      || error?.code === 'LEGEND_SOLAR_TERM_TIME_REQUIRED'
+    ) return null;
     throw error;
   }
   return {
@@ -14606,6 +14616,7 @@ const PALPUM_TERM_SPECS = Object.freeze([
   Object.freeze({ name: '입동', index: 20, longitude: 225 }),
   Object.freeze({ name: '동지', index: 23, longitude: 270 })
 ]);
+const LEGACY_JEOLGI_KST_OFFSET_DAYS = 9 / 24;
 
 const PALPUM_PUBLIC_SOURCES = Object.freeze([
   Object.freeze({
@@ -14696,6 +14707,11 @@ function precisePalpumTermInstant(year, index) {
   return palpumGanjiAdapter.getSolarTermInstant(year, index);
 }
 
+function legacyPalpumTermInstant(year, longitude) {
+  const utcJulianDay = findJeolgiJD(year, longitude) - LEGACY_JEOLGI_KST_OFFSET_DAYS;
+  return (utcJulianDay - 2440587.5) * 86400000;
+}
+
 function collectPalpumBoundaries(year, historical) {
   const boundaries = [];
   for (let boundaryYear = year - 1; boundaryYear <= year + 1; boundaryYear++) {
@@ -14703,7 +14719,7 @@ function collectPalpumBoundaries(year, historical) {
       boundaries.push({
         name: term.name,
         instantMs: historical
-          ? (findJeolgiJD(boundaryYear, term.longitude) - 2440587.5) * 86400000
+          ? legacyPalpumTermInstant(boundaryYear, term.longitude)
           : precisePalpumTermInstant(boundaryYear, term.index)
       });
     });
@@ -14718,6 +14734,18 @@ function palpumBoundaryIntersectsDay(year, month, day) {
   return collectPalpumBoundaries(year, false).some(
     boundary => boundary.instantMs >= dayStartMs && boundary.instantMs < dayEndMs
   );
+}
+
+function palpumClassificationInputSignature(saju) {
+  if (!saju) return '';
+  return [
+    saju.year,
+    saju.month,
+    saju.day,
+    saju.hour,
+    saju.minute,
+    saju.unknown === true ? 'unknown' : 'known'
+  ].join('|');
 }
 
 function buildCurrentPalpum(saju) {
@@ -14742,6 +14770,12 @@ function buildCurrentPalpum(saju) {
       ? { startMs: dayStartMs, endMs: dayEndMs - 1 }
       : undefined
   });
+}
+
+function rebuildCurrentPalpum(saju) {
+  currentPalpum = buildCurrentPalpum(saju);
+  currentPalpumSignature = palpumClassificationInputSignature(saju);
+  return currentPalpum;
 }
 
 function nextFortuneMonth(date) {
@@ -15208,9 +15242,9 @@ function _renderFortuneInner() {
   const fortune = isMonth
     ? calcMonthFortune(s, fortuneCursorYear, fortuneCursorMonth)
     : calcYearFortune(s, fortuneCursorYear);
-  if (currentPalpumSource !== s) {
-    currentPalpum = buildCurrentPalpum(s);
-    currentPalpumSource = s;
+  const classificationSignature = palpumClassificationInputSignature(s);
+  if (currentPalpumSignature !== classificationSignature) {
+    rebuildCurrentPalpum(s);
   }
   const target = {
     year: fortune.year,
@@ -15488,14 +15522,15 @@ async function openMatchPicker() {
     return;
   }
   list.sort((a,b) => (b.savedAt || 0) - (a.savedAt || 0));
+  const currentForMatch = currentSaju?.palpumProvisional === true ? null : currentSaju;
 
   let itemsHtml = '';
-  if (currentSaju) {
+  if (currentForMatch) {
     itemsHtml += `<div class="pick-add-current" data-use-current>
-      ✨ 현재 원국 사용 — ${escapeHtml(currentSaju.name)} (${currentSaju.gender==='M'?'남':'여'})
+      ✨ 현재 원국 사용 — ${escapeHtml(currentForMatch.name)} (${currentForMatch.gender==='M'?'남':'여'})
     </div>`;
   }
-  if (list.length === 0 && !currentSaju) {
+  if (list.length === 0 && !currentForMatch) {
     itemsHtml += `<div class="empty-pick">저장된 명반이 없습니다<br>'새 사주 입력'으로 직접 입력하세요</div>`;
   } else if (list.length > 0) {
     itemsHtml += `<div style="font-size:12px; font-weight:700; color:var(--text-sub); margin-bottom:8px; padding-left:4px;">저장된 명반</div>`;
@@ -15527,7 +15562,7 @@ async function openMatchPicker() {
   const useCurrent = $('#matchPickerBody [data-use-current]');
   if (useCurrent) {
     useCurrent.addEventListener('click', () => {
-      setMatchSlot(matchPickerTarget, { ...currentSaju });
+      setMatchSlot(matchPickerTarget, { ...currentForMatch });
       closeMatchPicker();
     });
   }

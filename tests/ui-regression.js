@@ -1406,6 +1406,41 @@ async function inspectPalpumConstruction(page, width) {
     accuracy: 'historical-approximation'
   }, `${width}px historical Palpum construction`);
 
+  const historicalBoundary = await page.evaluate(() => {
+    // Frozen independent fixture for the legacy approximation, rounded to 1 ms.
+    const expectedBoundaryMs = Date.UTC(1799, 1, 3, 17, 34, 39, 335);
+    const boundaries = collectPalpumBoundaries(1799, true);
+    const boundary = boundaries
+      .filter(item => item.name === '입춘')
+      .sort((left, right) => (
+        Math.abs(left.instantMs - expectedBoundaryMs) - Math.abs(right.instantMs - expectedBoundaryMs)
+      ))[0];
+    const classify = instantMs => LegendPalpum.classifyPalpum({
+      instantMs,
+      boundaries,
+      accuracy: 'historical-approximation'
+    }).type;
+    return {
+      deltaMs: boundary.instantMs - expectedBoundaryMs,
+      before: classify(expectedBoundaryMs - 1),
+      at: classify(expectedBoundaryMs),
+      after: classify(expectedBoundaryMs + 1)
+    };
+  });
+  assert.ok(
+    Math.abs(historicalBoundary.deltaMs) < 1,
+    `${width}px historical boundary shares the absolute UTC axis`
+  );
+  assert.deepEqual({
+    before: historicalBoundary.before,
+    at: historicalBoundary.at,
+    after: historicalBoundary.after
+  }, {
+    before: '자축품',
+    at: '인묘품',
+    after: '인묘품'
+  }, `${width}px historical boundary before/at/after`);
+
   await page.emulateTimezone('UTC');
   await page.reload({ waitUntil: 'networkidle0' });
   await calculateFixture(page, { birth: '20260204', time: '0430' });
@@ -1496,6 +1531,23 @@ async function inspectUnknownTimePalpumBoundary(page, width) {
     disclosure: true
   }, `${width}px unknown-time boundary candidates`);
 
+  const provisionalGuard = await page.evaluate(() => {
+    const provisional = currentSaju?.palpumProvisional === true;
+    window.activateLegendDestination('result');
+    return {
+      provisional,
+      originalAvailable: window.hasCurrentSaju(),
+      activePanel: document.querySelector('.view.active')?.id,
+      visiblePillars: document.querySelectorAll('#view-result:not([hidden]) .pillar-block').length
+    };
+  });
+  assert.deepEqual(provisionalGuard, {
+    provisional: true,
+    originalAvailable: false,
+    activePanel: 'view-input',
+    visiblePillars: 0
+  }, `${width}px provisional Palpum pillars are guarded from the original chart`);
+
   await page.reload({ waitUntil: 'networkidle0' });
   await page.click('#advancedCalculationSettings > summary');
   await page.click('#segDayBoundary [data-val="jasi"]');
@@ -1525,11 +1577,133 @@ async function inspectUnknownTimePalpumBoundary(page, width) {
   await page.click('#segDayBoundary [data-val="midnight"]');
 }
 
+async function inspectPalpumHourRecalculation(page, width) {
+  await calculateFixture(page, { birth: '20260204', time: '' });
+  assert.equal(
+    await page.evaluate(() => currentPalpum?.boundaryUncertain),
+    true,
+    `${width}px boundary starts uncertain without a birth time`
+  );
+
+  await calculateFixture(page, { birth: '20260204', time: '0430' });
+  const suppliedTime = await page.evaluate(() => {
+    window.__palpumHourChart = currentSaju;
+    return {
+      type: currentPalpum?.type,
+      uncertain: currentPalpum?.boundaryUncertain,
+      hour: [currentSaju?.hour, currentSaju?.minute],
+      pillars: [
+        currentSaju?.yStem, currentSaju?.yBranch,
+        currentSaju?.mStem, currentSaju?.mBranch
+      ]
+    };
+  });
+  assert.deepEqual(suppliedTime, {
+    type: '자축품',
+    uncertain: false,
+    hour: [4, 30],
+    pillars: [1, 5, 5, 1]
+  }, `${width}px supplied pre-boundary time resolves one exact Palpum`);
+
+  await activateDestination(page, 'result');
+  await page.click('#hourPillar');
+  const firstHourEdit = await page.evaluate(() => {
+    const expected = calcSaju({
+      year: 2026,
+      month: 2,
+      day: 4,
+      hour: 5,
+      minute: 0,
+      calendar: 'solar',
+      isLeapMonth: false,
+      gender: 'M',
+      unknown: false,
+      dayBoundary: 'midnight'
+    });
+    const actualCore = [
+      currentSaju.yStem, currentSaju.yBranch,
+      currentSaju.mStem, currentSaju.mBranch,
+      currentSaju.dStem, currentSaju.dBranch,
+      currentSaju.hStem, currentSaju.hBranch
+    ];
+    const expectedCore = [
+      expected.yStem, expected.yBranch,
+      expected.mStem, expected.mBranch,
+      expected.dStem, expected.dBranch,
+      expected.hStem, expected.hBranch
+    ];
+    const result = {
+      replaced: currentSaju !== window.__palpumHourChart,
+      hour: [currentSaju.hour, currentSaju.minute],
+      actualCore,
+      expectedCore,
+      daeunMatches: JSON.stringify(currentSaju.daeun) === JSON.stringify(expected.daeun),
+      type: currentPalpum?.type
+    };
+    window.__palpumHourChart = currentSaju;
+    return result;
+  });
+  assert.equal(firstHourEdit.replaced, true, `${width}px first hour edit replaces currentSaju`);
+  assert.deepEqual(firstHourEdit.hour, [5, 0], `${width}px first hour representative time`);
+  assert.deepEqual(firstHourEdit.actualCore, firstHourEdit.expectedCore, `${width}px first hour full recalculation`);
+  assert.equal(firstHourEdit.daeunMatches, true, `${width}px first hour recalculates daeun`);
+  assert.equal(firstHourEdit.type, '자축품', `${width}px 05:00 remains before the boundary`);
+
+  await page.click('#hourPillar');
+  const secondHourEdit = await page.evaluate(() => {
+    const expected = calcSaju({
+      year: 2026,
+      month: 2,
+      day: 4,
+      hour: 7,
+      minute: 0,
+      calendar: 'solar',
+      isLeapMonth: false,
+      gender: 'M',
+      unknown: false,
+      dayBoundary: 'midnight'
+    });
+    const actualCore = [
+      currentSaju.yStem, currentSaju.yBranch,
+      currentSaju.mStem, currentSaju.mBranch,
+      currentSaju.dStem, currentSaju.dBranch,
+      currentSaju.hStem, currentSaju.hBranch
+    ];
+    const expectedCore = [
+      expected.yStem, expected.yBranch,
+      expected.mStem, expected.mBranch,
+      expected.dStem, expected.dBranch,
+      expected.hStem, expected.hBranch
+    ];
+    return {
+      replaced: currentSaju !== window.__palpumHourChart,
+      hour: [currentSaju.hour, currentSaju.minute],
+      actualCore,
+      expectedCore,
+      daeunMatches: JSON.stringify(currentSaju.daeun) === JSON.stringify(expected.daeun),
+      type: currentPalpum?.type
+    };
+  });
+  assert.equal(secondHourEdit.replaced, true, `${width}px second hour edit replaces currentSaju`);
+  assert.deepEqual(secondHourEdit.hour, [7, 0], `${width}px second hour representative time`);
+  assert.deepEqual(secondHourEdit.actualCore, secondHourEdit.expectedCore, `${width}px second hour full recalculation`);
+  assert.equal(secondHourEdit.daeunMatches, true, `${width}px second hour recalculates daeun`);
+  assert.equal(secondHourEdit.type, '인묘품', `${width}px 07:00 crosses the boundary`);
+
+  assert.equal(await page.evaluate(() => {
+    currentSaju.hour = 4;
+    currentSaju.minute = 30;
+    renderFortune();
+    return currentPalpum?.type;
+  }), '자축품', `${width}px in-place classification input change invalidates Palpum cache`);
+}
+
 async function inspectPalpumIntegration(page, width) {
   await inspectPalpumConstruction(page, width);
   await inspectPalpumResultRendering(page, width);
   await inspectHistoricalPalpumDisclosure(page, width);
   await inspectUnknownTimePalpumBoundary(page, width);
+  await inspectPalpumHourRecalculation(page, width);
 }
 
 async function inspectPalpumPeriodBoundaries(page, width) {
@@ -1538,39 +1712,46 @@ async function inspectPalpumPeriodBoundaries(page, width) {
     mode: fortuneQuickPeriod,
     year: fortuneCursorYear,
     month: fortuneCursorMonth,
-    title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
+    title: document.querySelector('.fortune-period-title strong')?.textContent.trim(),
+    expectedYear: new Date().getFullYear(),
+    expectedMonth: new Date().getMonth() + 1
   }));
-  assert.deepEqual(thisYear, {
-    mode: 'this-year',
-    year: 2026,
-    month: 7,
-    title: '2026년'
-  }, `${width}px current app date`);
+  assert.equal(thisYear.mode, 'this-year', `${width}px current app period`);
+  assert.equal(thisYear.year, thisYear.expectedYear, `${width}px current app year`);
+  assert.equal(thisYear.month, thisYear.expectedMonth, `${width}px current app month`);
+  assert.equal(thisYear.title, `${thisYear.expectedYear}년`, `${width}px current app title`);
 
   await page.click('[data-palpum-period="next-month"]');
   const nextMonth = await page.evaluate(() => ({
     mode: fortuneQuickPeriod,
     year: fortuneCursorYear,
     month: fortuneCursorMonth,
-    title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
+    title: document.querySelector('.fortune-period-title strong')?.textContent.trim(),
+    expected: (() => {
+      const now = new Date();
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      return { year: next.getFullYear(), month: next.getMonth() + 1 };
+    })()
   }));
-  assert.deepEqual(nextMonth, {
-    mode: 'next-month',
-    year: 2026,
-    month: 8,
-    title: '2026년 8월'
-  }, `${width}px next month from current app date`);
+  assert.equal(nextMonth.mode, 'next-month', `${width}px next-month mode`);
+  assert.equal(nextMonth.year, nextMonth.expected.year, `${width}px next-month year`);
+  assert.equal(nextMonth.month, nextMonth.expected.month, `${width}px next-month month`);
+  assert.equal(
+    nextMonth.title,
+    `${nextMonth.expected.year}년 ${nextMonth.expected.month}월`,
+    `${width}px next-month title`
+  );
 
   await page.click('[data-palpum-period="next-year"]');
-  assert.deepEqual(await page.evaluate(() => ({
+  const nextYear = await page.evaluate(() => ({
     mode: fortuneQuickPeriod,
     year: fortuneCursorYear,
-    title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
-  })), {
-    mode: 'next-year',
-    year: 2027,
-    title: '2027년'
-  }, `${width}px next year from current app date`);
+    title: document.querySelector('.fortune-period-title strong')?.textContent.trim(),
+    expectedYear: Math.min(2099, new Date().getFullYear() + 1)
+  }));
+  assert.equal(nextYear.mode, 'next-year', `${width}px next-year mode`);
+  assert.equal(nextYear.year, nextYear.expectedYear, `${width}px next-year year`);
+  assert.equal(nextYear.title, `${nextYear.expectedYear}년`, `${width}px next-year title`);
 
   const rollover = await page.evaluate(() => {
     if (typeof nextFortuneMonth !== 'function') return { api: typeof nextFortuneMonth };

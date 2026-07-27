@@ -839,6 +839,75 @@ test('browser renders default-midnight solar-term uncertainty and keeps advanced
   }
 });
 
+test('browser keeps shared calculation, saved normalization, and compatibility fail-closed', async () => {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
+      waitUntil: 'networkidle0'
+    });
+    await openInputDestination(page);
+
+    const sharedConsumers = await page.evaluate(() => {
+      const input = {
+        year: 2024,
+        month: 2,
+        day: 4,
+        hour: 0,
+        minute: 0,
+        calendar: 'solar',
+        isLeapMonth: false,
+        gender: 'M',
+        unknown: true,
+        dayBoundary: 'midnight'
+      };
+      let directError = null;
+      try {
+        calcSaju(input);
+      } catch (error) {
+        directError = { name: error.name, code: error.code, message: error.message };
+      }
+      return {
+        directError,
+        normalized: normalizeImportedRecord({
+          ...input,
+          name: '경계 저장 명반',
+          savedAt: Date.now()
+        })
+      };
+    });
+    assert.equal(sharedConsumers.directError?.code, 'LEGEND_SOLAR_TERM_TIME_REQUIRED');
+    assert.match(sharedConsumers.directError?.message || '', /태어난 시간/);
+    assert.equal(sharedConsumers.normalized, null);
+
+    let dialogMessage = '';
+    page.once('dialog', async dialog => {
+      dialogMessage = dialog.message();
+      await dialog.accept();
+    });
+    await page.evaluate(() => {
+      document.querySelector('#segDayBoundary [data-val="midnight"]').click();
+      matchSlotA = null;
+      matchPickerTarget = 'A';
+      openMatchNewForm();
+      document.getElementById('mnfBirth').value = '20240204';
+      document.getElementById('mnfTime').value = '';
+      submitMatchNewForm();
+    });
+    await new Promise(resolve => setTimeout(resolve, 200));
+    assert.match(dialogMessage, /태어난 시간/);
+    assert.deepEqual(await page.evaluate(() => ({
+      slotEmpty: matchSlotA === null,
+      modalOpen: document.getElementById('matchNewModal').classList.contains('active')
+    })), {
+      slotEmpty: true,
+      modalOpen: true
+    });
+  } finally {
+    await page.close();
+  }
+});
+
 test('browser match form accepts a real leap month and rejects an impossible one', async () => {
   const browser = await getBrowser();
   const page = await browser.newPage();

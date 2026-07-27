@@ -187,6 +187,122 @@ test('partial import failure rolls back written records and rejects', async () =
   assert.deepEqual([...values.keys()].filter(key => key.startsWith(RECORD_PREFIX)), []);
 });
 
+test('failed primary update makes the newer fallback authoritative', async () => {
+  const { createRecordStore, RECORD_PREFIX, FALLBACK_KEY } =
+    require('../scripts/legend-storage.js');
+  const primary = new Map([
+    [`${RECORD_PREFIX}same`, JSON.stringify({ id: 'same', memo: 'old', fav: false })]
+  ]);
+  let fallbackValue = '[]';
+  const storage = {
+    list: async prefix => ({ keys: [...primary.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async () => { throw new Error('primary unavailable'); },
+    delete: async key => { primary.delete(key); }
+  };
+  const fallbackStorage = {
+    getItem: key => key === FALLBACK_KEY ? fallbackValue : null,
+    setItem: (key, value) => {
+      if (key === FALLBACK_KEY) fallbackValue = value;
+    }
+  };
+  const recordStore = createRecordStore(storage, fallbackStorage);
+
+  await recordStore.updateRecord('same', { memo: 'new', fav: true });
+
+  assert.deepEqual(await recordStore.getRecord('same'), {
+    id: 'same',
+    memo: 'new',
+    fav: true
+  });
+});
+
+test('successful primary write clears the superseded fallback afterward', async () => {
+  const { createRecordStore, RECORD_PREFIX, FALLBACK_KEY } =
+    require('../scripts/legend-storage.js');
+  const primary = new Map([
+    [`${RECORD_PREFIX}same`, JSON.stringify({ id: 'same', memo: 'old' })]
+  ]);
+  let fallbackValue = JSON.stringify([{ id: 'same', memo: 'fallback' }]);
+  const storage = {
+    list: async prefix => ({ keys: [...primary.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async (key, value) => { primary.set(key, value); },
+    delete: async key => { primary.delete(key); }
+  };
+  const fallbackStorage = {
+    getItem: key => key === FALLBACK_KEY ? fallbackValue : null,
+    setItem: (key, value) => {
+      if (key === FALLBACK_KEY) fallbackValue = value;
+    }
+  };
+  const recordStore = createRecordStore(storage, fallbackStorage);
+
+  await recordStore.saveRecord({ id: 'same', memo: 'primary-new' });
+
+  assert.deepEqual(JSON.parse(fallbackValue), []);
+  assert.equal((await recordStore.getRecord('same')).memo, 'primary-new');
+});
+
+test('failed primary deletion preserves the latest fallback record', async () => {
+  const { createRecordStore, RECORD_PREFIX, FALLBACK_KEY } =
+    require('../scripts/legend-storage.js');
+  const primary = new Map([
+    [`${RECORD_PREFIX}same`, JSON.stringify({ id: 'same', memo: 'old' })]
+  ]);
+  let fallbackValue = JSON.stringify([{ id: 'same', memo: 'new' }]);
+  const storage = {
+    list: async prefix => ({ keys: [...primary.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async (key, value) => { primary.set(key, value); },
+    delete: async () => { throw new Error('primary delete failed'); }
+  };
+  const fallbackStorage = {
+    getItem: key => key === FALLBACK_KEY ? fallbackValue : null,
+    setItem: (key, value) => {
+      if (key === FALLBACK_KEY) fallbackValue = value;
+    }
+  };
+  const recordStore = createRecordStore(storage, fallbackStorage);
+
+  await assert.rejects(recordStore.deleteRecord('same'), /삭제하지 못했습니다/);
+
+  assert.deepEqual(JSON.parse(fallbackValue), [{ id: 'same', memo: 'new' }]);
+  assert.equal((await recordStore.getRecord('same')).memo, 'new');
+});
+
+test('incomplete import rollback reports residual count and ids', async () => {
+  const { createRecordStore, RECORD_PREFIX } = require('../scripts/legend-storage.js');
+  const primary = new Map();
+  let writes = 0;
+  const storage = {
+    list: async prefix => ({ keys: [...primary.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async (key, value) => {
+      writes++;
+      if (writes === 2) throw new Error('second write failed');
+      primary.set(key, value);
+    },
+    delete: async () => { throw new Error('rollback delete failed'); }
+  };
+  const fallbackStorage = {
+    getItem: () => null,
+    setItem: () => {}
+  };
+  const recordStore = createRecordStore(storage, fallbackStorage);
+
+  const error = await recordStore
+    .importRecords([{ id: 'first' }, { id: 'second' }])
+    .then(() => null, reason => reason);
+
+  assert.equal(error.rollbackIncomplete, true);
+  assert.deepEqual(error.residualIds, ['first']);
+  assert.match(error.message, /롤백이 완료되지 않았습니다/);
+  assert.match(error.message, /1개/);
+  assert.match(error.message, /first/);
+  assert.equal(primary.has(`${RECORD_PREFIX}first`), true);
+});
+
 test('exports exact product schema and rule metadata', () => {
   assert.match(html, /product:\s*['"]legend-manse['"]/);
   assert.match(html, /schemaVersion:\s*2/);

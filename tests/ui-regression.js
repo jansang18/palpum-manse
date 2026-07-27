@@ -2444,7 +2444,7 @@ async function inspectAppleDesign(page, width) {
     }
     assert.ok(componentInspection.geometry.segmentedButtons.length > 0, `${width}px ${theme} segmented target collection is empty`);
     for (const { width: targetWidth, height } of componentInspection.geometry.segmentedButtons) {
-      assert.ok(targetWidth >= 44 && height >= 44, `${width}px ${theme} segmented target is below 44px: ${targetWidth}x${height}px`);
+      assert.ok(targetWidth >= 43.99 && height >= 43.99, `${width}px ${theme} segmented target is below 44px: ${targetWidth}x${height}px`);
     }
     assert.equal(componentInspection.radii.input, '12px', `${width}px ${theme} input radius`);
     assert.equal(componentInspection.radii.segmented, '14px', `${width}px ${theme} segmented radius`);

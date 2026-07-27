@@ -1469,6 +1469,17 @@ async function inspectLegendFlow(page, width) {
       .map(node => node.getAttribute('data-time-layer')),
     hourlyCount: document.querySelectorAll('[data-hour-branch]').length,
     evidenceButtons: document.querySelectorAll('[data-legend-evidence]').length,
+    interpretationGroups: [...document.querySelectorAll('[data-legend-story-group]')]
+      .map(node => node.getAttribute('data-legend-story-group')),
+    storyCount: document.querySelectorAll('[data-legend-story]').length,
+    storySources: [...new Set(
+      [...document.querySelectorAll('[data-legend-story-source]')]
+        .map(node => node.getAttribute('data-legend-story-source'))
+    )],
+    interpretationText: document.querySelector('.legend-narrative')?.textContent,
+    highlights: document.querySelectorAll('.legend-highlight').length,
+    horizontalOverflow: document.querySelector('.legend-shell')?.scrollWidth
+      > document.querySelector('.legend-shell')?.clientWidth + 1,
     unsafeElementCount: document.querySelectorAll('#legendContent img').length,
     xss: window.__legendXss || 0,
     hourlyApi: typeof window.getHourlyFortunes
@@ -1481,6 +1492,21 @@ async function inspectLegendFlow(page, width) {
   );
   assert.equal(state.hourlyCount, 12, `${width}px hourly fortune count`);
   assert.ok(state.evidenceButtons >= 1, `${width}px legend evidence trigger`);
+  assert.deepEqual(state.interpretationGroups, [
+    '명식의 뼈대',
+    '시간의 작용',
+    '삶의 주제'
+  ]);
+  assert.equal(state.storyCount, 17, `${width}px rich interpretation count`);
+  assert.deepEqual(state.storySources, ['명리 계산', '간이 해석', '전통 표지', '창작 공명']);
+  assert.match(state.interpretationText, /오행의 균형/);
+  assert.match(state.interpretationText, /십신의 언어/);
+  assert.match(state.interpretationText, /합과 충의 구조/);
+  assert.match(state.interpretationText, /신살과 공망/);
+  assert.match(state.interpretationText, /대운의 계절/);
+  assert.match(state.interpretationText, /일운의 선택/);
+  assert.equal(state.highlights, 3, `${width}px interpretation highlights`);
+  assert.equal(state.horizontalOverflow, false, `${width}px legend interpretation overflow`);
   assert.equal(state.unsafeElementCount, 0, `${width}px user name must remain plain text`);
   assert.equal(state.xss, 0, `${width}px user name executed markup`);
   assert.equal(state.hourlyApi, 'function', `${width}px hourly fortune API`);
@@ -2045,6 +2071,30 @@ async function inspectLegendHome(page, width) {
     { selectedTab: 'input', activePanel: 'view-input', focused: 'inBirth' }
   );
 
+  const inputDesign = await page.evaluate(() => {
+    const color = selector => getComputedStyle(document.querySelector(selector)).backgroundColor;
+    return {
+      hasTitle: Boolean(document.getElementById('legendInputTitle')),
+      hasSeal: Boolean(document.querySelector('.legend-input-seal')?.offsetParent),
+      legacyLogoWidth: document.querySelector('.intro-logo-img').getBoundingClientRect().width,
+      view: color('#view-input'),
+      card: color('#view-input .input-card'),
+      primary: color('#view-input .primary-btn'),
+      selected: color('#view-input .segmented button.active'),
+      inputText: getComputedStyle(document.querySelector('#view-input .input')).color
+    };
+  });
+  assert.deepEqual(inputDesign, {
+    hasTitle: true,
+    hasSeal: true,
+    legacyLogoWidth: 1,
+    view: 'rgb(242, 236, 221)',
+    card: 'rgb(250, 247, 238)',
+    primary: 'rgb(158, 62, 50)',
+    selected: 'rgb(158, 62, 50)',
+    inputText: 'rgb(32, 35, 31)'
+  });
+
   await page.reload({ waitUntil: 'networkidle0' });
   await page.click('#legendPersonButton');
   await sleep(80);
@@ -2445,18 +2495,11 @@ async function inspectAppleDesign(page, width) {
     const activeTabTint = parseCssColor(activeTab.base.values.backgroundColor);
     assert.ok(activeTabTint.a > 0.08, `${width}px ${theme} active tab capsule background is transparent: ${activeTab.base.values.backgroundColor}`);
     if (width >= 768) {
-      const expectedColor = expectedAccentColors[theme];
-      const expectedTint = expectedAccentTints[theme];
-      assert.equal(activeTab.base.values.color, expectedColor, `${width}px ${theme} active tab text color`);
-      assert.ok(
-        activeTabTint.b - activeTabTint.r >= 60 && activeTabTint.b - activeTabTint.g >= 60,
-        `${width}px ${theme} active tab capsule is not blue-tinted: ${activeTab.base.values.backgroundColor}`
-      );
-      assert.ok(
-        Math.abs(activeTabTint.r - expectedTint.r) <= 48 &&
-        Math.abs(activeTabTint.g - expectedTint.g) <= 48 &&
-        Math.abs(activeTabTint.b - expectedTint.b) <= 48,
-        `${width}px ${theme} active tab capsule is outside the system-blue family: ${activeTab.base.values.backgroundColor}`
+      assert.equal(activeTab.base.values.color, 'rgb(250, 247, 238)', `${width}px ${theme} active tab text color`);
+      assert.deepEqual(
+        [activeTabTint.r, activeTabTint.g, activeTabTint.b],
+        [158, 62, 50],
+        `${width}px ${theme} active tab must use the legend seal color`
       );
     }
 
@@ -3760,7 +3803,7 @@ async function inspectWidth(browser, width) {
     collapsedErrorBorder: getComputedStyle(document.getElementById('inErr')).borderTopColor
   }));
   assert.ok(inputPolish.logoWidth <= 190, `${width}px intro logo is too large: ${inputPolish.logoWidth}`);
-  assert.equal(inputPolish.cardBorder, 'rgba(255, 255, 255, 0.08)', `${width}px input card border`);
+  assert.equal(inputPolish.cardBorder, 'rgba(32, 35, 31, 0.14)', `${width}px input card border`);
   assert.equal(inputPolish.collapsedErrorBorder, 'rgba(0, 0, 0, 0)', `${width}px collapsed error line`);
 
   if (runsShellWidth()) {

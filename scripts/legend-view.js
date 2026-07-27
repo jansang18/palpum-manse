@@ -241,16 +241,195 @@
     return hero;
   }
 
+  function pillarDetail(label, stem, branch, stemTenGod, branchTenGod) {
+    if (!Number.isInteger(stem) || !Number.isInteger(branch) || stem < 0 || branch < 0) {
+      return {
+        label,
+        ganji: '時未詳',
+        stemTenGod: '미상',
+        branchTenGod: '미상'
+      };
+    }
+    return {
+      label,
+      ganji: `${STEM[stem]}${BRANCH[branch]}`,
+      stemTenGod,
+      branchTenGod
+    };
+  }
+
+  function storyContext(saju, selection, hours) {
+    const hourTenGods = [...new Set(hours.map(hour => SIPSIN_KOR[hour.sipsin]).filter(Boolean))];
+    const interaction = saju.interactions || {};
+    const shinsal = saju.shinsal || {};
+    const guiin = Array.isArray(shinsal.guiin) ? shinsal.guiin.map(item => item.name) : [];
+    const special = Array.isArray(shinsal.special) ? shinsal.special.map(item => item.name) : [];
+    const twelve = shinsal.twelve && typeof shinsal.twelve === 'object'
+      ? Object.keys(shinsal.twelve)
+      : [];
+    const yongsin = getYongsin(saju);
+    const rankedElements = EL_KOR
+      .map((name, index) => ({ name, count: saju.ohaeng[index] || 0 }))
+      .sort((first, second) => second.count - first.count || EL_KOR.indexOf(first.name) - EL_KOR.indexOf(second.name));
+    const lowest = rankedElements[rankedElements.length - 1].count;
+    const daeun = selection.daeun;
+    const period = (label, pillar) => ({
+      label,
+      ganji: `${STEM[pillar.stem]}${BRANCH[pillar.branch]}`,
+      stemTenGod: SIPSIN_KOR[getSipsin(saju.dStem, pillar.stem)],
+      branchTenGod: SIPSIN_KOR[getSipsin(saju.dStem, JIJANGAN[pillar.branch][0])]
+    });
+
+    return {
+      profile: {
+        dayMaster: {
+          ganji: `${STEM[saju.dStem]}${BRANCH[saju.dBranch]}`,
+          stem: STEM[saju.dStem],
+          stemKorean: STEM_KOR[saju.dStem],
+          branch: BRANCH[saju.dBranch],
+          element: EL_KOR[STEM_EL[saju.dStem]],
+          yinYang: STEM_YIN[saju.dStem] === 0 ? '양' : '음'
+        },
+        pillars: [
+          pillarDetail(
+            '연주',
+            saju.yStem,
+            saju.yBranch,
+            SIPSIN_KOR[saju.sipsin.year],
+            SIPSIN_KOR[saju.sipsinJi.year]
+          ),
+          pillarDetail(
+            '월주',
+            saju.mStem,
+            saju.mBranch,
+            SIPSIN_KOR[saju.sipsin.month],
+            SIPSIN_KOR[saju.sipsinJi.month]
+          ),
+          pillarDetail(
+            '일주',
+            saju.dStem,
+            saju.dBranch,
+            '일간',
+            SIPSIN_KOR[saju.sipsinJi.day]
+          ),
+          pillarDetail(
+            '시주',
+            saju.hStem,
+            saju.hBranch,
+            SIPSIN_KOR[saju.sipsin.hour],
+            SIPSIN_KOR[saju.sipsinJi.hour]
+          )
+        ],
+        elements: Object.fromEntries(
+          EL_KOR.map((name, index) => [name, saju.ohaeng[index] || 0])
+        ),
+        dominantElement: rankedElements[0].name,
+        weakElements: rankedElements
+          .filter(item => item.count === lowest)
+          .map(item => item.name),
+        interactions: {
+          harmony: [
+            ...(interaction.hap || []),
+            ...(interaction.ganhap || [])
+          ],
+          tension: [
+            ...(interaction.chung || []),
+            ...(interaction.hyeong || []),
+            ...(interaction.pa || []),
+            ...(interaction.hae || []),
+            ...(interaction.ganchung || [])
+          ]
+        },
+        symbols: [...new Set([...guiin, ...special, ...twelve])],
+        voidBranches: Array.isArray(saju.gongmang)
+          ? saju.gongmang.map(branch => BRANCH[branch])
+          : [],
+        unknownTime: saju.unknown === true,
+        usefulCandidate: EL_KOR[yongsin.yongsin]
+      },
+      timing: {
+        daeun: daeun
+          ? {
+              ...period('대운', daeun),
+              age: daeun.age
+            }
+          : {
+              label: '대운',
+              ganji: '선택 전',
+              stemTenGod: '미상',
+              branchTenGod: '미상'
+            },
+        year: period(`${selection.year}년`, selection.yearPillar),
+        month: period(`${selection.month}월`, selection.monthPillar),
+        day: period(
+          formatDate(selection.year, selection.month, selection.day),
+          selection.dayPillar
+        ),
+        hour: {
+          count: hours.length,
+          focus: `선택일에는 ${hourTenGods.join(', ')}의 시진이 차례로 열립니다.`
+        }
+      }
+    };
+  }
+
   function narrativeGrid(narrative) {
     const grid = element('section', 'legend-narrative');
     grid.setAttribute('aria-label', '취명선 전설 해석');
-    narrative.sections.forEach(section => {
-      const article = element('article', 'legend-story');
-      appendText(article, 'div', 'legend-story-mark', section.hanja);
-      appendText(article, 'h3', '', section.title);
-      appendText(article, 'p', 'legend-story-summary', section.summary);
-      appendText(article, 'p', 'legend-story-body', section.body);
-      grid.appendChild(article);
+
+    const highlights = element('section', 'legend-highlights');
+    appendText(highlights, 'div', 'legend-chapter-kicker', 'THREE LINES · 핵심 세 줄');
+    const highlightList = element('div', 'legend-highlight-list');
+    narrative.highlights.forEach((highlight, index) => {
+      const item = element('p', 'legend-highlight');
+      appendText(item, 'span', '', String(index + 1).padStart(2, '0'));
+      appendText(item, 'strong', '', highlight);
+      highlightList.appendChild(item);
+    });
+    highlights.appendChild(highlightList);
+    grid.appendChild(highlights);
+
+    const groupMeta = {
+      '명식의 뼈대': ['I · NATAL FRAME', '태어난 구조를 먼저 읽습니다.'],
+      '시간의 작용': ['II · TIME LAYERS', '대운에서 시운까지 시간의 초점을 겹칩니다.'],
+      '삶의 주제': ['III · LIFE THEMES', '해석을 실제 선택과 생활의 언어로 옮깁니다.']
+    };
+    const groups = [...new Set(narrative.sections.map(section => section.group))];
+    groups.forEach(groupName => {
+      const group = element('section', 'legend-story-group');
+      group.dataset.legendStoryGroup = groupName;
+      const heading = element('header', 'legend-chapter-heading');
+      const [kicker, intro] = groupMeta[groupName] || [groupName, ''];
+      appendText(heading, 'div', 'legend-chapter-kicker', kicker);
+      appendText(heading, 'h2', '', groupName);
+      appendText(heading, 'p', '', intro);
+      group.appendChild(heading);
+
+      narrative.sections
+        .filter(section => section.group === groupName)
+        .forEach(section => {
+          const article = element('article', 'legend-story');
+          article.dataset.legendStory = section.key;
+          appendText(article, 'div', 'legend-story-mark', section.hanja);
+          const titleRow = element('div', 'legend-story-title-row');
+          appendText(titleRow, 'h3', '', section.title);
+          const sourceBadge = appendText(
+            titleRow,
+            'span',
+            `legend-story-source source-${section.source === '명리 계산'
+              ? 'traditional'
+              : section.source === '창작 공명'
+                ? 'creative'
+                : 'heuristic'}`,
+            section.source
+          );
+          sourceBadge.dataset.legendStorySource = section.source;
+          article.appendChild(titleRow);
+          appendText(article, 'p', 'legend-story-summary', section.summary);
+          appendText(article, 'p', 'legend-story-body', section.body);
+          group.appendChild(article);
+        });
+      grid.appendChild(group);
     });
     return grid;
   }
@@ -401,17 +580,18 @@
     const selection = selectionFor(saju);
     const era = root.LegendEra.getLegendEra(selection.year);
     const resonance = resonanceFor(saju, era, selection);
-    const narrative = root.LegendCopy.buildNarrative({
-      name: saju.name,
-      era,
-      resonance
-    });
     const hours = getHourlyFortunes(
       selection.year,
       selection.month,
       selection.day,
       selection.dayPillar.stem
     );
+    const narrative = root.LegendCopy.buildNarrative({
+      name: saju.name,
+      era,
+      resonance,
+      ...storyContext(saju, selection, hours)
+    });
     const dialog = evidenceDialog(resonance);
     const shell = element('div', 'legend-shell');
     const timeline = element('section', 'legend-timeline');

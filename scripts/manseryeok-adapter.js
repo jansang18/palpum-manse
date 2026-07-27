@@ -174,8 +174,16 @@
   function createAdapter(engine) {
     if (!engine || typeof engine.calculateFourPillars !== 'function' ||
         typeof engine.lunarToSolar !== 'function' ||
-        typeof engine.solarToLunar !== 'function') {
+        typeof engine.solarToLunar !== 'function' ||
+        typeof engine.getSolarTerm !== 'function') {
       throw new TypeError('manseryeok 2.0.0 계산 엔진이 필요합니다.');
+    }
+
+    function getSolarTermInstant(year, index) {
+      const term = engine.getSolarTerm(year, index);
+      const instantMs = term?.date?.getTime();
+      if (!Number.isFinite(instantMs)) throw new RangeError('invalid solar term instant');
+      return instantMs;
     }
 
     function calculate(input) {
@@ -228,7 +236,7 @@
       };
     }
 
-    return Object.freeze({ calculate });
+    return Object.freeze({ calculate, getSolarTermInstant });
   }
 
   const api = { createAdapter };

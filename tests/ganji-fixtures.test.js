@@ -6,9 +6,76 @@ const { pathToFileURL } = require('node:url');
 const puppeteer = require('puppeteer-core');
 const manseryeok = require('manseryeok');
 const { createAdapter } = require('../scripts/manseryeok-adapter.js');
+const { classifyPalpum } = require('../scripts/legend-palpum.js');
 
 const adapter = createAdapter(manseryeok);
 let browserPromise = null;
+
+test('exposes a stable UTC millisecond instant for Palpum boundaries', () => {
+  const adapter = createAdapter({
+    calculateFourPillars() {},
+    lunarToSolar() {},
+    solarToLunar() {},
+    getSolarTerm(year, index) {
+      return { date: new Date(Date.UTC(year, 1, index, 3, 4, 5)) };
+    }
+  });
+
+  assert.equal(
+    adapter.getSolarTermInstant(2026, 2),
+    Date.UTC(2026, 1, 2, 3, 4, 5)
+  );
+});
+
+// UTC instants are recorded KASI-aligned fixture constants, not values
+// calculated by the adapter under test.
+const PALPUM_2026_BOUNDARIES = [
+  { name: '동지', year: 2025, index: 23, instantMs: Date.UTC(2025, 11, 21, 15, 3) },
+  { name: '입춘', year: 2026, index: 2, instantMs: Date.UTC(2026, 1, 3, 20, 2) },
+  { name: '춘분', year: 2026, index: 5, instantMs: Date.UTC(2026, 2, 20, 14, 46) },
+  { name: '입하', year: 2026, index: 8, instantMs: Date.UTC(2026, 4, 5, 11, 49) },
+  { name: '하지', year: 2026, index: 11, instantMs: Date.UTC(2026, 5, 21, 8, 25) },
+  { name: '입추', year: 2026, index: 14, instantMs: Date.UTC(2026, 7, 7, 11, 43) },
+  { name: '추분', year: 2026, index: 17, instantMs: Date.UTC(2026, 8, 23, 0, 5) },
+  { name: '입동', year: 2026, index: 20, instantMs: Date.UTC(2026, 10, 7, 9, 52) },
+  { name: '동지', year: 2026, index: 23, instantMs: Date.UTC(2026, 11, 21, 20, 50) },
+  { name: '입춘', year: 2027, index: 2, instantMs: Date.UTC(2027, 1, 4, 1, 33) }
+];
+
+const PALPUM_2026_FIXTURES = [
+  { name: '입춘', index: 2, instantMs: Date.UTC(2026, 1, 3, 20, 2), before: '자축품', after: '인묘품' },
+  { name: '춘분', index: 5, instantMs: Date.UTC(2026, 2, 20, 14, 46), before: '인묘품', after: '묘진품' },
+  { name: '입하', index: 8, instantMs: Date.UTC(2026, 4, 5, 11, 49), before: '묘진품', after: '사오품' },
+  { name: '하지', index: 11, instantMs: Date.UTC(2026, 5, 21, 8, 25), before: '사오품', after: '오미품' },
+  { name: '입추', index: 14, instantMs: Date.UTC(2026, 7, 7, 11, 43), before: '오미품', after: '신유품' },
+  { name: '추분', index: 17, instantMs: Date.UTC(2026, 8, 23, 0, 5), before: '신유품', after: '유술품' },
+  { name: '입동', index: 20, instantMs: Date.UTC(2026, 10, 7, 9, 52), before: '유술품', after: '해자품' },
+  { name: '동지', index: 23, instantMs: Date.UTC(2026, 11, 21, 20, 50), before: '해자품', after: '자축품' }
+];
+
+function palpumBoundaries() {
+  return PALPUM_2026_BOUNDARIES.map(boundary => ({
+    name: boundary.name,
+    instantMs: adapter.getSolarTermInstant(boundary.year, boundary.index)
+  }));
+}
+
+function classifyPalpumAt(instantMs) {
+  return classifyPalpum({ instantMs, boundaries: palpumBoundaries() }).type;
+}
+
+for (const fixture of PALPUM_2026_FIXTURES) {
+  test(`${fixture.name} changes Palpum at the exact instant`, () => {
+    const actualInstant = palpumBoundaries().find(boundary =>
+      boundary.name === fixture.name && boundary.instantMs === fixture.instantMs
+    )?.instantMs;
+
+    assert.equal(actualInstant, fixture.instantMs);
+    assert.equal(classifyPalpumAt(fixture.instantMs - 60_000), fixture.before);
+    assert.equal(classifyPalpumAt(fixture.instantMs), fixture.after);
+    assert.equal(classifyPalpumAt(fixture.instantMs + 60_000), fixture.after);
+  });
+}
 
 function findChromeExecutable() {
   if (process.env.CHROME_PATH) {

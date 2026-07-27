@@ -12288,7 +12288,7 @@ window.addEventListener('unhandledrejection', function(e) {
   if (!window.storage || typeof window.storage.get !== 'function') {
     try {
       // localStorage 사용 가능 여부 확인
-      const testKey = '__saju_test__';
+      const testKey = 'legend-saju:test';
       localStorage.setItem(testKey, '1');
       localStorage.removeItem(testKey);
       window.storage = {
@@ -12316,6 +12316,23 @@ window.addEventListener('unhandledrejection', function(e) {
     }
   }
 })();
+
+const LEGEND_STORAGE_PREFIX = 'legend-saju:';
+const LEGEND_FALLBACK_KEY = 'legend-saju:records';
+const LEGEND_THEME_KEY = 'legend-saju:theme';
+
+function readLegendFallbackRecords() {
+  try {
+    const value = JSON.parse(localStorage.getItem(LEGEND_FALLBACK_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeLegendFallbackRecords(records) {
+  localStorage.setItem(LEGEND_FALLBACK_KEY, JSON.stringify(records));
+}
 
 /* 계산 엔진 */
 const STEM = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
@@ -13637,11 +13654,11 @@ onTap($('#saveConfirm'), async () => {
   const name = $('#saveName').value.trim() || '이름 없음';
   const memo = $('#saveMemo').value.trim();
   const record = { ...currentSaju, name, memo, savedAt: Date.now(), id: 'saju_' + Date.now() };
-  try { await window.storage.set('saju:' + record.id, JSON.stringify(record)); }
+  try { await window.storage.set(LEGEND_STORAGE_PREFIX + record.id, JSON.stringify(record)); }
   catch (e) {
-    const list = JSON.parse(localStorage.getItem('saju_list') || '[]');
+    const list = readLegendFallbackRecords();
     list.push(record);
-    localStorage.setItem('saju_list', JSON.stringify(list));
+    writeLegendFallbackRecords(list);
   }
   window.closeAppModal($('#saveModal'));
   window.showAppToast('명반이 저장되었습니다');
@@ -13728,12 +13745,12 @@ function makeSavedCard(record) {
 async function renderSaved() {
   let list = [];
   try {
-    const res = await window.storage.list('saju:');
+    const res = await window.storage.list(LEGEND_STORAGE_PREFIX);
     if (res && res.keys) for (const k of res.keys) {
       const r = await window.storage.get(k);
       if (r) list.push(JSON.parse(r.value));
     }
-  } catch (e) { list = JSON.parse(localStorage.getItem('saju_list') || '[]'); }
+  } catch (e) { list = readLegendFallbackRecords(); }
 
   list = list.filter(record => record && typeof record === 'object');
   const content = $('#savedContent');
@@ -13776,9 +13793,9 @@ async function renderSaved() {
       if (e.target.classList.contains('sdelete')) return;
       const id = c.dataset.id;
       let rec;
-      try { const r = await window.storage.get('saju:' + id); if (r) rec = JSON.parse(r.value); }
+      try { const r = await window.storage.get(LEGEND_STORAGE_PREFIX + id); if (r) rec = JSON.parse(r.value); }
       catch (err) {
-        const arr = JSON.parse(localStorage.getItem('saju_list') || '[]');
+        const arr = readLegendFallbackRecords();
         rec = arr.find(x => x.id === id);
       }
       if (rec) {
@@ -13795,10 +13812,10 @@ async function renderSaved() {
         e.stopPropagation();
         if (!confirm('삭제하시겠습니까?')) return;
         const id = b.dataset.del;
-        try { await window.storage.delete('saju:' + id); }
+        try { await window.storage.delete(LEGEND_STORAGE_PREFIX + id); }
         catch (err) {
-          const arr = JSON.parse(localStorage.getItem('saju_list') || '[]');
-          localStorage.setItem('saju_list', JSON.stringify(arr.filter(x => x.id !== id)));
+          const arr = readLegendFallbackRecords();
+          writeLegendFallbackRecords(arr.filter(x => x.id !== id));
         }
         renderSaved();
       });
@@ -13813,12 +13830,12 @@ async function renderSaved() {
 }
 
 async function updateSavedRecord(id, patch) {
-  try { const r = await window.storage.get('saju:' + id); if (r) { const rec = JSON.parse(r.value); Object.assign(rec, patch); await window.storage.set('saju:' + id, JSON.stringify(rec)); return; } } catch (e) {}
-  const arr = JSON.parse(localStorage.getItem('saju_list') || '[]'); const i = arr.findIndex(x => x.id === id); if (i >= 0) { Object.assign(arr[i], patch); localStorage.setItem('saju_list', JSON.stringify(arr)); }
+  try { const r = await window.storage.get(LEGEND_STORAGE_PREFIX + id); if (r) { const rec = JSON.parse(r.value); Object.assign(rec, patch); await window.storage.set(LEGEND_STORAGE_PREFIX + id, JSON.stringify(rec)); return; } } catch (e) {}
+  const arr = readLegendFallbackRecords(); const i = arr.findIndex(x => x.id === id); if (i >= 0) { Object.assign(arr[i], patch); writeLegendFallbackRecords(arr); }
 }
 async function toggleFav(id) {
   let cur = false;
-  try { const r = await window.storage.get('saju:' + id); if (r) cur = !!JSON.parse(r.value).fav; } catch (e) { const arr = JSON.parse(localStorage.getItem('saju_list') || '[]'); const rec = arr.find(x => x.id === id); cur = rec && !!rec.fav; }
+  try { const r = await window.storage.get(LEGEND_STORAGE_PREFIX + id); if (r) cur = !!JSON.parse(r.value).fav; } catch (e) { const arr = readLegendFallbackRecords(); const rec = arr.find(x => x.id === id); cur = rec && !!rec.fav; }
   await updateSavedRecord(id, { fav: !cur });
 }
 function filterSaved(q) {
@@ -13866,13 +13883,13 @@ async function findSimilarSaju() {
   // 저장 목록 불러오기
   let list = [];
   try {
-    const res = await window.storage.list('saju:');
+    const res = await window.storage.list(LEGEND_STORAGE_PREFIX);
     if (res && res.keys) for (const k of res.keys) {
       const r = await window.storage.get(k);
       if (r) list.push(JSON.parse(r.value));
     }
   } catch (err) {
-    list = JSON.parse(localStorage.getItem('saju_list') || '[]');
+    list = readLegendFallbackRecords();
   }
 
   if (list.length === 0) {
@@ -14008,13 +14025,40 @@ async function importSavedRecords(records) {
 
   try {
     for (const record of accepted) {
-      await window.storage.set(`saju:${record.id}`, JSON.stringify(record));
+      await window.storage.set(`${LEGEND_STORAGE_PREFIX}${record.id}`, JSON.stringify(record));
     }
   } catch (error) {
-    const existing = JSON.parse(localStorage.getItem('saju_list') || '[]');
-    localStorage.setItem('saju_list', JSON.stringify(existing.concat(accepted)));
+    const existing = readLegendFallbackRecords();
+    writeLegendFallbackRecords(existing.concat(accepted));
   }
   return { added: accepted.length, skipped };
+}
+
+function normalizeImportedBackup(data) {
+  if (Array.isArray(data)) return data;
+  if (!data || typeof data !== 'object' || !Array.isArray(data.records)) {
+    throw new Error('지원하지 않는 백업 형식입니다.');
+  }
+
+  const isLegendBackup =
+    data.product === 'legend-manse' &&
+    data.schemaVersion === 2 &&
+    data.ruleVersion === 'legend-1';
+  const legacyProducts = new Set([
+    '취명선 만세력',
+    '취명선 전설의 만세력',
+    '신의음성만세력',
+    '정재훈 만세력'
+  ]);
+  const isLegacyBackup =
+    data.version === 1 &&
+    typeof data.app === 'string' &&
+    legacyProducts.has(data.app);
+
+  if (!isLegendBackup && !isLegacyBackup) {
+    throw new Error('지원하지 않는 백업 버전입니다.');
+  }
+  return data.records;
 }
 
 function bindSavedToolbar(list) {
@@ -14026,10 +14070,10 @@ function bindSavedToolbar(list) {
   expBtn.addEventListener('click', () => {
     if (!list.length) { alert('내보낼 명반이 없습니다.'); return; }
     const payload = {
-      app: '취명선 전설의 만세력',
-      version: 1,
+      product: 'legend-manse',
+      schemaVersion: 2,
+      ruleVersion: 'legend-1',
       exportedAt: new Date().toISOString(),
-      count: list.length,
       records: list
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -14052,16 +14096,7 @@ function bindSavedToolbar(list) {
       if (f.size > 2 * 1024 * 1024) throw new Error('백업 파일은 2MB 이하여야 합니다.');
       const text = await f.text();
       const data = JSON.parse(text);
-      if (!Array.isArray(data) && (!data || typeof data !== 'object' || Array.isArray(data.records) === false)) {
-        throw new Error('지원하지 않는 백업 형식입니다.');
-      }
-      if (!Array.isArray(data) && data.version !== undefined && data.version !== 1) {
-        throw new Error('지원하지 않는 백업 버전입니다.');
-      }
-      if (!Array.isArray(data) && data.app !== undefined && (
-        typeof data.app !== 'string' || data.app.length > 40
-      )) throw new Error('잘못된 앱 식별자입니다.');
-      const records = Array.isArray(data) ? data : data.records;
+      const records = normalizeImportedBackup(data);
       if (!records.length) { alert('가져올 명반이 없습니다.'); fileIn.value=''; return; }
       const { added, skipped } = await importSavedRecords(records);
       alert(`${added}개 가져왔습니다${skipped?` (${skipped}개 형식 오류로 건너뜀)`:''}.`);
@@ -14302,7 +14337,7 @@ function applyTheme(theme) {
 }
 (function initTheme() {
   let saved = null;
-  try { saved = localStorage.getItem('saju_theme'); } catch (e) {}
+  try { saved = localStorage.getItem(LEGEND_THEME_KEY); } catch (e) {}
   if (!saved) {
     try {
       saved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -14312,7 +14347,7 @@ function applyTheme(theme) {
   // window.storage도 체크 (polyfill 기준이지만 혹시 다른 값 있을 때)
   (async () => {
     try {
-      const r = await window.storage.get('theme');
+      const r = await window.storage.get(LEGEND_THEME_KEY);
       if (r && r.value && r.value !== saved) applyTheme(r.value);
     } catch (e) {}
   })();
@@ -14323,8 +14358,7 @@ if (themeBtn) {
     const isDark = document.body.classList.contains('dark');
     const next = isDark ? 'light' : 'dark';
     applyTheme(next);
-    try { localStorage.setItem('saju_theme', next); } catch (e) {}
-    try { await window.storage.set('theme', next); } catch (e) {}
+    try { await window.storage.set(LEGEND_THEME_KEY, next); } catch (e) {}
   });
 }
 
@@ -14837,12 +14871,12 @@ async function openMatchPicker() {
   // 모달로 저장된 명반 리스트 + 현재 사주 + 새로 입력 옵션
   let list = [];
   try {
-    const res = await window.storage.list('saju:');
+    const res = await window.storage.list(LEGEND_STORAGE_PREFIX);
     if (res && res.keys) for (const k of res.keys) {
       const r = await window.storage.get(k);
       if (r) list.push(JSON.parse(r.value));
     }
-  } catch (e) { list = JSON.parse(localStorage.getItem('saju_list') || '[]'); }
+  } catch (e) { list = readLegendFallbackRecords(); }
   list.sort((a,b) => (b.savedAt || 0) - (a.savedAt || 0));
 
   let itemsHtml = '';
@@ -14891,9 +14925,9 @@ async function openMatchPicker() {
     el.addEventListener('click', async () => {
       const id = el.dataset.id;
       let rec;
-      try { const r = await window.storage.get('saju:' + id); if (r) rec = JSON.parse(r.value); }
+      try { const r = await window.storage.get(LEGEND_STORAGE_PREFIX + id); if (r) rec = JSON.parse(r.value); }
       catch (err) {
-        const arr = JSON.parse(localStorage.getItem('saju_list') || '[]');
+        const arr = readLegendFallbackRecords();
         rec = arr.find(x => x.id === id);
       }
       if (rec) { setMatchSlot(matchPickerTarget, rec); closeMatchPicker(); }

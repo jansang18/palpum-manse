@@ -3,11 +3,11 @@
   "short_name": "전설의 만세력",
   "description": "취명선 전설의 만세력 · 삼원구운과 사주 명리의 여덟 겹 시간 해석",
   "lang": "ko",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#FAF7EE",
+  "background_color": "#F2ECDD",
   "theme_color": "#F2ECDD",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

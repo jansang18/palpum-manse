@@ -24,7 +24,19 @@ $ReleaseWebFiles = @(
     'share.js',
     'polish.css',
     'main-logo.png',
-    'cosmos.jpg'
+    'cosmos.jpg',
+    'styles/legend-tokens.css',
+    'styles/legend-layout.css',
+    'styles/legend-motion.css',
+    'assets/legend-landscape.webp',
+    'assets/legend-seal.webp',
+    'scripts/vendor/manseryeok.browser.js',
+    'scripts/manseryeok-adapter.js',
+    'scripts/legend-era.js',
+    'scripts/legend-resonance.js',
+    'scripts/legend-copy.js',
+    'scripts/legend-view.js',
+    'scripts/legend-nav.js'
 )
 $WebOnlyFiles = @(
     'sw.js',
@@ -33,7 +45,18 @@ $WebOnlyFiles = @(
     'icon-512.png',
     'apple-touch-icon.png'
 )
-$ProtectedFiles = @('index.html', 'nav.js', 'share.js')
+$ProtectedFiles = @(
+    'index.html',
+    'nav.js',
+    'share.js',
+    'scripts/vendor/manseryeok.browser.js',
+    'scripts/manseryeok-adapter.js',
+    'scripts/legend-era.js',
+    'scripts/legend-resonance.js',
+    'scripts/legend-copy.js',
+    'scripts/legend-view.js',
+    'scripts/legend-nav.js'
+)
 
 function Resolve-AbsolutePath {
     param([string]$BasePath, [string]$Candidate)

@@ -169,6 +169,47 @@
   function p2(n) { return ('0' + n).slice(-2); }
   function sip(i) { return (typeof i === 'number' && i >= 0 && typeof SIPSIN_KOR !== 'undefined') ? SIPSIN_KOR[i] : ''; }
 
+  function sharePillar(s, stemKey, branchKey) {
+    var stem = s[stemKey];
+    var branch = s[branchKey];
+    if (!Number.isInteger(stem) || !Number.isInteger(branch) || stem < 0 || branch < 0) return '모름';
+    return STEM[stem] + BRANCH[branch];
+  }
+
+  function buildLegendShareText(s) {
+    var currentYear = new Date().getFullYear();
+    var era = window.LegendEra && window.LegendEra.getLegendEra
+      ? window.LegendEra.getLegendEra(currentYear)
+      : { yuan: '하원', yun: 9, trigram: '리', hanja: '離', element: '화' };
+    var dayElement = Number.isInteger(s.dStem) && typeof STEM_EL !== 'undefined' && typeof EL_KOR !== 'undefined'
+      ? EL_KOR[STEM_EL[s.dStem]]
+      : null;
+    var resonance = window.LegendResonance && window.LegendResonance.calculateResonance
+      ? window.LegendResonance.calculateResonance({
+          eraElement: era.element,
+          dayElement: dayElement
+        })
+      : { relation: '판단 보류' };
+    var relation = resonance.relation || '판단 보류';
+    var pillars = [
+      '년주 ' + sharePillar(s, 'yStem', 'yBranch'),
+      '월주 ' + sharePillar(s, 'mStem', 'mBranch'),
+      '일주 ' + sharePillar(s, 'dStem', 'dBranch'),
+      '시주 ' + (s.unknown ? '모름' : sharePillar(s, 'hStem', 'hBranch'))
+    ].join(' · ');
+
+    return [
+      '취명선 전설의 만세력',
+      (s.name || '이름 없음') + '의 명식',
+      currentYear + '년 시대 · ' + era.yuan + ' ' + era.yun + '운 · ' + era.trigram + '(' + era.hanja + ') · ' + era.element,
+      '시대 공명 관계 · ' + relation,
+      pillars,
+      'jansang18.github.io/legend-manse'
+    ].join('\n');
+  }
+
+  window.buildLegendShareText = buildLegendShareText;
+
   function closeShareCardModal() {
     var modal = document.getElementById('shareCardModal');
     if (!modal) return false;
@@ -259,7 +300,7 @@
     document.getElementById('shareCardDo').onclick = function () {
       cv.toBlob(async function (blob) {
         var file = new File([blob], (s.name || '사주') + '_취명선_전설의_만세력.png', { type: 'image/png' });
-        var txt = (s.name || '') + ' 사주 · 취명선 전설의 만세력\njansang18.github.io/legend-manse';
+        var txt = buildLegendShareText(s);
         try {
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({ files: [file], text: txt });

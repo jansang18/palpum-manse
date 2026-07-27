@@ -11,6 +11,7 @@ const TEST_GREP = grepIndex >= 0 ? process.argv[grepIndex + 1] : '';
 const GREP_GROUPS = {
   'Palpum quick periods': 'palpum-quick-periods',
   'Palpum result rendering': 'palpum-result-rendering',
+  'historical candidate guards': 'historical-candidate-guards',
   'Palpum period boundaries': 'palpum-period-boundaries',
   'legacy saved chart derives Palpum': 'task-7',
   'Palpum period accessibility': 'palpum-period-accessibility',
@@ -1828,6 +1829,153 @@ async function inspectPalpumIntegration(page, width) {
   await inspectHistoricalPalpumDisclosure(page, width);
   await inspectUnknownTimePalpumBoundary(page, width);
   await inspectPalpumHourRecalculation(page, width);
+}
+
+async function inspectHistoricalCandidateGuards(page, width) {
+  await calculateFixture(page, { birth: '19860219', time: '1430' });
+  const state = await page.evaluate(async () => {
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const originalAlert = window.alert;
+    const alerts = [];
+    window.alert = message => alerts.push(String(message));
+    const baseline = currentSaju;
+    const copyPillars = record => {
+      for (const key of [
+        'yStem', 'yBranch', 'mStem', 'mBranch', 'dStem', 'dBranch', 'hStem', 'hBranch'
+      ]) record[key] = baseline[key];
+      return record;
+    };
+    const makeRecord = ({ id, time, unknown }) => {
+      const record = calcSaju({
+        year: 1799,
+        month: 2,
+        day: 4,
+        hour: time?.hour || 0,
+        minute: time?.minute || 0,
+        calendar: 'solar',
+        isLeapMonth: false,
+        gender: 'M',
+        unknown,
+        dayBoundary: 'midnight'
+      });
+      return copyPillars(Object.assign(record, {
+        id,
+        name: id,
+        memo: '',
+        fav: false,
+        savedAt: 1700000000000
+      }));
+    };
+    const uncertain = makeRecord({ id: 'historical-uncertain', unknown: true });
+    const known = makeRecord({
+      id: 'historical-known',
+      time: { hour: 14, minute: 30 },
+      unknown: false
+    });
+
+    for (const key of (await window.storage.list('palpum-manse:record:')).keys || []) {
+      await window.storage.delete(key);
+    }
+    await window.storage.delete('palpum-manse:legacy-copy-v1');
+    await window.storage.set(
+      'legend-saju:record:historical-uncertain',
+      JSON.stringify(uncertain)
+    );
+    await recordStore.saveRecord(known);
+
+    matchSlotA = null;
+    matchSlotB = null;
+    matchPickerTarget = 'A';
+    document.getElementById('mnfName').value = 'direct-uncertain';
+    document.getElementById('mnfBirth').value = '17990204';
+    document.getElementById('mnfTime').value = '';
+    submitMatchNewForm();
+    const directUncertain = {
+      accepted: matchSlotA !== null,
+      daeun: matchSlotA?.daeun ?? null,
+      alert: alerts.at(-1) || ''
+    };
+
+    document.getElementById('mnfName').value = 'direct-known';
+    document.getElementById('mnfBirth').value = '17990204';
+    document.getElementById('mnfTime').value = '1430';
+    submitMatchNewForm();
+    const directKnown = {
+      accepted: matchSlotA?.name === 'direct-known',
+      hasDaeun: Array.isArray(matchSlotA?.daeun?.list) && matchSlotA.daeun.list.length > 0
+    };
+
+    matchSlotA = null;
+    matchSlotB = null;
+    renderMatch();
+    matchPickerTarget = 'A';
+    await openMatchPicker();
+    document.querySelector('#matchPickerBody [data-id="historical-uncertain"]').click();
+    await wait(30);
+    const savedUncertain = {
+      accepted: matchSlotA !== null,
+      alert: alerts.at(-1) || '',
+      pickerOpen: document.getElementById('matchPickerModal').classList.contains('active')
+    };
+    document.querySelector('#matchPickerBody [data-id="historical-known"]').click();
+    await wait(30);
+    const savedKnown = {
+      accepted: matchSlotA?.id === 'historical-known',
+      hasDaeun: Array.isArray(matchSlotA?.daeun?.list) && matchSlotA.daeun.list.length > 0
+    };
+
+    currentSaju = baseline;
+    rebuildCurrentPalpum(currentSaju);
+    await findSimilarSaju();
+    document.querySelector('#similarModal [data-id="historical-uncertain"]').click();
+    await wait(30);
+    const similarUncertain = {
+      currentId: currentSaju.id || null,
+      stayedOnBaseline: currentSaju === baseline,
+      alert: alerts.at(-1) || '',
+      modalOpen: document.getElementById('similarModal').classList.contains('active')
+    };
+    document.querySelector('#similarModal [data-id="historical-known"]').click();
+    await wait(30);
+    const similarKnown = {
+      currentId: currentSaju.id,
+      hasDaeun: Array.isArray(currentSaju.daeun?.list) && currentSaju.daeun.list.length > 0,
+      activePanel: document.querySelector('.view.active')?.id
+    };
+
+    window.alert = originalAlert;
+    await window.storage.delete('legend-saju:record:historical-uncertain');
+    await window.storage.delete('palpum-manse:record:historical-uncertain');
+    await window.storage.delete('palpum-manse:record:historical-known');
+    await window.storage.delete('palpum-manse:legacy-copy-v1');
+    return {
+      directUncertain,
+      directKnown,
+      savedUncertain,
+      savedKnown,
+      similarUncertain,
+      similarKnown
+    };
+  });
+
+  for (const blocked of [
+    state.directUncertain,
+    state.savedUncertain,
+    state.similarUncertain
+  ]) {
+    assert.equal(blocked.accepted ?? !blocked.stayedOnBaseline, false, `${width}px uncertain candidate was accepted`);
+    assert.match(blocked.alert, /(?:태어난|출생) 시간을/, `${width}px uncertain candidate must request a birth time`);
+  }
+  assert.equal(state.directUncertain.daeun, null, `${width}px direct uncertain candidate must not expose Daeun`);
+  assert.equal(state.savedUncertain.pickerOpen, true, `${width}px rejected saved candidate keeps its picker open`);
+  assert.equal(state.similarUncertain.modalOpen, true, `${width}px rejected similar candidate keeps its modal open`);
+  assert.deepEqual(state.directKnown, { accepted: true, hasDaeun: true }, `${width}px direct known-time candidate`);
+  assert.deepEqual(state.savedKnown, { accepted: true, hasDaeun: true }, `${width}px saved known-time candidate`);
+  assert.deepEqual(state.similarKnown, {
+    currentId: 'historical-known',
+    hasDaeun: true,
+    activePanel: 'view-result'
+  }, `${width}px similar known-time candidate`);
 }
 
 async function inspectSavedChartPalpumStates(page, width) {
@@ -4763,6 +4911,16 @@ async function inspectWidth(browser, width) {
     await inspectSavedChartPalpumStates(page, width);
     await closeCleanPage(page, width, pageIssues);
     return;
+  }
+
+  if (TEST_GROUP === 'historical-candidate-guards' || (!TEST_GROUP && width === 390)) {
+    await inspectHistoricalCandidateGuards(page, width);
+    if (TEST_GROUP === 'historical-candidate-guards') {
+      await closeCleanPage(page, width, pageIssues);
+      return;
+    }
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
   }
 
   if (TEST_GROUP === 'palpum-period-boundaries' || (!TEST_GROUP && width === 390)) {

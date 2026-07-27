@@ -14167,9 +14167,12 @@ async function findSimilarSaju() {
       const id = c.dataset.id;
       const item = scored.find(x => x.rec.id === id);
       if (item) {
-        currentSaju = item.rec;
+        const assessment = requireCertainPalpumCandidate(item.rec);
+        if (!assessment) return;
+        currentSaju = assessment.saju;
+        applyCurrentPalpumAssessment(assessment);
         selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
-        renderResult(item.rec);
+        renderResult();
         window.closeAppModal($('#similarModal'));
         window.activateLegendDestination('result');
       }
@@ -14783,13 +14786,36 @@ function buildCurrentPalpum(saju) {
   return Object.freeze({ version: 'palpum-v1', ...classification });
 }
 
-function rebuildCurrentPalpum(saju) {
-  currentPalpum = buildCurrentPalpum(saju);
+const PALPUM_CANDIDATE_TIME_REQUEST =
+  '팔품 경계에 걸친 날짜입니다. 태어난 시간을 입력해 주세요.';
+
+function classifyPalpumCandidate(saju) {
+  const palpum = buildCurrentPalpum(saju);
   if (saju) {
-    saju.palpumBoundaryUncertain = currentPalpum?.boundaryUncertain === true;
+    saju.palpumBoundaryUncertain = palpum?.boundaryUncertain === true;
     if (saju.palpumBoundaryUncertain) saju.daeun = null;
   }
-  currentPalpumSignature = palpumClassificationInputSignature(saju);
+  return { saju, palpum };
+}
+
+function requireCertainPalpumCandidate(saju) {
+  const assessment = classifyPalpumCandidate(saju);
+  if (!assessment.saju || assessment.palpum?.boundaryUncertain === true) {
+    alert(PALPUM_CANDIDATE_TIME_REQUEST);
+    return null;
+  }
+  return assessment;
+}
+
+function applyCurrentPalpumAssessment(assessment) {
+  currentPalpum = assessment.palpum;
+  currentPalpumSignature = palpumClassificationInputSignature(assessment.saju);
+  return currentPalpum;
+}
+
+function rebuildCurrentPalpum(saju) {
+  const assessment = classifyPalpumCandidate(saju);
+  applyCurrentPalpumAssessment(assessment);
   return currentPalpum;
 }
 
@@ -15664,8 +15690,7 @@ async function openMatchPicker() {
   const useCurrent = $('#matchPickerBody [data-use-current]');
   if (useCurrent) {
     useCurrent.addEventListener('click', () => {
-      setMatchSlot(matchPickerTarget, { ...currentForMatch });
-      closeMatchPicker();
+      if (setMatchSlot(matchPickerTarget, { ...currentForMatch })) closeMatchPicker();
     });
   }
   $$('#matchPickerBody .pick-item').forEach(el => {
@@ -15678,7 +15703,7 @@ async function openMatchPicker() {
         reportLegendStorageError(error);
         return;
       }
-      if (rec) { setMatchSlot(matchPickerTarget, rec); closeMatchPicker(); }
+      if (rec && setMatchSlot(matchPickerTarget, rec)) closeMatchPicker();
     });
   });
   $('#pickNewBtn').addEventListener('click', () => {
@@ -15694,12 +15719,15 @@ function closeMatchPicker() {
 }
 
 function setMatchSlot(target, person) {
+  const assessment = requireCertainPalpumCandidate(person);
+  if (!assessment) return false;
   const wasEmpty = target === 'A' ? !matchSlotA : !matchSlotB;
-  if (target === 'A') matchSlotA = person;
-  else matchSlotB = person;
+  if (target === 'A') matchSlotA = assessment.saju;
+  else matchSlotB = assessment.saju;
   matchSlotMotionToken++;
   pendingMatchSlotMotion = wasEmpty ? target.toLowerCase() : null;
   renderMatch();
+  return true;
 }
 
 function openMatchNewForm() {
@@ -16031,8 +16059,7 @@ function submitMatchNewForm() {
       dayBoundary: getSelectedDayBoundary()
     });
     saju.name = name;
-    setMatchSlot(matchPickerTarget, saju);
-    closeMatchNewForm();
+    if (setMatchSlot(matchPickerTarget, saju)) closeMatchNewForm();
   } catch (e) { console.error(e); alert('계산 오류: ' + e.message); }
 }
 

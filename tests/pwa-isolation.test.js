@@ -200,7 +200,8 @@ test('routes successful calculation to this-year Palpum fortune', () => {
     html.indexOf('\nfunction renderResult()')
   );
 
-  assert.match(html, /currentPalpum\s*=\s*buildCurrentPalpum\(saju\)/);
+  assert.match(html, /function\s+classifyPalpumCandidate\(saju\)[\s\S]+buildCurrentPalpum\(saju\)/);
+  assert.match(html, /function\s+rebuildCurrentPalpum\(saju\)[\s\S]+classifyPalpumCandidate\(saju\)/);
   assert.match(html, /setFortuneQuickPeriod\(['"]this-year['"],\s*\{\s*render:\s*false\s*\}\)/);
   assert.match(calculationHandler, /activateLegendDestination\(['"]fortune['"]\)/);
   assert.doesNotMatch(calculationHandler, /activateLegendDestination\(['"]result['"]\)/);
@@ -374,13 +375,33 @@ test('copies legacy Legend records once and mutates only Palpum-owned keys after
   assert.equal(LEGACY_FALLBACK_KEY, 'legend-saju:records');
   assert.equal(LEGACY_COPY_KEY, 'palpum-manse:legacy-copy-v1');
 
-  const legacyPrimary = JSON.stringify({ id: 'legacy-primary', name: '기존 원본', fav: false });
+  const legacyPrimaryRecord = {
+    id: 'legacy-primary',
+    name: '기존 원본',
+    fav: false,
+    year: 1986,
+    month: 2,
+    day: 19,
+    gender: 'M'
+  };
+  const legacyFallbackRecord = {
+    id: 'legacy-fallback',
+    name: '기존 보조',
+    fav: false,
+    year: 1986,
+    month: 2,
+    day: 19,
+    gender: 'F'
+  };
+  const legacyPrimary = JSON.stringify(legacyPrimaryRecord);
   const legacyFallback = JSON.stringify([
-    { id: 'legacy-fallback', name: '기존 보조', fav: false },
+    legacyFallbackRecord,
+    { id: 'legacy-id-only' },
     { id: 'legacy-invalid-fallback', name: { nested: 'invalid' }, fav: false }
   ]);
   const primary = new Map([
     [`${LEGACY_RECORD_PREFIX}legacy-primary`, legacyPrimary],
+    [`${LEGACY_RECORD_PREFIX}legacy-id-only-primary`, JSON.stringify({ id: 'legacy-id-only-primary' })],
     [
       `${LEGACY_RECORD_PREFIX}legacy-invalid-primary`,
       JSON.stringify({ id: 'legacy-invalid-primary', name: 'invalid', fav: 'yes' })
@@ -425,7 +446,7 @@ test('copies legacy Legend records once and mutates only Palpum-owned keys after
   );
   assert.equal(
     primary.get(`${RECORD_PREFIX}legacy-fallback`),
-    JSON.stringify({ id: 'legacy-fallback', name: '기존 보조', fav: false })
+    JSON.stringify(legacyFallbackRecord)
   );
   assert.equal(primary.get(LEGACY_COPY_KEY), '1');
 

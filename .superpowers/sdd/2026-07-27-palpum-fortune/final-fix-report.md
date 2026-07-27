@@ -576,3 +576,186 @@ This reran relative assets, offline first load, original chart, compatibility, c
 ### Correction Decision
 
 **The two human-approved deployment blockers are closed locally. The corrected release candidate is ready for the separately authorized deployment-only step.**
+
+---
+
+## Historical Candidate-Ingress Corrections - 2026-07-28
+
+This continuation addresses three reviewer-confirmed bypasses in the already approved historical boundary-uncertainty correction:
+
+1. Direct compatibility input accepted a pre-1800 unknown-time boundary chart immediately after `calcSaju()`.
+2. Saved and read-only legacy compatibility selection assigned records directly to a match slot.
+3. Similar-chart selection assigned a stored record to `currentSaju` and rendered it without Palpum classification.
+
+The same wave tightens read-only legacy discovery so an ID-only object is not copied.
+
+### RED Evidence
+
+Production code was not changed until the regressions failed.
+
+#### Candidate-ingress browser regression
+
+Command:
+
+```powershell
+node tests/ui-regression.js --grep "historical candidate guards"
+```
+
+The new 1799-02-04 regression failed because an unknown-time boundary candidate was accepted. Source inspection confirmed the same unguarded assignment in all three reported paths:
+
+- Direct match input called `setMatchSlot()` immediately after `calcSaju()`.
+- Saved/legacy match selection called `setMatchSlot()` with the stored record.
+- Similarity selection assigned the stored record to `currentSaju` and called `renderResult()`.
+
+The browser regression exercises each path with a boundary-uncertain 1799 record and pairs each with a known-time 1799 control.
+
+#### ID-only legacy discovery
+
+Command:
+
+```powershell
+node --test tests/pwa-isolation.test.js
+```
+
+Observed result:
+
+```text
+35 passed
+1 failed
+```
+
+Both primary and fallback ID-only legacy objects appeared in the discovered record list.
+
+### Implemented Corrections
+
+#### Reusable candidate assessment
+
+- Added `classifyPalpumCandidate(saju)` as the single candidate-classification operation.
+- The classifier builds the Palpum classification, records `palpumBoundaryUncertain`, and removes Daeun when the candidate spans a boundary.
+- Added `requireCertainPalpumCandidate(saju)` as the shared fail-closed ingress guard.
+- Rejected candidates receive one clear request: `팔품 경계에 걸친 날짜입니다. 태어난 시간을 입력해 주세요.`
+- Added `applyCurrentPalpumAssessment(assessment)` so a successfully classified candidate can become current without rebuilding or diverging from the checked result.
+- Existing `rebuildCurrentPalpum()` now uses the same classifier, eliminating separate certainty logic.
+
+#### Match ingress
+
+- `setMatchSlot()` is now the guarded match boundary for direct input, current-chart selection, Palpum-saved selection, and copied legacy selection.
+- It returns `false` for boundary uncertainty, leaves the slot unchanged, and preserves the active input/picker modal so the user can supply a time.
+- Direct and saved picker callers close their modal only after a successful guarded assignment.
+
+#### Similarity ingress
+
+- Similarity selection classifies the stored candidate before changing `currentSaju` or rendering the original chart.
+- A boundary-uncertain candidate leaves the baseline chart and similarity modal intact and requests birth time.
+- A known-time historical candidate applies the checked Palpum assessment, retains Daeun, and opens the original chart.
+
+#### Legacy validation
+
+Read-only legacy discovery now requires:
+
+- Integer year in 1026-2099.
+- Integer month in 1-12.
+- Integer day in 1-31.
+- Gender `M` or `F`.
+- The prior optional-field type checks remain in force.
+
+This rejects ID-only objects without broadening normal Palpum save/import behavior or writing to any Legend key.
+
+### Browser Regression Coverage
+
+The focused test proves:
+
+- Direct unknown-time 1799 match input is rejected, contains no exposed Daeun, and requests birth time.
+- Direct known-time 1799 input enters the slot with Daeun.
+- Read-only legacy unknown-time 1799 picker selection is rejected and keeps the picker open.
+- Known-time stored selection enters the match slot with Daeun.
+- Unknown-time 1799 similarity selection leaves the current chart unchanged and keeps the modal open.
+- Known-time 1799 similarity selection retains Daeun and opens `view-result`.
+- Non-boundary/current-chart behavior remains covered by the existing full suite.
+
+### GREEN Evidence
+
+#### Focused
+
+```text
+node --test tests/pwa-isolation.test.js
+36/36 PASS
+
+node tests/ui-regression.js --grep "historical candidate guards"
+UI regression PASS: 390
+```
+
+#### Core
+
+```text
+npm run test:core
+113/113 PASS
+```
+
+#### Required combined gate
+
+```text
+npm test
+Core: 113/113 PASS
+UI widths: 360, 390, 412, 768, 1220 PASS
+Geometry: 412x915, 1152x768, 1440x1000 PASS
+```
+
+#### Supported release audit
+
+```text
+$env:TEST_GROUP='release-audit'; node tests/ui-regression.js
+360, 390, 412, 768, 1220 PASS
+```
+
+#### Task 6 geometry
+
+```text
+node tests/ui-regression.js --grep "Palpum ink wash|navigation never covers"
+412x915, 1152x768, 1440x1000 PASS
+```
+
+#### Prefixed full verification
+
+```text
+$env:UI_BASE_PATH='/palpum-manse/'; node tests/ui-regression.js
+UI widths: 360, 390, 412, 768, 1220 PASS
+Geometry: 412x915, 1152x768, 1440x1000 PASS
+```
+
+### Files Changed
+
+- `index.html`
+- `scripts/legend-storage.js`
+- `tests/pwa-isolation.test.js`
+- `tests/ui-regression.js`
+- `.superpowers/sdd/2026-07-27-palpum-fortune/final-fix-report.md`
+
+### Commit
+
+- Parent correction commit: `866cf577a9731f355a42550901a4c5f5e5493864`
+- This bypass correction wave: commit subject `fix: guard historical candidate ingress`
+
+### Self-Review
+
+- Every `setMatchSlot()` caller now reaches the centralized certainty guard.
+- Similarity cannot assign or render a stored candidate before the guard succeeds.
+- Main saved-chart loading still calls `rebuildCurrentPalpum()` immediately after assignment and therefore uses the same classifier.
+- Boundary-uncertain candidate Daeun is cleared before rejection, so a caller retaining the in-memory object cannot expose the guessed value.
+- Rejected match and similarity selections preserve context instead of silently substituting a midnight/noon-derived chart.
+- Known-time historical and modern non-boundary flows remain enabled.
+- Read-only legacy source values are never updated or deleted.
+- `git diff --check` passed.
+- No dependency, remote, deployment, or push operation was performed.
+- `artifacts/` remained unrelated, untracked, unstaged, and untouched.
+
+### Remaining Concerns
+
+- Production remains unverified until the separately authorized deployment step.
+- Historical pre-1800 classification remains an explicitly disclosed approximation.
+- Legacy discovery remains a one-time isolated copy by design.
+- Palpum-owned low-level storage accepts sparse objects for backward compatibility; public imports are normalized, application saves are complete, and read-only legacy discovery now rejects ID-only values.
+
+### Decision
+
+**All three reviewer-reported historical candidate-ingress bypasses are closed locally and covered by browser regressions.**

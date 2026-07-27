@@ -18,6 +18,10 @@
 
   function validLegacyRecord(record) {
     return validRecord(record) &&
+      Number.isInteger(record.year) && record.year >= 1026 && record.year <= 2099 &&
+      Number.isInteger(record.month) && record.month >= 1 && record.month <= 12 &&
+      Number.isInteger(record.day) && record.day >= 1 && record.day <= 31 &&
+      (record.gender === 'M' || record.gender === 'F') &&
       (record.name === undefined || typeof record.name === 'string') &&
       (record.memo === undefined || typeof record.memo === 'string') &&
       (record.fav === undefined || typeof record.fav === 'boolean') &&

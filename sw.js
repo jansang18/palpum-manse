@@ -1,7 +1,7 @@
 // 취명선 전설의 만세력 서비스워커
 // 전략: HTML/CSS/JS = 네트워크 우선(항상 최신 디자인), 이미지/아이콘 = 캐시 우선(빠름).
 // 오프라인일 때만 캐시로 폴백한다. 배포 시 VERSION만 올리면 옛 캐시는 자동 삭제됨.
-const VERSION = 'v12-20260728-final-review';
+const VERSION = 'v13-20260728-uniform-upper-bar';
 const CACHE_PREFIX = 'palpum-manse-';
 const CACHE = CACHE_PREFIX + VERSION;
 const SCOPE_URL = new URL(self.registration.scope);

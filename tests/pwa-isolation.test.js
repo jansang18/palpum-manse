@@ -17,6 +17,10 @@ const deploymentGuide = fs.readFileSync('웹배포_안내.md', 'utf8');
 const legendView = fs.readFileSync('scripts/legend-view.js', 'utf8');
 const legendNav = fs.readFileSync('scripts/legend-nav.js', 'utf8');
 
+test('ships a fresh Palpum cache for the uniform upper-bar release', () => {
+  assert.match(serviceWorker, /const VERSION = 'v13-20260728-uniform-upper-bar';/);
+});
+
 const runtimeAssets = [
   'polish.css',
   'luxury.css',
@@ -209,7 +213,7 @@ test('routes successful calculation to this-year Palpum fortune', () => {
 });
 
 test('keeps the current-era legend and isolated Palpum PWA identity available', () => {
-  assert.match(serviceWorker, /const VERSION = 'v12-20260728-final-review'/);
+  assert.match(serviceWorker, /const VERSION = 'v13-20260728-uniform-upper-bar'/);
   assert.match(serviceWorker, /const CACHE_PREFIX = 'palpum-manse-'/);
   assert.match(legendView, /id\s*=\s*['"]legendLanding['"]/);
   assert.match(legendView, /id\s*=\s*['"]legendStartButton['"]/);

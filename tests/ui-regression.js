@@ -315,6 +315,18 @@ function inspectLegendEraMetadata() {
 }
 
 async function inspectCalendarShellWidth(page, width) {
+  await activateDestination(page, 'input');
+  await sleep(60);
+  const legendShell = await page.evaluate(() => {
+    const rect = element => {
+      const box = element.getBoundingClientRect();
+      return { left: box.left, width: box.width };
+    };
+    return {
+      header: rect(document.querySelector('.top-bar')),
+      tabs: rect(document.querySelector('.tabs'))
+    };
+  });
   await activateDestination(page, 'calendar');
   await sleep(100);
   const geometry = await page.evaluate(() => {
@@ -331,61 +343,54 @@ async function inspectCalendarShellWidth(page, width) {
   });
   for (const name of ['header', 'tabs']) {
     assert.ok(
-      Math.abs(geometry[name].width - geometry.calendar.width) <= 1,
-      `${width}px calendar ${name} width ${geometry[name].width}px must match calendar card ${geometry.calendar.width}px`
+      Math.abs(geometry[name].width - legendShell[name].width) <= 1,
+      `${width}px calendar ${name} width ${geometry[name].width}px must match Legend Saju ${legendShell[name].width}px`
     );
     assert.ok(
-      Math.abs(geometry[name].left - geometry.calendar.left) <= 1,
-      `${width}px calendar ${name} left edge must match calendar card`
+      Math.abs(geometry[name].left - legendShell[name].left) <= 1,
+      `${width}px calendar ${name} left edge must match Legend Saju`
     );
   }
   assert.ok(geometry.calendar.left >= 0 && geometry.calendar.right <= geometry.viewport + 1, `${width}px calendar shell overflows viewport`);
 }
 
 async function inspectAllTabShellWidths(page, width) {
-  const targets = {
-    input: '.input-card',
-    result: '.oguk-card',
-    fortune: '.overall-card',
-    match: '.match-intro',
-    calendar: '.cal-grid'
-  };
-  for (const [tab, selector] of Object.entries(targets)) {
+  await activateDestination(page, 'input');
+  await sleep(60);
+  const legendShell = await page.evaluate(() => {
+    const rect = element => {
+      const box = element.getBoundingClientRect();
+      return { left: box.left, width: box.width };
+    };
+    return {
+      header: rect(document.querySelector('.top-bar')),
+      tabs: rect(document.querySelector('.tabs'))
+    };
+  });
+  const destinations = ['input', 'result', 'fortune', 'match', 'calendar', 'saved'];
+  for (const tab of destinations) {
     await activateDestination(page, tab);
     await sleep(60);
-    const geometry = await page.evaluate(selector => {
+    const geometry = await page.evaluate(() => {
       const rect = element => {
         const box = element.getBoundingClientRect();
         return { left: box.left, right: box.right, width: box.width };
       };
       return {
         header: rect(document.querySelector('.top-bar')),
-        tabs: rect(document.querySelector('.tabs')),
-        target: rect(document.querySelector(selector))
+        tabs: rect(document.querySelector('.tabs'))
       };
-    }, selector);
+    });
     for (const name of width < 768 ? ['header'] : ['header', 'tabs']) {
-      assert.ok(Math.abs(geometry[name].width - geometry.target.width) <= 1, `${width}px ${tab} ${name} width must match content`);
-      assert.ok(Math.abs(geometry[name].left - geometry.target.left) <= 1, `${width}px ${tab} ${name} left edge must match content`);
+      assert.ok(
+        Math.abs(geometry[name].width - legendShell[name].width) <= 1,
+        `${width}px ${tab} ${name} width must match Legend Saju`
+      );
+      assert.ok(
+        Math.abs(geometry[name].left - legendShell[name].left) <= 1,
+        `${width}px ${tab} ${name} left edge must match Legend Saju`
+      );
     }
-  }
-
-  await activateDestination(page, 'saved');
-  await sleep(60);
-  const savedGeometry = await page.evaluate(() => {
-    const shell = element => {
-      const box = element.getBoundingClientRect();
-      return { left: box.left, width: box.width };
-    };
-    const view = document.getElementById('view-saved');
-    const style = getComputedStyle(view);
-    const left = view.getBoundingClientRect().left + parseFloat(style.paddingLeft);
-    const width = view.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-    return { header: shell(document.querySelector('.top-bar')), tabs: shell(document.querySelector('.tabs')), target: { left, width } };
-  });
-  for (const name of width < 768 ? ['header'] : ['header', 'tabs']) {
-    assert.ok(Math.abs(savedGeometry[name].width - savedGeometry.target.width) <= 1, `${width}px saved ${name} width must match content`);
-    assert.ok(Math.abs(savedGeometry[name].left - savedGeometry.target.left) <= 1, `${width}px saved ${name} left edge must match content`);
   }
 }
 

@@ -580,6 +580,7 @@ body.dark .day-item.selected[data-legend-day] {
 
 #legendMoreButton,
 [data-legend-primary-nav],
+[data-legend-secondary-nav],
 [data-legend-more-nav] {
   min-width: 2.75rem;
   min-height: 2.75rem;
@@ -589,8 +590,15 @@ body.dark .day-item.selected[data-legend-day] {
 
 #legendMoreButton.is-pressed,
 [data-legend-primary-nav].is-pressed,
+[data-legend-secondary-nav].is-pressed,
 [data-legend-more-nav].is-pressed {
   transform: scale(0.96);
+}
+
+#legendMoreButton[aria-current="page"] {
+  color: var(--seal);
+  background: color-mix(in srgb, var(--paper-bright) 90%, var(--seal));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--seal) 22%, transparent);
 }
 
 .legend-mobile-nav {
@@ -621,6 +629,7 @@ body.dark .day-item.selected[data-legend-day] {
   display: none !important;
 }
 
+[data-legend-secondary-nav],
 [data-legend-more-nav] {
   display: grid;
   grid-template-columns: 2.75rem minmax(0, 1fr);
@@ -637,11 +646,14 @@ body.dark .day-item.selected[data-legend-day] {
   cursor: pointer;
 }
 
+[data-legend-secondary-nav]:hover,
+[data-legend-secondary-nav]:focus-visible,
 [data-legend-more-nav]:hover,
 [data-legend-more-nav]:focus-visible {
   background: color-mix(in srgb, var(--seal) 9%, transparent);
 }
 
+[data-legend-secondary-nav]:focus-visible,
 [data-legend-more-nav]:focus-visible,
 [data-legend-primary-nav]:focus-visible,
 #legendMoreButton:focus-visible {
@@ -649,17 +661,21 @@ body.dark .day-item.selected[data-legend-day] {
   outline-offset: 1px;
 }
 
+[data-legend-secondary-nav] strong,
+[data-legend-secondary-nav] small,
 [data-legend-more-nav] strong,
 [data-legend-more-nav] small {
   display: block;
 }
 
+[data-legend-secondary-nav] strong,
 [data-legend-more-nav] strong {
   font-size: 0.92rem;
   line-height: 1.35;
   letter-spacing: -0.015em;
 }
 
+[data-legend-secondary-nav] small,
 [data-legend-more-nav] small {
   margin-top: 0.12rem;
   color: var(--ink-muted);
@@ -767,12 +783,14 @@ body.dark .day-item.selected[data-legend-day] {
 @media (prefers-reduced-motion: reduce) {
   #legendMoreButton,
   [data-legend-primary-nav],
+  [data-legend-secondary-nav],
   [data-legend-more-nav] {
     transition: color 100ms linear, background-color 100ms linear;
   }
 
   #legendMoreButton.is-pressed,
   [data-legend-primary-nav].is-pressed,
+  [data-legend-secondary-nav].is-pressed,
   [data-legend-more-nav].is-pressed {
     transform: none;
     opacity: 0.72;

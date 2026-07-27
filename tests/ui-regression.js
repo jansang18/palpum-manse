@@ -1379,6 +1379,8 @@ async function inspectLegendNavigation(page, width) {
       .map(node => node.dataset.tab),
     more: [...document.querySelectorAll('[data-legend-more-nav]')]
       .map(node => node.dataset.tab),
+    secondary: [...document.querySelectorAll('[data-legend-secondary-nav]')]
+      .map(node => ({ tab: node.dataset.tab, role: node.getAttribute('role') })),
     targets: [...document.querySelectorAll('[data-legend-primary-nav]')].map(node => ({
       tab: node.dataset.tab,
       height: node.getBoundingClientRect().height,
@@ -1393,6 +1395,7 @@ async function inspectLegendNavigation(page, width) {
   assert.equal(source.evidence, 'function');
   assert.deepEqual(source.primary, ['input', 'result', 'legend', 'calendar', 'saved']);
   assert.deepEqual(source.more, ['match', 'about']);
+  assert.deepEqual(source.secondary, [{ tab: 'fortune', role: 'menuitem' }]);
   source.targets.forEach(target => {
     assert.equal(target.controls, `view-${target.tab}`);
     if (width < 768) assert.ok(target.height >= 44, `${target.tab} mobile target is ${target.height}px`);
@@ -1457,7 +1460,7 @@ async function inspectLegendNavigation(page, width) {
     expanded: 'true',
     hidden: false,
     role: 'menu',
-    focused: 'match',
+    focused: 'fortune',
     anchored: true
   });
   await page.keyboard.press('Escape');
@@ -1470,13 +1473,34 @@ async function inspectLegendNavigation(page, width) {
   assert.deepEqual(menuClosed, { expanded: 'false', hidden: true, focus: 'legendMoreButton' });
 
   await page.click(moreButton);
+  await page.focus('[data-legend-more-nav][data-tab="match"]');
   await page.keyboard.press('Enter');
   await sleep(100);
-  assert.equal(
-    await page.evaluate(() => document.querySelector('.tab.active')?.dataset.tab),
-    'match',
-    `${width}px more-menu match destination`
-  );
+  const matchDestination = await page.evaluate(() => ({
+    active: document.querySelector('.tab.active')?.dataset.tab,
+    current: document.getElementById('legendMoreButton')?.getAttribute('aria-current'),
+    focused: document.activeElement?.id || document.activeElement?.dataset?.tab || ''
+  }));
+  assert.deepEqual(matchDestination, {
+    active: 'match',
+    current: 'page',
+    focused: width < 768 ? 'legendMoreButton' : 'tab-match'
+  }, `${width}px more-menu match destination`);
+
+  await page.click(moreButton);
+  await page.focus('[data-legend-secondary-nav][data-tab="fortune"]');
+  await page.keyboard.press('Enter');
+  await sleep(100);
+  const fortuneDestination = await page.evaluate(() => ({
+    active: document.querySelector('.tab.active')?.dataset.tab,
+    current: document.getElementById('legendMoreButton')?.getAttribute('aria-current'),
+    focused: document.activeElement?.id || document.activeElement?.dataset?.tab || ''
+  }));
+  assert.deepEqual(fortuneDestination, {
+    active: 'fortune',
+    current: 'page',
+    focused: width < 768 ? 'legendMoreButton' : 'tab-fortune'
+  }, `${width}px mobile fortune destination`);
   await page.evaluate(() => window.activateLegendDestination('legend'));
 
   const evidenceTrigger = '[data-legend-evidence]';
@@ -1546,7 +1570,7 @@ async function inspectLegendNavigation(page, width) {
     `${width}px about form overlay opens from more`
   );
   assert.equal(await page.evaluate(() => window.handleAppBack()), true);
-  await sleep(260);
+  await sleep(360);
   assert.equal(
     await page.evaluate(() => document.getElementById('aboutModal').classList.contains('active')),
     false,
@@ -2760,6 +2784,7 @@ async function inspectWidth(browser, width) {
         return { about: inspect('aboutModal'), save: inspect('saveModal') };
       });
 
+      await page.click('#legendMoreButton');
       await page.click('#aboutBtn');
       await sleep(30);
       const aboutEntry = await page.evaluate(() => ({
@@ -2783,7 +2808,7 @@ async function inspectWidth(browser, width) {
       }
 
       await page.evaluate(() => {
-        document.getElementById('aboutBtn').focus();
+        document.getElementById('legendMoreButton').focus();
         window.openAppModal(document.getElementById('saveModal'));
       });
       await sleep(30);
@@ -2815,11 +2840,11 @@ async function inspectWidth(browser, width) {
         },
         aboutEntry: { activeId: 'aboutClose', inside: true, appInert: true, bottomBarInert: true },
         aboutTrappedId: 'aboutClose',
-        aboutExit: { active: false, restoredId: 'aboutBtn', appInert: false },
+        aboutExit: { active: false, restoredId: 'legendMoreButton', appInert: false },
         saveEntryId: 'saveName',
         saveForwardTrapId: 'saveName',
         saveBackwardTrapId: 'saveConfirm',
-        saveExit: { active: false, restoredId: 'aboutBtn', appInert: false }
+        saveExit: { active: false, restoredId: 'legendMoreButton', appInert: false }
       });
     }
 

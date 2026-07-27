@@ -1478,6 +1478,19 @@ async function inspectLegendFlow(page, width) {
     )],
     interpretationText: document.querySelector('.legend-narrative')?.textContent,
     highlights: document.querySelectorAll('.legend-highlight').length,
+    highlightsBeforeTimeline: Boolean(
+      document.querySelector('.legend-highlights')?.compareDocumentPosition(
+        document.querySelector('.legend-timeline')
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ),
+    narrativeAfterTimeline: Boolean(
+      document.querySelector('.legend-timeline')?.compareDocumentPosition(
+        document.querySelector('.legend-narrative')
+      ) & Node.DOCUMENT_POSITION_FOLLOWING
+    ),
+    timelineDisclosureExists: Boolean(document.getElementById('legendTimelineDetails')),
+    layerReadings: [...document.querySelectorAll('[data-layer-reading]')]
+      .map(node => node.textContent.trim()),
     horizontalOverflow: document.querySelector('.legend-shell')?.scrollWidth
       > document.querySelector('.legend-shell')?.clientWidth + 1,
     unsafeElementCount: document.querySelectorAll('#legendContent img').length,
@@ -1506,6 +1519,14 @@ async function inspectLegendFlow(page, width) {
   assert.match(state.interpretationText, /대운의 계절/);
   assert.match(state.interpretationText, /일운의 선택/);
   assert.equal(state.highlights, 3, `${width}px interpretation highlights`);
+  assert.equal(state.highlightsBeforeTimeline, true, `${width}px core interpretation must appear before the time flow`);
+  assert.equal(state.narrativeAfterTimeline, true, `${width}px detailed chapters must follow the interpreted time flow`);
+  assert.equal(state.timelineDisclosureExists, false, `${width}px interpreted time flow must be visible by default`);
+  assert.equal(state.layerReadings.length, 8, `${width}px every time layer needs an interpretation`);
+  assert.ok(
+    state.layerReadings.every(reading => reading.length >= 35),
+    `${width}px time-layer interpretation is too short`
+  );
   assert.equal(state.horizontalOverflow, false, `${width}px legend interpretation overflow`);
   assert.equal(state.unsafeElementCount, 0, `${width}px user name must remain plain text`);
   assert.equal(state.xss, 0, `${width}px user name executed markup`);

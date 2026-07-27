@@ -119,16 +119,24 @@
     appendText(article, 'h3', 'legend-layer-title', layer.title);
     appendText(article, 'div', 'legend-layer-value', layer.value);
     appendText(article, 'p', 'legend-layer-detail', layer.detail);
+    if (layer.reading) {
+      const reading = element('div', 'legend-layer-reading');
+      reading.dataset.layerReading = layer.key;
+      appendText(reading, 'span', '', '해석');
+      appendText(reading, 'p', '', layer.reading);
+      article.appendChild(reading);
+    }
     return article;
   }
 
-  function hourLayer(selection, hours) {
+  function hourLayer(selection, hours, reading) {
     const article = layerCard({
       key: 'hour',
       kicker: '2 HOURS',
       title: '시운 · 하루의 열두 문',
       value: formatDate(selection.year, selection.month, selection.day),
-      detail: '출생시각과 별개로 선택한 날의 12시진을 모두 펼칩니다.'
+      detail: '출생시각과 별개로 선택한 날의 12시진을 모두 펼칩니다.',
+      reading
     });
     article.dataset.selectedDate = `${selection.year}-${selection.month}-${selection.day}`;
     const list = element('div', 'legend-hour-list');
@@ -377,18 +385,6 @@
     const grid = element('section', 'legend-narrative');
     grid.setAttribute('aria-label', '취명선 전설 해석');
 
-    const highlights = element('section', 'legend-highlights');
-    appendText(highlights, 'div', 'legend-chapter-kicker', 'THREE LINES · 핵심 세 줄');
-    const highlightList = element('div', 'legend-highlight-list');
-    narrative.highlights.forEach((highlight, index) => {
-      const item = element('p', 'legend-highlight');
-      appendText(item, 'span', '', String(index + 1).padStart(2, '0'));
-      appendText(item, 'strong', '', highlight);
-      highlightList.appendChild(item);
-    });
-    highlights.appendChild(highlightList);
-    grid.appendChild(highlights);
-
     const groupMeta = {
       '명식의 뼈대': ['I · NATAL FRAME', '태어난 구조를 먼저 읽습니다.'],
       '시간의 작용': ['II · TIME LAYERS', '대운에서 시운까지 시간의 초점을 겹칩니다.'],
@@ -432,6 +428,21 @@
       grid.appendChild(group);
     });
     return grid;
+  }
+
+  function highlightPanel(narrative) {
+    const highlights = element('section', 'legend-highlights');
+    highlights.setAttribute('aria-label', '당신의 핵심 해석');
+    appendText(highlights, 'div', 'legend-chapter-kicker', 'READ FIRST · 당신의 핵심 해석');
+    const highlightList = element('div', 'legend-highlight-list');
+    narrative.highlights.forEach((highlight, index) => {
+      const item = element('p', 'legend-highlight');
+      appendText(item, 'span', '', String(index + 1).padStart(2, '0'));
+      appendText(item, 'strong', '', highlight);
+      highlightList.appendChild(item);
+    });
+    highlights.appendChild(highlightList);
+    return highlights;
   }
 
   function emptyView(mount) {
@@ -592,6 +603,11 @@
       resonance,
       ...storyContext(saju, selection, hours)
     });
+    const readingFor = (...keys) => keys
+      .map(key => narrative.sections.find(section => section.key === key))
+      .filter(Boolean)
+      .map(section => `${section.summary} ${section.body}`)
+      .join(' ');
     const dialog = evidenceDialog(resonance);
     const shell = element('div', 'legend-shell');
     const timeline = element('section', 'legend-timeline');
@@ -616,14 +632,16 @@
         kicker: '180 YEARS',
         title: '삼원 전체 순환',
         value: `${era.cycleStart}–${era.cycleEnd}`,
-        detail: `${era.yuan}부터 하원까지 이어지는 가장 큰 시대의 호흡입니다.`
+        detail: `${era.yuan}부터 하원까지 이어지는 가장 큰 시대의 호흡입니다.`,
+        reading: readingFor('era')
       },
       {
         key: 'yun',
         kicker: '20 YEARS',
         title: `${era.yuan} ${era.yun}운`,
         value: `${era.hanja} · ${era.symbol} · ${era.element}`,
-        detail: `${era.yunStart}–${era.yunEnd}년, 현재 선택 연도 기준 ${Math.round(era.progress * 100)}% 지점`
+        detail: `${era.yunStart}–${era.yunEnd}년, 현재 선택 연도 기준 ${Math.round(era.progress * 100)}% 지점`,
+        reading: readingFor('era', 'action')
       },
       {
         key: 'natal',
@@ -632,45 +650,51 @@
         value: natalValue,
         detail: saju.unknown
           ? `${saju.year}년생 · 시각 미상, 시주는 원국 판단에서 제외합니다.`
-          : `${saju.year}년생 · ${BRANCH_KOR[saju.hBranch]}시까지 반영한 네 기둥입니다.`
+          : `${saju.year}년생 · ${BRANCH_KOR[saju.hBranch]}시까지 반영한 네 기둥입니다.`,
+        reading: readingFor('day-master', 'balance')
       },
       {
         key: 'daeun',
         kicker: '10 YEARS',
         title: '대운 · 개인의 계절',
         value: daeunValue,
-        detail: daeunDetail
+        detail: daeunDetail,
+        reading: readingFor('daeun')
       },
       {
         key: 'seun',
         kicker: '1 YEAR',
         title: '세운 · 올해의 장면',
         value: `${selection.year} · ${ganji(selection.yearPillar.stem, selection.yearPillar.branch)}`,
-        detail: selectedSeun ? '원국에서 선택한 세운입니다.' : '선택 전에는 현재 연도를 기준으로 봅니다.'
+        detail: selectedSeun ? '원국에서 선택한 세운입니다.' : '선택 전에는 현재 연도를 기준으로 봅니다.',
+        reading: readingFor('year', 'work')
       },
       {
         key: 'month',
         kicker: '1 MONTH',
         title: '월운 · 변화의 결',
         value: `${selection.month}월 · ${ganji(selection.monthPillar.stem, selection.monthPillar.branch)}`,
-        detail: selectedWoon ? '원국에서 선택한 월운입니다.' : '선택 전에는 현재 월을 기준으로 봅니다.'
+        detail: selectedWoon ? '원국에서 선택한 월운입니다.' : '선택 전에는 현재 월을 기준으로 봅니다.',
+        reading: readingFor('month', 'relation')
       },
       {
         key: 'day',
         kicker: '1 DAY',
         title: '일운 · 선택한 하루',
         value: `${formatDate(selection.year, selection.month, selection.day)} · ${ganji(selection.dayPillar.stem, selection.dayPillar.branch)}`,
-        detail: selectedLegendDay ? '일운 달력에서 선택한 날짜입니다.' : '날짜를 고르지 않으면 해당 월의 오늘 또는 1일을 기준으로 봅니다.'
+        detail: selectedLegendDay ? '일운 달력에서 선택한 날짜입니다.' : '날짜를 고르지 않으면 해당 월의 오늘 또는 1일을 기준으로 봅니다.',
+        reading: readingFor('day')
       }
     ];
 
     layers.forEach(layer => timeline.appendChild(layerCard(layer)));
-    timeline.appendChild(hourLayer(selection, hours));
+    timeline.appendChild(hourLayer(selection, hours, readingFor('hour')));
     if (timeline.children.length !== LAYER_KEYS.length) {
       throw new Error('전설 시간층은 정확히 여덟 개여야 합니다.');
     }
 
     shell.appendChild(heroCard(narrative, resonance, dialog));
+    shell.appendChild(highlightPanel(narrative));
     shell.appendChild(timeline);
     shell.appendChild(narrativeGrid(narrative));
     shell.appendChild(dialog);

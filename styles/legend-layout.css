@@ -289,7 +289,8 @@ html {
   grid-template:
     "kicker kicker" auto
     "value title" auto
-    "value detail" 1fr / minmax(10rem, 0.78fr) minmax(0, 1.22fr);
+    "value detail" auto
+    "reading reading" 1fr / minmax(10rem, 0.78fr) minmax(0, 1.22fr);
   gap: 0.3rem clamp(1.25rem, 4vw, 3rem);
   align-items: center;
   min-height: 10rem;
@@ -300,7 +301,8 @@ html {
   grid-template:
     "kicker kicker" auto
     "title value" auto
-    "detail value" 1fr / minmax(0, 1.22fr) minmax(10rem, 0.78fr);
+    "detail value" auto
+    "reading reading" 1fr / minmax(0, 1.22fr) minmax(10rem, 0.78fr);
 }
 
 .legend-layer:nth-child(even):not([data-time-layer="hour"]) .legend-layer-value {
@@ -341,6 +343,35 @@ html {
   word-break: keep-all;
 }
 
+.legend-layer-reading {
+  position: relative;
+  z-index: 1;
+  grid-area: reading;
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--legend-line);
+}
+
+.legend-layer-reading > span {
+  color: var(--seal);
+  font-size: 0.68rem;
+  font-weight: 820;
+  letter-spacing: 0.08em;
+}
+
+.legend-layer-reading > p {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(0.88rem, 0.84rem + 0.18vw, 0.98rem);
+  font-weight: 610;
+  line-height: 1.72;
+  word-break: keep-all;
+}
+
 .legend-layer[data-time-layer="cycle"]::before,
 .legend-layer[data-time-layer="yun"]::before {
   position: absolute;
@@ -373,6 +404,10 @@ html {
 
 .legend-layer[data-time-layer="hour"] .legend-layer-detail {
   margin-top: 0.45rem;
+}
+
+.legend-layer[data-time-layer="hour"] .legend-layer-reading {
+  margin-top: 1rem;
 }
 
 .legend-hour-list {
@@ -430,6 +465,8 @@ html {
 .legend-highlights {
   position: relative;
   overflow: hidden;
+  width: min(100%, 54rem);
+  margin-inline: auto;
   padding: clamp(1.4rem, 4vw, 2.75rem);
   border: 1px solid var(--legend-line-strong);
   border-radius: var(--legend-radius-card);
@@ -1189,7 +1226,8 @@ body.dark .day-item.selected[data-legend-day] {
       "kicker" auto
       "value" auto
       "title" auto
-      "detail" auto / minmax(0, 1fr);
+      "detail" auto
+      "reading" auto / minmax(0, 1fr);
     gap: 0.45rem;
     min-height: 0;
     padding: 1.2rem;

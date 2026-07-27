@@ -1136,6 +1136,13 @@ body:has(.tab[data-tab="calendar"].active) .tabs {
   }
 }
 
+@media (min-width: 700px) and (max-width: 767px) {
+  body:has(.tab[data-tab="calendar"].active) .top-bar,
+  body:has(.tab[data-tab="calendar"].active) .tabs {
+    width: calc(100vw - 56px) !important;
+  }
+}
+
 @media (min-width: 768px) {
   body:has(.tab[data-tab="calendar"].active) .top-bar,
   body:has(.tab[data-tab="calendar"].active) .tabs {
@@ -1158,6 +1165,20 @@ body:has(.tab[data-tab="calendar"].active) .tabs {
   }
 }
 
+@media (min-width: 700px) and (max-width: 767px) {
+  body:has(.tab[data-tab="result"].active) .top-bar,
+  body:has(.tab[data-tab="result"].active) .tabs {
+    width: calc(100vw - 56px) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  body:has(.tab[data-tab="result"].active) .top-bar,
+  body:has(.tab[data-tab="result"].active) .tabs {
+    width: 616px !important;
+  }
+}
+
 /* Fortune, compatibility, and saved views share the same card measure. */
 body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .top-bar,
 body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .tabs {
@@ -1175,6 +1196,13 @@ body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).a
   body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .top-bar,
   body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .tabs {
     width: 496px !important;
+  }
+}
+
+@media (min-width: 700px) and (max-width: 767px) {
+  body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .top-bar,
+  body:has(.tab:is([data-tab="fortune"], [data-tab="match"], [data-tab="saved"]).active) .tabs {
+    width: calc(100vw - 56px) !important;
   }
 }
 

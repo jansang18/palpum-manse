@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const childProcess = require('node:child_process');
 const fs = require('node:fs');
+const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -115,13 +116,15 @@ const APP_ROOT = process.env.APP_ROOT
   : fs.existsSync(path.join(repoRoot, 'index.html'))
     ? repoRoot
     : path.resolve(__dirname, '..', '..');
+const ANDROID_ROOT = path.join(APP_ROOT, 'android');
+const HAS_ANDROID_PROJECT = fs.existsSync(path.join(ANDROID_ROOT, 'app', 'src', 'main', 'AndroidManifest.xml'));
 const WEB_ROOT = process.env.WEB_ROOT
   ? path.resolve(APP_ROOT, process.env.WEB_ROOT)
   : fs.existsSync(path.join(repoRoot, 'index.html'))
     ? repoRoot
     : path.join(APP_ROOT, 'web');
 const CHROME = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
+let URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
 const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-width'
   ? [390, 1220]
   : TEST_GROUP === 'fold-layout'
@@ -138,9 +141,11 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [390, 1220]
   : TEST_GROUP === 'legend-navigation'
     ? [390, 1220]
+  : TEST_GROUP === 'release-audit'
+    ? [360, 390, 412, 768, 1220]
   : TEST_GROUP === 'repository-root'
     ? [390]
-  : TEST_GROUP ? [390] : [360, 390, 412, 768];
+  : TEST_GROUP ? [390] : [360, 390, 412, 768, 1220];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const activateDestination = (page, tab) => page.evaluate(
   destination => window.activateLegendDestination(destination),
@@ -155,7 +160,71 @@ const runsResultWidthBrand = () => TEST_GROUP === 'result-width-brand';
 const runsShellWidth = () => TEST_GROUP === 'shell-width';
 const runsFoldLayout = () => TEST_GROUP === 'fold-layout';
 const runsResultHeaderCompact = () => !TEST_GROUP || TEST_GROUP === 'result-header-compact';
-const runsAndroidSafeArea = () => !TEST_GROUP || TEST_GROUP === 'android-safe-area';
+const runsAndroidSafeArea = () => HAS_ANDROID_PROJECT && (!TEST_GROUP || TEST_GROUP === 'android-safe-area');
+
+function startStaticServer(root) {
+  const mimeTypes = {
+    '.css': 'text/css; charset=utf-8',
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.png': 'image/png',
+    '.webmanifest': 'application/manifest+json; charset=utf-8',
+    '.webp': 'image/webp'
+  };
+  const normalizedRoot = path.resolve(root);
+  const server = http.createServer((request, response) => {
+    const pathname = decodeURIComponent(new globalThis.URL(request.url, 'http://127.0.0.1').pathname);
+    const relativePath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+    const filePath = path.resolve(normalizedRoot, relativePath);
+    if (filePath !== normalizedRoot && !filePath.startsWith(`${normalizedRoot}${path.sep}`)) {
+      response.writeHead(403).end('Forbidden');
+      return;
+    }
+    fs.readFile(filePath, (error, content) => {
+      if (error) {
+        response.writeHead(error.code === 'ENOENT' ? 404 : 500).end('Not found');
+        return;
+      }
+      response.writeHead(200, {
+        'Content-Type': mimeTypes[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+        'Cache-Control': 'no-store'
+      });
+      response.end(content);
+    });
+  });
+
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      resolve({ server, url: `http://127.0.0.1:${address.port}/index.html` });
+    });
+  });
+}
+
+function inspectLegendEraMetadata() {
+  const { getLegendEra } = require('../scripts/legend-era.js');
+  const expected = [
+    [1, '상원', '감', '坎', '수', '심연'],
+    [2, '상원', '곤', '坤', '토', '대지'],
+    [3, '상원', '진', '震', '목', '천둥'],
+    [4, '중원', '손', '巽', '목', '바람'],
+    [5, '중원', '중궁', '中', '토', '중심'],
+    [6, '중원', '건', '乾', '금', '하늘'],
+    [7, '하원', '태', '兌', '금', '호수'],
+    [8, '하원', '간', '艮', '토', '산']
+  ];
+
+  assert.deepEqual(
+    expected.map(([yun], index) => {
+      const era = getLegendEra(1864 + index * 20);
+      return [era.yun, era.yuan, era.trigram, era.hanja, era.element, era.symbol];
+    }),
+    expected,
+    'periods 1 through 8 must preserve their public metadata'
+  );
+}
 
 async function inspectCalendarShellWidth(page, width) {
   await activateDestination(page, 'calendar');
@@ -601,12 +670,8 @@ function inspectResultHeaderCompactContract() {
 function inspectFinalSecuritySourceContracts() {
   const indexHtml = fs.readFileSync(path.join(UI_ROOT, 'index.html'), 'utf8');
   const appleCss = fs.readFileSync(path.join(UI_ROOT, 'apple.css'), 'utf8');
-  const stringsXml = fs.readFileSync(
-    path.join(APP_ROOT, 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml'),
-    'utf8'
-  );
   const renderSavedSource = indexHtml.match(
-    /async function renderSaved\(\)\s*\{[\s\S]*?\n\}\n\nasync function updateSavedRecord/
+    /async function renderSaved\(\)\s*\{[\s\S]*?\r?\n\}\r?\n\r?\nasync function updateSavedRecord/
   );
 
   assert.ok(renderSavedSource, 'renderSaved source contract missing');
@@ -648,8 +713,14 @@ function inspectFinalSecuritySourceContracts() {
   assert.match(indexHtml, /function fetchAllowedJson\(/);
   assert.match(indexHtml, /취명선_전설의_만세력_백업_/);
   assert.doesNotMatch(indexHtml, /신의음성만세력_백업_/);
-  assert.match(stringsXml, /<string name="app_name">취명선 만세력<\/string>/);
-  assert.match(stringsXml, /<string name="title_activity_main">취명선 만세력<\/string>/);
+  if (HAS_ANDROID_PROJECT) {
+    const stringsXml = fs.readFileSync(
+      path.join(ANDROID_ROOT, 'app', 'src', 'main', 'res', 'values', 'strings.xml'),
+      'utf8'
+    );
+    assert.match(stringsXml, /<string name="app_name">취명선 전설의 만세력<\/string>/);
+    assert.match(stringsXml, /<string name="title_activity_main">취명선 전설의 만세력<\/string>/);
+  }
   assert.match(
     appleCss,
     /\.result-right \.luck-title::before[\s\S]*\.sub-luck-label::before[\s\S]*content:\s*none\s*!important/,
@@ -685,7 +756,7 @@ async function inspectFinalSecurityRuntime(page, width) {
     await renderSaved();
     const input = document.getElementById('savedImportFile');
     const file = new File(
-      [JSON.stringify({ app: '취명선 만세력', version: 1, records: [sample, invalid] })],
+      [JSON.stringify({ app: '취명선 전설의 만세력', version: 1, records: [sample, invalid] })],
       'malicious-backup.json',
       { type: 'application/json' }
     );
@@ -919,7 +990,7 @@ async function inspectImportedFieldDownstreamSafety(page, width) {
     await renderSaved();
     const input = document.getElementById('savedImportFile');
     const file = new File(
-      [JSON.stringify({ app: '취명선 만세력', version: 1, records: [record] })],
+      [JSON.stringify({ app: '취명선 전설의 만세력', version: 1, records: [record] })],
       'downstream-xss.json',
       { type: 'application/json' }
     );
@@ -1099,6 +1170,28 @@ async function fillAndCalculate(page) {
     document.getElementById('calcBtn').click();
   });
   await sleep(600);
+}
+
+async function inspectExactReleaseAssertions(page, width) {
+  await activateDestination(page, 'legend');
+  await sleep(80);
+  const release = await page.evaluate(() => ({
+    title: document.title,
+    timeLayers: document.querySelectorAll('[data-time-layer]').length,
+    hourBranches: document.querySelectorAll('[data-hour-branch]').length,
+    selectedTabs: document.querySelectorAll('.tab[aria-selected="true"]').length,
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth
+  }));
+
+  assert.equal(release.title, '취명선 전설의 만세력');
+  assert.equal(release.timeLayers, 8, `${width}px release time-layer count`);
+  assert.equal(release.hourBranches, 12, `${width}px release hour-branch count`);
+  assert.equal(release.selectedTabs, 1, `${width}px release selected-tab count`);
+  assert.ok(
+    release.documentWidth <= release.viewportWidth + 1,
+    `${width}px release document overflows by ${release.documentWidth - release.viewportWidth}px`
+  );
 }
 
 async function inspectLegendFlow(page, width) {
@@ -2620,9 +2713,30 @@ async function inspectAppleMotion(page, width) {
   }
 }
 
+function collectPageIssues(page) {
+  const issues = [];
+  page.on('pageerror', error => {
+    issues.push(`pageerror: ${error.message}`);
+  });
+  page.on('console', message => {
+    if (message.type() === 'error') issues.push(`console: ${message.text()}`);
+  });
+  page.on('requestfailed', request => {
+    issues.push(`request: ${request.url()} (${request.failure()?.errorText || 'failed'})`);
+  });
+  return issues;
+}
+
+async function closeCleanPage(page, width, issues) {
+  await sleep(50);
+  assert.deepEqual(issues, [], `${width}px emitted browser errors`);
+  await page.close();
+}
+
 async function inspectWidth(browser, width) {
   console.log(`[ui] ${width}px: opening page`);
   const page = await browser.newPage();
+  const pageIssues = collectPageIssues(page);
   await page.setViewport({
     width,
     height: 900,
@@ -2637,37 +2751,37 @@ async function inspectWidth(browser, width) {
 
   if (TEST_GROUP === 'legend-flow') {
     await inspectLegendFlow(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   if (TEST_GROUP === 'legend-accessibility') {
     await inspectLegendAccessibility(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   if (TEST_GROUP === 'legend-navigation') {
     await inspectLegendNavigation(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   if (TEST_GROUP === 'frontend-quality') {
     await inspectFrontendQuality(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   if (TEST_GROUP === 'calendar-shell-width') {
     await inspectCalendarShellWidth(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   await inspectCalendarCurrentYear(page, width);
   if (TEST_GROUP === 'calendar-current-year') {
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
   if (!TEST_GROUP && width === 390) {
@@ -3275,34 +3389,35 @@ async function inspectWidth(browser, width) {
 
   if (runsShellWidth()) {
     await inspectShellWidth(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   if (runsFoldLayout()) {
     await inspectFoldLayout(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   await fillAndCalculate(page);
+  if (runsGroup('release-audit')) await inspectExactReleaseAssertions(page, width);
 
   if (TEST_GROUP === 'all-tab-shell-width') {
     await inspectAllTabShellWidths(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   if (runsResultWidthBrand()) {
     await inspectResultWidthAndBrand(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
   if (runsImportedFieldXss()) {
     await inspectImportedFieldDownstreamSafety(page, width);
     if (TEST_GROUP === 'imported-fields-xss') {
-      await page.close();
+      await closeCleanPage(page, width, pageIssues);
       return;
     }
   }
@@ -3310,7 +3425,7 @@ async function inspectWidth(browser, width) {
   if (runsGroup('final-security')) {
     await inspectFinalSecurityRuntime(page, width);
     if (TEST_GROUP === 'final-security') {
-      await page.close();
+      await closeCleanPage(page, width, pageIssues);
       return;
     }
   }
@@ -3340,7 +3455,7 @@ async function inspectWidth(browser, width) {
     await inspectAppleDesign(page, width);
     await inspectAppleSecondaryScreens(page, width);
     await inspectAppleMotion(page, width);
-    await page.close();
+    await closeCleanPage(page, width, pageIssues);
     return;
   }
 
@@ -3436,18 +3551,23 @@ async function inspectWidth(browser, width) {
     '명반 만들러 가기'
   );
 
-  await page.close();
+  await closeCleanPage(page, width, pageIssues);
 }
 
 (async () => {
   if (runsGroup('repository-root')) inspectRepositoryRootInference();
   if (runsGroup('legend-source')) inspectLegendSourceContracts();
-  if (runsGroup('android-backup')) inspectAndroidBackupPolicy();
+  if (runsGroup('legend-era-metadata')) inspectLegendEraMetadata();
+  if (HAS_ANDROID_PROJECT && runsGroup('android-backup')) inspectAndroidBackupPolicy();
   if (runsAndroidSafeArea()) inspectAndroidSafeAreaContract();
   if (runsResultHeaderCompact()) inspectResultHeaderCompactContract();
-  if (runsGroup('release-contract')) inspectReleaseContract();
+  if (HAS_ANDROID_PROJECT && runsGroup('release-contract')) inspectReleaseContract();
   if (process.env.SKIP_SOURCE_CONTRACTS !== '1' && runsGroup('final-security')) inspectFinalSecuritySourceContracts();
-  if (TEST_GROUP === 'repository-root' || TEST_GROUP === 'legend-source' || TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'result-header-compact' || TEST_GROUP === 'release-contract') {
+  if (!HAS_ANDROID_PROJECT && ['android-backup', 'android-safe-area', 'release-contract'].includes(TEST_GROUP)) {
+    console.log(`${TEST_GROUP} regression SKIP: standalone web repository has no Android project`);
+    return;
+  }
+  if (TEST_GROUP === 'repository-root' || TEST_GROUP === 'legend-source' || TEST_GROUP === 'legend-era-metadata' || TEST_GROUP === 'android-backup' || TEST_GROUP === 'android-safe-area' || TEST_GROUP === 'result-header-compact' || TEST_GROUP === 'release-contract') {
     console.log(`${TEST_GROUP} regression PASS`);
     return;
   }
@@ -3483,18 +3603,22 @@ async function inspectWidth(browser, width) {
     console.log('Service-worker regression PASS');
     return;
   }
+  const staticSite = await startStaticServer(UI_ROOT);
+  URL = staticSite.url;
   console.log('[ui] launching Chrome');
-  const browser = await puppeteer.launch({
-    executablePath: CHROME,
-    headless: 'new',
-    args: ['--hide-scrollbars']
-  });
-  console.log('[ui] Chrome launched');
+  let browser;
   try {
+    browser = await puppeteer.launch({
+      executablePath: CHROME,
+      headless: 'new',
+      args: ['--hide-scrollbars']
+    });
+    console.log('[ui] Chrome launched');
     for (const width of widths) await inspectWidth(browser, width);
     console.log('UI regression PASS:', widths.join(', '));
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
+    await new Promise(resolve => staticSite.server.close(resolve));
   }
 })().catch(error => {
   console.error(error);

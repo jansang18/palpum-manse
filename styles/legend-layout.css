@@ -646,11 +646,16 @@ body.dark .day-item.selected[data-legend-day] {
   cursor: pointer;
 }
 
-[data-legend-secondary-nav]:hover,
 [data-legend-secondary-nav]:focus-visible,
-[data-legend-more-nav]:hover,
 [data-legend-more-nav]:focus-visible {
   background: color-mix(in srgb, var(--seal) 9%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-legend-secondary-nav]:hover,
+  [data-legend-more-nav]:hover {
+    background: color-mix(in srgb, var(--seal) 9%, transparent);
+  }
 }
 
 [data-legend-secondary-nav]:focus-visible,

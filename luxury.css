@@ -578,7 +578,9 @@ body.dark .saved-toolbar .bb {
 .saved-card { padding: 15px !important; }
 .saved-empty { padding-block: 40px; }
 .empty-cta { transition: background-color .16s ease, transform .08s ease; }
-.empty-cta:hover { background: rgba(216, 181, 106, .13); }
+@media (hover: hover) and (pointer: fine) {
+  .empty-cta:hover { background: rgba(10, 132, 255, .12); }
+}
 
 /* 저장 완료 피드백 */
 .app-toast {

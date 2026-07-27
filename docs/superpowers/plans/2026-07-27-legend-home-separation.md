@@ -29,11 +29,11 @@
 - Consumes: existing DOM destinations and `window.LegendEra.getLegendEra(year)`
 - Produces: regression coverage for the default `legend` destination and both landing actions
 
-- [ ] **Step 1: Add source-level failing assertions**
+- [x] **Step 1: Add source-level failing assertions**
 
 Assert that the initial active tab is `data-tab="legend"`, `#view-legend` is initially visible, `#view-input` is initially hidden, and the service-worker cache uses the next release identity.
 
-- [ ] **Step 2: Add a browser failing scenario**
+- [x] **Step 2: Add a browser failing scenario**
 
 At 390px, load the app and assert:
 
@@ -49,7 +49,7 @@ At 390px, load the app and assert:
 
 Click `#legendStartButton` and require the input destination plus focus on `#inBirth`. Reload, click `#legendPersonButton`, and require the person-search modal plus focus on `#psQuery`.
 
-- [ ] **Step 3: Run focused tests and confirm failure**
+- [x] **Step 3: Run focused tests and confirm failure**
 
 Run:
 
@@ -71,7 +71,7 @@ Expected: failure because the input destination still owns the initial state and
 - Consumes: `LegendEra.getLegendEra(year)` and `activateLegendDestination(tabName, options)`
 - Produces: `#legendLanding`, `#legendStartButton`, and `#legendPersonButton`
 
-- [ ] **Step 1: Replace the empty renderer**
+- [x] **Step 1: Replace the empty renderer**
 
 Have `emptyView(mount)` read the current year and render:
 
@@ -79,30 +79,30 @@ Have `emptyView(mount)` read the current year and render:
 const era = root.LegendEra.getLegendEra(new Date().getFullYear());
 ```
 
-The text output must include `era.yuan`, `era.period`, `era.periodStart`, `era.periodEnd`, `era.element`, and `era.progress`.
+The text output must include `era.yuan`, `era.yun`, `era.yunStart`, `era.yunEnd`, `era.element`, and `era.progress`.
 
-- [ ] **Step 2: Wire the two actions**
+- [x] **Step 2: Wire the two actions**
 
 `#legendStartButton` activates `input` and focuses `#inBirth`. `#legendPersonButton` activates `input`, invokes `#personSearchBtn.click()`, and focuses `#psQuery` after the modal opens.
 
-- [ ] **Step 3: Add the distinct visual composition**
+- [x] **Step 3: Add the distinct visual composition**
 
 Create a paper-and-ink landing with:
 
 - asymmetric landscape hero
 - decorative nine-node orbit with the current period marked
 - current period fact block
-- seven temporal scales
+- eight temporal scales
 - two high-contrast actions
 - source disclosure
 
 Ensure 360px collapses to one column with no horizontal overflow.
 
-- [ ] **Step 4: Add purposeful and reduced motion**
+- [x] **Step 4: Add purposeful and reduced motion**
 
 Use a short mist entrance and slow orbit drift only for visual hierarchy. Remove both in `prefers-reduced-motion`.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run:
 
@@ -124,15 +124,15 @@ Expected: PASS.
 - Consumes: existing `syncDestination(currentDestination())`
 - Produces: first-load `legend` destination and a cache identity that cannot serve the previous shell
 
-- [ ] **Step 1: Change initial ARIA and hidden states**
+- [x] **Step 1: Change initial ARIA and hidden states**
 
 Set only `#tab-legend` to `class="tab active"`, `aria-selected="true"`, and `tabindex="0"`. Set `#view-legend` visible and active; set `#view-input` hidden.
 
-- [ ] **Step 2: Clarify navigation copy**
+- [x] **Step 2: Clarify navigation copy**
 
 Change the input destination label from `입력` to `내 사주` in both desktop and mobile navigation while preserving `data-tab="input"`.
 
-- [ ] **Step 3: Bump the service-worker cache**
+- [x] **Step 3: Bump the service-worker cache**
 
 Change the cache identity from:
 
@@ -146,7 +146,7 @@ to:
 legend-manse-v4-20260727-home
 ```
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run:
 
@@ -166,7 +166,7 @@ Expected: PASS.
 - Consumes: the finished release commit
 - Produces: verified `legend/main` and GitHub Pages deployment
 
-- [ ] **Step 1: Run the complete local gate**
+- [x] **Step 1: Run the complete local gate**
 
 ```powershell
 npm test
@@ -177,7 +177,7 @@ git fsck --connectivity-only
 
 Expected: all tests pass, zero vulnerabilities, and no repository errors.
 
-- [ ] **Step 2: Compare fresh mobile screenshots**
+- [x] **Step 2: Compare fresh mobile screenshots**
 
 Capture the first viewport at 390x844 for both deployment sources. Confirm the new app starts with the paper-and-ink era home while the original starts with the black input form.
 

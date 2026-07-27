@@ -2014,16 +2014,16 @@
   </header>
 
   <nav class="tabs" role="tablist" aria-label="주요 화면">
-    <button type="button" class="tab active" id="tab-input" role="tab" aria-selected="true" aria-controls="view-input" data-tab="input">입력</button>
+    <button type="button" class="tab" id="tab-input" role="tab" aria-selected="false" aria-controls="view-input" data-tab="input">내 사주</button>
     <button type="button" class="tab" id="tab-result" role="tab" aria-selected="false" aria-controls="view-result" data-tab="result">원국</button>
-    <button type="button" class="tab" id="tab-legend" role="tab" aria-selected="false" aria-controls="view-legend" data-tab="legend">전설</button>
+    <button type="button" class="tab active" id="tab-legend" role="tab" aria-selected="true" aria-controls="view-legend" data-tab="legend">전설</button>
     <button type="button" class="tab" id="tab-fortune" role="tab" aria-selected="false" aria-controls="view-fortune" data-tab="fortune">풀이</button>
     <button type="button" class="tab" id="tab-match" role="tab" aria-selected="false" aria-controls="view-match" data-tab="match">궁합</button>
     <button type="button" class="tab" id="tab-calendar" role="tab" aria-selected="false" aria-controls="view-calendar" data-tab="calendar">만세력</button>
     <button type="button" class="tab" id="tab-saved" role="tab" aria-selected="false" aria-controls="view-saved" data-tab="saved">저장</button>
   </nav>
 
-  <section class="view active" id="view-input" role="tabpanel" aria-labelledby="tab-input">
+  <section class="view" id="view-input" role="tabpanel" aria-labelledby="tab-input" hidden>
     <div class="input-intro">
       <img class="intro-logo-img" src="main-logo.png" alt="취명선 전설의 만세력">
       <div class="sub">자평명리학 · 1000년 만세력 · 운세풀이 · 궁합</div>
@@ -2103,7 +2103,7 @@
 
   <section class="view" id="view-result" role="tabpanel" aria-labelledby="tab-result" hidden></section>
 
-  <section class="view" id="view-legend" role="tabpanel" aria-labelledby="tab-legend" hidden>
+  <section class="view active" id="view-legend" role="tabpanel" aria-labelledby="tab-legend">
     <div id="legendContent" aria-live="polite"></div>
   </section>
 
@@ -2133,7 +2133,7 @@
 <nav class="legend-mobile-nav" id="legendMobileNav" aria-label="모바일 주요 화면">
   <button type="button" data-legend-primary-nav data-tab="input" aria-controls="view-input">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5v8.25A1.25 1.25 0 0 1 18.75 20H5.25A1.25 1.25 0 0 1 4 18.75Z"/><path d="M9 20v-6h6v6"/></svg>
-    <span>입력</span>
+    <span>내 사주</span>
   </button>
   <button type="button" data-legend-primary-nav data-tab="result" aria-controls="view-result">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9.5 4v16M14.5 4v16M5 9.3h14M5 14.7h14"/></svg>

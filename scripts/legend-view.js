@@ -256,10 +256,131 @@
   }
 
   function emptyView(mount) {
-    const empty = element('section', 'legend-empty');
-    appendText(empty, 'h2', '', '먼저 사주를 펼쳐주세요');
-    appendText(empty, 'p', '', '원국을 세우면 180년 시대부터 오늘의 2시간 시운까지 한 흐름으로 이어집니다.');
-    mount.replaceChildren(empty);
+    if (!root.LegendEra) {
+      const error = element('section', 'legend-empty');
+      appendText(error, 'h2', '', '시대의 흐름을 불러오지 못했습니다');
+      appendText(error, 'p', '', '페이지를 새로고침한 뒤 다시 시도해주세요.');
+      mount.replaceChildren(error);
+      return;
+    }
+
+    const era = root.LegendEra.getLegendEra(new Date().getFullYear());
+    const landing = element('section', 'legend-landing');
+    landing.id = 'legendLanding';
+    landing.setAttribute('aria-labelledby', 'legendLandingTitle');
+
+    const hero = element('div', 'legend-landing-hero');
+    const copy = element('div', 'legend-landing-copy');
+    appendText(copy, 'div', 'legend-landing-kicker', '三元九運 · 180 YEARS');
+    const title = appendText(copy, 'h2', '', '시대의 빛과 나의 시간을 겹쳐 읽다');
+    title.id = 'legendLandingTitle';
+    appendText(
+      copy,
+      'p',
+      'legend-landing-lead',
+      '180년 대순환에서 오늘의 2시간 시운까지, 여덟 겹 시간을 한 사람의 명리 위에 펼칩니다.'
+    );
+
+    const eraPanel = element('div', 'legend-era-panel');
+    appendText(eraPanel, 'span', 'legend-era-label', '지금의 시대');
+    const eraPeriod = appendText(
+      eraPanel,
+      'strong',
+      'legend-era-period',
+      `${era.yuan} ${era.yun}운 · ${era.hanja}${era.trigram}`
+    );
+    eraPeriod.id = 'legendEraPeriod';
+    appendText(
+      eraPanel,
+      'span',
+      'legend-era-years',
+      `${era.yunStart}–${era.yunEnd} · ${era.element}의 기운 · ${era.symbol}`
+    );
+    const progress = element('div', 'legend-era-progress');
+    progress.setAttribute('role', 'progressbar');
+    progress.setAttribute('aria-label', `${era.yun}운 진행률`);
+    progress.setAttribute('aria-valuemin', '0');
+    progress.setAttribute('aria-valuemax', '100');
+    progress.setAttribute('aria-valuenow', String(Math.round(era.progress * 100)));
+    const progressFill = element('span', 'legend-era-progress-fill');
+    progressFill.style.width = `${Math.round(era.progress * 100)}%`;
+    progress.appendChild(progressFill);
+    eraPanel.appendChild(progress);
+    copy.appendChild(eraPanel);
+
+    const actions = element('div', 'legend-landing-actions');
+    const start = appendText(actions, 'button', 'legend-start-button', '내 전설 열기');
+    start.id = 'legendStartButton';
+    start.type = 'button';
+    const person = appendText(actions, 'button', 'legend-person-button', '유명인으로 먼저 보기');
+    person.id = 'legendPersonButton';
+    person.type = 'button';
+    copy.appendChild(actions);
+
+    const orbit = element('div', 'legend-orbit');
+    orbit.setAttribute('aria-hidden', 'true');
+    const orbitRing = element('div', 'legend-orbit-ring');
+    for (let index = 1; index <= 9; index += 1) {
+      const angle = -Math.PI / 2 + ((index - 1) * Math.PI * 2) / 9;
+      const node = appendText(orbitRing, 'span', 'legend-orbit-node', index);
+      node.style.left = `${50 + Math.cos(angle) * 44}%`;
+      node.style.top = `${50 + Math.sin(angle) * 44}%`;
+      if (index === era.yun) node.classList.add('is-current');
+    }
+    const orbitCenter = element('div', 'legend-orbit-center');
+    appendText(orbitCenter, 'span', '', `${era.hanja}`);
+    appendText(orbitCenter, 'strong', '', `${era.yun}運`);
+    orbitRing.appendChild(orbitCenter);
+    orbit.appendChild(orbitRing);
+
+    hero.append(copy, orbit);
+    landing.appendChild(hero);
+
+    const scales = element('section', 'legend-scales');
+    scales.setAttribute('aria-labelledby', 'legendScalesTitle');
+    const scalesTitle = appendText(scales, 'h3', '', '여덟 겹 시간');
+    scalesTitle.id = 'legendScalesTitle';
+    const scaleList = element('div', 'legend-scale-list');
+    [
+      ['180년', '대순환'],
+      ['20년', '원운'],
+      ['본명반', '타고난 결'],
+      ['10년', '대운'],
+      ['1년', '세운'],
+      ['1개월', '월운'],
+      ['1일', '일운'],
+      ['2시간', '시운']
+    ].forEach(([value, label]) => {
+      const item = element('div', 'legend-scale-item');
+      appendText(item, 'strong', '', value);
+      appendText(item, 'span', '', label);
+      scaleList.appendChild(item);
+    });
+    scales.appendChild(scaleList);
+    landing.appendChild(scales);
+
+    appendText(
+      landing,
+      'p',
+      'legend-landing-source',
+      '삼원구운 공명도와 전설 서사는 취명선 창작 규칙이며, 명리 계산값과 구분해 표시합니다.'
+    );
+
+    start.addEventListener('click', () => {
+      if (typeof root.activateLegendDestination !== 'function') return;
+      root.activateLegendDestination('input');
+      requestAnimationFrame(() => document.getElementById('inBirth')?.focus());
+    });
+    person.addEventListener('click', () => {
+      if (typeof root.activateLegendDestination !== 'function') return;
+      root.activateLegendDestination('input');
+      requestAnimationFrame(() => {
+        document.getElementById('personSearchBtn')?.click();
+        requestAnimationFrame(() => document.getElementById('psQuery')?.focus());
+      });
+    });
+
+    mount.replaceChildren(landing);
   }
 
   function renderLegend(saju) {

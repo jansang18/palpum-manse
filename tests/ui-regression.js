@@ -185,6 +185,8 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [390, 1220]
   : TEST_GROUP === 'legend-navigation'
     ? [390, 1220]
+  : TEST_GROUP === 'legend-home'
+    ? [390]
   : TEST_GROUP === 'release-audit'
     ? [360, 390, 412, 768, 1220]
   : TEST_GROUP === 'lunar-input' || TEST_GROUP === 'legacy-import'
@@ -1974,6 +1976,85 @@ async function inspectLegendNavigation(page, width) {
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 }
 
+async function inspectLegendHome(page, width) {
+  const initial = await page.evaluate(() => {
+    const era = window.LegendEra.getLegendEra(new Date().getFullYear());
+    const landing = document.getElementById('legendLanding');
+    return {
+      selectedTab: document.querySelector('.tab.active')?.dataset.tab,
+      selectedMobile: document.querySelector('[data-legend-primary-nav][aria-current="page"]')?.dataset.tab,
+      activePanel: document.querySelector('.view.active')?.id,
+      hasLanding: Boolean(landing),
+      hasEra: document.getElementById('legendEraPeriod')?.textContent.includes(String(era.yun)) || false,
+      hasOpenButton: Boolean(document.getElementById('legendStartButton')),
+      hasPersonButton: Boolean(document.getElementById('legendPersonButton')),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      currentEra: {
+        yuan: era.yuan,
+        yun: era.yun,
+        yunStart: era.yunStart,
+        yunEnd: era.yunEnd,
+        element: era.element
+      },
+      visibleEra: landing?.textContent.replace(/\s+/g, ' ').trim() || ''
+    };
+  });
+
+  assert.deepEqual(
+    {
+      selectedTab: initial.selectedTab,
+      selectedMobile: initial.selectedMobile,
+      activePanel: initial.activePanel,
+      hasLanding: initial.hasLanding,
+      hasEra: initial.hasEra,
+      hasOpenButton: initial.hasOpenButton,
+      hasPersonButton: initial.hasPersonButton
+    },
+    {
+      selectedTab: 'legend',
+      selectedMobile: 'legend',
+      activePanel: 'view-legend',
+      hasLanding: true,
+      hasEra: true,
+      hasOpenButton: true,
+      hasPersonButton: true
+    }
+  );
+  assert.ok(initial.overflow <= 1, `${width}px legend home overflows by ${initial.overflow}px`);
+  assert.match(initial.visibleEra, new RegExp(initial.currentEra.yuan));
+  assert.match(initial.visibleEra, new RegExp(`${initial.currentEra.yunStart}.*${initial.currentEra.yunEnd}`));
+  assert.match(initial.visibleEra, new RegExp(initial.currentEra.element));
+
+  await page.click('#legendStartButton');
+  await sleep(80);
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      selectedTab: document.querySelector('.tab.active')?.dataset.tab,
+      activePanel: document.querySelector('.view.active')?.id,
+      focused: document.activeElement?.id
+    })),
+    { selectedTab: 'input', activePanel: 'view-input', focused: 'inBirth' }
+  );
+
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.click('#legendPersonButton');
+  await sleep(80);
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      selectedTab: document.querySelector('.tab.active')?.dataset.tab,
+      activePanel: document.querySelector('.view.active')?.id,
+      modalActive: document.getElementById('personSearchModal').classList.contains('active'),
+      focused: document.activeElement?.id
+    })),
+    {
+      selectedTab: 'input',
+      activePanel: 'view-input',
+      modalActive: true,
+      focused: 'psQuery'
+    }
+  );
+}
+
 async function collectAppleInspection(page, selectors) {
   return page.evaluate(({ styleSelectors, geometrySelectors }) => {
     const visualProperties = [
@@ -3041,6 +3122,16 @@ async function inspectWidth(browser, width) {
     await inspectLegendNavigation(page, width);
     await closeCleanPage(page, width, pageIssues);
     return;
+  }
+
+  if (TEST_GROUP === 'legend-home' || (!TEST_GROUP && width === 390)) {
+    await inspectLegendHome(page, width);
+    if (TEST_GROUP === 'legend-home') {
+      await closeCleanPage(page, width, pageIssues);
+      return;
+    }
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
   }
 
   if (TEST_GROUP === 'frontend-quality') {

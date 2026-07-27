@@ -11,6 +11,7 @@ const protectedBuild = fs.readFileSync('scripts/build-protected.ps1', 'utf8');
 const ganjiFixtures = fs.readFileSync('tests/ganji-fixtures.test.js', 'utf8');
 const uiRegression = fs.readFileSync('tests/ui-regression.js', 'utf8');
 const deploymentGuide = fs.readFileSync('웹배포_안내.md', 'utf8');
+const legendView = fs.readFileSync('scripts/legend-view.js', 'utf8');
 
 const runtimeAssets = [
   'polish.css',
@@ -52,6 +53,27 @@ test('uses legend-specific PWA identity and colors', () => {
   assert.equal(manifest.theme_color, '#F2ECDD');
   assert.match(serviceWorker, /legend-manse-/);
   assert.doesNotMatch(serviceWorker, /chwimyeongseon-manse-/);
+});
+
+test('opens on a distinct current-era legend home instead of the inherited input screen', () => {
+  assert.match(
+    html,
+    /class="tab active"[^>]*aria-selected="true"[^>]*data-tab="legend"/
+  );
+  assert.match(
+    html,
+    /<section class="view" id="view-input"[^>]*hidden/
+  );
+  assert.match(
+    html,
+    /<section class="view active" id="view-legend"[^>]*>/
+  );
+  assert.match(serviceWorker, /const VERSION = 'v4-20260727-home'/);
+  assert.match(serviceWorker, /const CACHE_PREFIX = 'legend-manse-'/);
+  assert.match(legendView, /id\s*=\s*['"]legendLanding['"]/);
+  assert.match(legendView, /id\s*=\s*['"]legendStartButton['"]/);
+  assert.match(legendView, /id\s*=\s*['"]legendPersonButton['"]/);
+  assert.match(legendView, /LegendEra\.getLegendEra\(new Date\(\)\.getFullYear\(\)\)/);
 });
 
 test('precaches every legend runtime asset for an offline first visit', () => {

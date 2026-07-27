@@ -54,6 +54,10 @@ function getBrowser() {
   return browserPromise;
 }
 
+async function openInputDestination(page) {
+  await page.evaluate(() => window.activateLegendDestination('input'));
+}
+
 test.after(async () => {
   if (browserPromise) await (await browserPromise).close();
 });
@@ -451,6 +455,7 @@ test('browser calculation renders the precise KASI result contract', async () =>
     await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
       waitUntil: 'networkidle0'
     });
+    await openInputDestination(page);
     await page.evaluate(() => {
       document.getElementById('inputName').value = '정밀fixture';
       document.querySelector('#segGender [data-val="M"]').click();
@@ -493,6 +498,7 @@ test('browser labels pre-1908 KASI calculations as UTC+9 approximations', async 
     await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
       waitUntil: 'networkidle0'
     });
+    await openInputDestination(page);
     await page.evaluate(() => {
       document.querySelector('#segCal [data-val="solar"]').click();
       document.getElementById('inBirth').value = '19000101';
@@ -523,6 +529,7 @@ test('browser famous-person search auto-fills a complete local profile and calcu
     await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
       waitUntil: 'networkidle0'
     });
+    await openInputDestination(page);
     await page.click('#personSearchBtn');
     await page.evaluate(() => {
       document.getElementById('psQuery').value = '반기문';
@@ -612,10 +619,12 @@ test('browser persists the advanced day-boundary choice and explains calculation
   try {
     const url = pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href;
     await page.goto(url, { waitUntil: 'networkidle0' });
+    await openInputDestination(page);
     await page.evaluate(() => {
       localStorage.removeItem('legend-saju:day-boundary');
     });
     await page.reload({ waitUntil: 'networkidle0' });
+    await openInputDestination(page);
 
     const initial = await page.evaluate(() => {
       document.getElementById('advancedCalculationSettings').open = true;
@@ -672,6 +681,7 @@ test('browser asks for time on a solar-term date but accepts an ordinary unknown
     await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
       waitUntil: 'networkidle0'
     });
+    await openInputDestination(page);
     await page.evaluate(() => {
       document.querySelector('#segDayBoundary [data-val="midnight"]').click();
       document.getElementById('inBirth').value = '20240204';
@@ -798,6 +808,7 @@ test('browser keeps saved UI indeterminate and labels all legend evidence source
     assert.match(storageState.toast, /저장소 상태를 확인할 수 없습니다/);
 
     await page.reload({ waitUntil: 'networkidle0' });
+    await openInputDestination(page);
     await page.evaluate(() => {
       document.getElementById('inputName').value = '근거검증';
       document.getElementById('inBirth').value = '19921024';
@@ -837,6 +848,7 @@ test('browser rejects pre-1800 lunar dates but preserves solar legacy mode', asy
     await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
       waitUntil: 'networkidle0'
     });
+    await openInputDestination(page);
 
     const direct = await page.evaluate(() => {
       let lunarError = null;

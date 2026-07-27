@@ -10,6 +10,7 @@
 }
 
 .legend-hero,
+.legend-landing,
 .legend-section,
 .legend-layer,
 .legend-story {
@@ -50,6 +51,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .legend-hero,
+  .legend-landing,
   .legend-section,
   .legend-layer,
   .legend-story,

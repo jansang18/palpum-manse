@@ -125,6 +125,11 @@ async function openInputDestination(page) {
   await page.evaluate(() => window.activateLegendDestination('input'));
 }
 
+async function openResultDestination(page) {
+  await page.evaluate(() => window.activateLegendDestination('result'));
+  await page.waitForSelector('#view-result.active');
+}
+
 test.after(async () => {
   if (browserPromise) await (await browserPromise).close();
 });
@@ -532,6 +537,7 @@ test('browser calculation renders the precise KASI result contract', async () =>
       document.getElementById('calcBtn').click();
     });
     await new Promise(resolve => setTimeout(resolve, 300));
+    await openResultDestination(page);
 
     const result = await page.evaluate(() => ({
       adapter: typeof globalThis.LegendGanji?.calculate,
@@ -573,6 +579,7 @@ test('browser labels pre-1908 KASI calculations as UTC+9 approximations', async 
       document.getElementById('calcBtn').click();
     });
     await new Promise(resolve => setTimeout(resolve, 250));
+    await openResultDestination(page);
 
     const result = await page.evaluate(() => ({
       mode: currentSaju?.calculationMode,
@@ -716,6 +723,7 @@ test('browser persists the advanced day-boundary choice and explains calculation
       document.getElementById('calcBtn').click();
     });
     await new Promise(resolve => setTimeout(resolve, 250));
+    await openResultDestination(page);
 
     const calculated = await page.evaluate(() => ({
       preference: localStorage.getItem('legend-saju:day-boundary'),
@@ -741,13 +749,12 @@ test('browser persists the advanced day-boundary choice and explains calculation
   }
 });
 
-test('browser asks for time on a solar-term date but accepts an ordinary unknown-time date', async () => {
+test('browser renders default-midnight solar-term uncertainty and keeps advanced boundaries fail-closed', async () => {
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
-      waitUntil: 'networkidle0'
-    });
+    const url = pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href;
+    await page.goto(url, { waitUntil: 'networkidle0' });
     await openInputDestination(page);
     await page.evaluate(() => {
       document.querySelector('#segDayBoundary [data-val="midnight"]').click();
@@ -755,30 +762,77 @@ test('browser asks for time on a solar-term date but accepts an ordinary unknown
       document.getElementById('inTime').value = '';
       document.getElementById('calcBtn').click();
     });
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await page.waitForFunction(() =>
+      document.querySelector('.tab.active')?.dataset.tab === 'fortune'
+    );
 
     const ambiguous = await page.evaluate(() => ({
       message: document.getElementById('inErr').textContent.trim(),
-      focused: document.activeElement?.id,
-      hasResult: Boolean(currentSaju)
-    }));
-    assert.match(ambiguous.message, /절입.*태어난 시간|태어난 시간.*절입/);
-    assert.equal(ambiguous.focused, 'inTime');
-    assert.equal(ambiguous.hasResult, false);
-
-    await page.evaluate(() => {
-      document.getElementById('inBirth').value = '20240205';
-      document.getElementById('calcBtn').click();
-    });
-    await new Promise(resolve => setTimeout(resolve, 200));
-    assert.deepEqual(await page.evaluate(() => ({
+      destination: document.querySelector('.view.active')?.id.replace('view-', ''),
       hasResult: Boolean(currentSaju),
       unknown: currentSaju?.unknown,
-      hour: [currentSaju?.hStem, currentSaju?.hBranch]
+      hour: [currentSaju?.hStem, currentSaju?.hBranch],
+      boundaryUncertain: currentPalpum?.boundaryUncertain,
+      candidates: currentPalpum?.candidates ? [...currentPalpum.candidates] : [],
+      boundaryLabel: document.querySelector('.palpum-boundary')?.textContent.trim(),
+      guidance: document.getElementById('fortuneContent')?.textContent.replace(/\s+/g, ' ').trim()
+    }));
+    assert.equal(ambiguous.message, '');
+    assert.equal(ambiguous.destination, 'fortune');
+    assert.equal(ambiguous.hasResult, true);
+    assert.equal(ambiguous.unknown, true);
+    assert.deepEqual(ambiguous.hour, [-1, -1]);
+    assert.equal(ambiguous.boundaryUncertain, true);
+    assert.deepEqual(ambiguous.candidates, ['자축품', '인묘품']);
+    assert.equal(ambiguous.boundaryLabel, '팔품 경계 가능성');
+    assert.match(ambiguous.guidance, /출생 시각|태어난 시간/);
+
+    for (const dayBoundary of ['jasi', 'splitJasi']) {
+      await page.reload({ waitUntil: 'networkidle0' });
+      await openInputDestination(page);
+      await page.evaluate(boundary => {
+        document.querySelector(`#segDayBoundary [data-val="${boundary}"]`).click();
+        document.getElementById('inBirth').value = '20240204';
+        document.getElementById('inTime').value = '';
+        document.getElementById('calcBtn').click();
+      }, dayBoundary);
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const rejected = await page.evaluate(() => ({
+        selected: document.querySelector('#segDayBoundary .active')?.dataset.val,
+        destination: document.querySelector('.view.active')?.id.replace('view-', ''),
+        message: document.getElementById('inErr').textContent.trim(),
+        focused: document.activeElement?.id,
+        hasResult: Boolean(currentSaju)
+      }));
+      assert.equal(rejected.selected, dayBoundary);
+      assert.equal(rejected.destination, 'input');
+      assert.match(rejected.message, /절입.*태어난 시간|태어난 시간.*절입/);
+      assert.equal(rejected.focused, 'inTime');
+      assert.equal(rejected.hasResult, false);
+    }
+
+    await page.reload({ waitUntil: 'networkidle0' });
+    await openInputDestination(page);
+    await page.evaluate(() => {
+      document.querySelector('#segDayBoundary [data-val="midnight"]').click();
+      document.getElementById('inBirth').value = '20240205';
+      document.getElementById('inTime').value = '';
+      document.getElementById('calcBtn').click();
+    });
+    await page.waitForFunction(() => Boolean(currentSaju));
+    assert.deepEqual(await page.evaluate(() => ({
+      destination: document.querySelector('.view.active')?.id.replace('view-', ''),
+      hasResult: Boolean(currentSaju),
+      unknown: currentSaju?.unknown,
+      hour: [currentSaju?.hStem, currentSaju?.hBranch],
+      boundaryUncertain: currentPalpum?.boundaryUncertain
     })), {
+      destination: 'fortune',
       hasResult: true,
       unknown: true,
-      hour: [-1, -1]
+      hour: [-1, -1],
+      boundaryUncertain: false
     });
   } finally {
     await page.close();

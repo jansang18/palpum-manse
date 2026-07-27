@@ -12572,6 +12572,8 @@ function calcSaju(opts) {
   let hBranch = -1, hStem = -1;
   let daeun = null;
   let calculationMode = 'legacy-approximate';
+  let timeStandard = 'legacy-approximate';
+  let trueSolarCorrection = false;
 
   if (year >= 1800) {
     if (!globalThis.LegendGanji || typeof globalThis.LegendGanji.calculate !== 'function') {
@@ -12593,6 +12595,8 @@ function calcSaju(opts) {
     hBranch = precise.hBranch;
     daeun = precise.daeun;
     calculationMode = precise.calculationMode;
+    timeStandard = precise.timeStandard;
+    trueSolarCorrection = precise.trueSolarCorrection;
   } else {
     if (calendar === 'lunar') {
       const sol = lunarToSolar(year, month, day, false);
@@ -12652,8 +12656,8 @@ function calcSaju(opts) {
     hStem, hBranch,
     sipsin, sipsinJi, ohaeng, interactions, shinsal, daeun, gongmang,
     unknown, gender, jd, calculationMode, dayBoundary,
-    timeStandard: year >= 1800 ? 'asia-seoul-civil' : 'legacy-approximate',
-    trueSolarCorrection: false
+    timeStandard,
+    trueSolarCorrection
   };
 }
 
@@ -13025,7 +13029,13 @@ function renderResult() {
       </div>
       <div class="result-source-legend" aria-label="계산 및 해석 출처">
         <span class="source-badge source-traditional">명리 계산 · KASI</span>
-        <span>${DAY_BOUNDARY_LABELS[s.dayBoundary] || DAY_BOUNDARY_LABELS.midnight} · Asia/Seoul civil time</span>
+        <span>${DAY_BOUNDARY_LABELS[s.dayBoundary] || DAY_BOUNDARY_LABELS.midnight} · ${
+          s.timeStandard === 'asia-seoul-civil'
+            ? 'Asia/Seoul 역사 민간시'
+            : s.timeStandard === 'kst-fallback'
+              ? '1908년 4월 이전 UTC+9 기준 근사'
+              : '역사 범위 근사'
+        }</span>
         <span class="source-badge source-creative">취명선 창작 규칙</span>
         <span>공명도와 전설 서사는 참고용 창작 해석입니다.</span>
       </div>

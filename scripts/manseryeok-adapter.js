@@ -102,8 +102,8 @@
     };
   }
 
-  function engineBirthInput(input, dates, hour, minute) {
-    return {
+  function engineBirthInput(input, dates, hour, minute, historicalCivilTime) {
+    const birthInput = {
       year: dates.solar.y,
       month: dates.solar.m,
       day: dates.solar.d,
@@ -111,29 +111,54 @@
       minute,
       isLunar: false,
       isLeapMonth: false,
-      trueSolarTime: KOREA_CIVIL_TIME,
       dayBoundary: input.dayBoundary || 'midnight',
       gender: input.gender === 'M' ? 'male' : 'female'
     };
+    if (historicalCivilTime) birthInput.trueSolarTime = KOREA_CIVIL_TIME;
+    return birthInput;
   }
 
-  function pillarHead(result) {
+  function calculateForWallTime(engine, input, dates, hour, minute) {
+    const historicalResult = engine.calculateFourPillars(
+      engineBirthInput(input, dates, hour, minute, true)
+    );
+    const wallClockResult = engine.calculateFourPillars(
+      engineBirthInput(input, dates, hour, minute, false)
+    );
+    return {
+      year: historicalResult.year,
+      month: historicalResult.month,
+      day: wallClockResult.day,
+      hour: wallClockResult.hour,
+      luckPillars: historicalResult.luckPillars
+    };
+  }
+
+  function decisivePillarHead(result) {
     return [
       result.year.heavenlyStem,
       result.year.earthlyBranch,
       result.month.heavenlyStem,
-      result.month.earthlyBranch
+      result.month.earthlyBranch,
+      result.day.heavenlyStem,
+      result.day.earthlyBranch
     ].join(':');
   }
 
   function assertKnownTimeIsNotRequired(engine, input, dates) {
     if (!input.unknown) return;
-    const start = engine.calculateFourPillars(engineBirthInput(input, dates, 0, 0));
-    const end = engine.calculateFourPillars(engineBirthInput(input, dates, 23, 59));
-    if (pillarHead(start) === pillarHead(end)) return;
+    const candidates = [
+      calculateForWallTime(engine, input, dates, 0, 0),
+      calculateForWallTime(engine, input, dates, 12, 0),
+      calculateForWallTime(engine, input, dates, 22, 59),
+      calculateForWallTime(engine, input, dates, 23, 30),
+      calculateForWallTime(engine, input, dates, 23, 59)
+    ];
+    const first = decisivePillarHead(candidates[0]);
+    if (candidates.every(result => decisivePillarHead(result) === first)) return;
 
     const error = new Error(
-      '이 날짜에는 절입 시각이 있어 태어난 시간을 알아야 연주·월주와 대운을 확정할 수 있습니다.'
+      '이 날짜는 절입 시각이나 자시 일 경계에 따라 연주·월주 또는 일주가 달라질 수 있어 태어난 시간을 알아야 명식을 확정할 수 있습니다.'
     );
     error.name = 'LegendSolarTermTimeRequiredError';
     error.code = 'LEGEND_SOLAR_TERM_TIME_REQUIRED';
@@ -154,12 +179,13 @@
       }
       const dates = convertedDates(engine, input);
       assertKnownTimeIsNotRequired(engine, input, dates);
-      const result = engine.calculateFourPillars(engineBirthInput(
+      const result = calculateForWallTime(
+        engine,
         input,
         dates,
         input.unknown ? 12 : input.hour,
         input.unknown ? 0 : input.minute
-      ));
+      );
       const y = indexPillar(result.year);
       const m = indexPillar(result.month);
       const d = indexPillar(result.day);
@@ -182,11 +208,22 @@
         hStem: h.stem,
         hBranch: h.branch,
         daeun: mapDaeun(result, result.month),
-        calculationMode: 'kasi-precise',
+        calculationMode: dates.solar.y < 1908 ||
+          (dates.solar.y === 1908 && (dates.solar.m < 4 ||
+            (dates.solar.m === 4 && dates.solar.d < 1)))
+          ? 'kasi-solar-kst-fallback'
+          : 'kasi-precise',
         dayBoundary: input.dayBoundary || 'midnight',
-        timeStandard: 'asia-seoul-civil',
+        timeStandard: dates.solar.y < 1908 ||
+          (dates.solar.y === 1908 && (dates.solar.m < 4 ||
+            (dates.solar.m === 4 && dates.solar.d < 1)))
+          ? 'kst-fallback'
+          : 'asia-seoul-civil',
         trueSolarCorrection: false,
-        engineResult: result
+        calculationBasis: Object.freeze({
+          yearMonth: 'historical-civil-solar-terms',
+          dayHour: 'civil-wall-clock'
+        })
       };
     }
 

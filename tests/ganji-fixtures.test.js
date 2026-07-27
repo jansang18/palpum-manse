@@ -229,7 +229,7 @@ test('honors recorded Asia/Seoul civil offsets without longitude or equation-of-
   const fixtures = [
     {
       input: [1908, 9, 8, 10, 30],
-      expected: [4, 8, 7, 9, 2, 2, 0, 6]
+      expected: [4, 8, 7, 9, 2, 2, 9, 5]
     },
     {
       input: [1912, 3, 6, 7, 21],
@@ -237,7 +237,7 @@ test('honors recorded Asia/Seoul civil offsets without longitude or equation-of-
     },
     {
       input: [1954, 4, 5, 16, 45],
-      expected: [0, 6, 4, 4, 7, 3, 3, 9]
+      expected: [0, 6, 4, 4, 7, 3, 2, 8]
     },
     {
       input: [1955, 6, 6, 20, 58],
@@ -249,7 +249,7 @@ test('honors recorded Asia/Seoul civil offsets without longitude or equation-of-
     },
     {
       input: [1988, 9, 7, 19, 30],
-      expected: [4, 4, 6, 8, 1, 1, 1, 9]
+      expected: [4, 4, 6, 8, 1, 1, 2, 10]
     }
   ];
 
@@ -280,8 +280,8 @@ test('honors historical Korean DST at recorded 1955 and 1988 solar-term boundari
     {
       before: [1955, 6, 6, 21, 12],
       at: [1955, 6, 6, 21, 13],
-      beforeExpected: [1, 7, 7, 5, 4, 10, 8, 10],
-      atExpected: [1, 7, 8, 6, 4, 10, 8, 10]
+      beforeExpected: [1, 7, 7, 5, 4, 10, 9, 11],
+      atExpected: [1, 7, 8, 6, 4, 10, 9, 11]
     },
     {
       before: [1988, 9, 7, 20, 11],
@@ -308,6 +308,64 @@ test('honors historical Korean DST at recorded 1955 and 1988 solar-term boundari
     assert.deepEqual(calculate(fixture.before), fixture.beforeExpected);
     assert.deepEqual(calculate(fixture.at), fixture.atExpected);
   }
+});
+
+test('historical civil offsets do not shift the wall-clock day or hour pillars', () => {
+  const fixtures = [
+    [1954, 4, 5, 0, 40],
+    [1955, 6, 6, 0, 15],
+    [1988, 6, 6, 0, 30]
+  ];
+
+  for (const [year, month, day, hour, minute] of fixtures) {
+    const input = {
+      year, month, day, hour, minute,
+      calendar: 'solar', gender: 'F', unknown: false,
+      dayBoundary: 'midnight'
+    };
+    const result = adapter.calculate(input);
+    const wallClock = manseryeok.calculateFourPillars({
+      year, month, day, hour, minute,
+      gender: 'female',
+      dayBoundary: 'midnight'
+    });
+    const wallDay = [
+      ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계']
+        .indexOf(wallClock.day.heavenlyStem),
+      ['자', '축', '인', '묘', '진', '사', '오', '미', '신', '유', '술', '해']
+        .indexOf(wallClock.day.earthlyBranch)
+    ];
+    const wallHour = [
+      ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계']
+        .indexOf(wallClock.hour.heavenlyStem),
+      ['자', '축', '인', '묘', '진', '사', '오', '미', '신', '유', '술', '해']
+        .indexOf(wallClock.hour.earthlyBranch)
+    ];
+
+    assert.deepEqual(
+      [result.dStem, result.dBranch],
+      wallDay,
+      `day pillar must preserve civil wall time for ${year}-${month}-${day} ${hour}:${minute}`
+    );
+    assert.deepEqual(
+      [result.hStem, result.hBranch],
+      wallHour,
+      `hour pillar must preserve civil wall time for ${year}-${month}-${day} ${hour}:${minute}`
+    );
+    assert.equal(result.trueSolarCorrection, false);
+  }
+});
+
+test('unknown birth time rejects a day-pillar ambiguity under the jasi boundary', () => {
+  assert.throws(() => adapter.calculate({
+    year: 2024, month: 3, day: 10, hour: 0, minute: 0,
+    calendar: 'solar', gender: 'F', unknown: true,
+    dayBoundary: 'jasi'
+  }), error => {
+    assert.equal(error.code, 'LEGEND_SOLAR_TERM_TIME_REQUIRED');
+    assert.match(error.message, /일주|태어난 시간/);
+    return true;
+  });
 });
 
 test('preserves the selected 23:30 day-boundary convention', () => {
@@ -354,7 +412,17 @@ test('uses the complete precise solar and lunar input ranges from the engine', (
   assert.equal(adapter.calculate({
     year: 1800, month: 1, day: 1, hour: 12, minute: 0,
     calendar: 'solar', gender: 'M', unknown: false
-  }).calculationMode, 'kasi-precise');
+  }).timeStandard, 'kst-fallback');
+  const civilResult = adapter.calculate({
+    year: 1908, month: 4, day: 1, hour: 12, minute: 0,
+    calendar: 'solar', gender: 'M', unknown: false
+  });
+  assert.equal(civilResult.calculationMode, 'kasi-precise');
+  assert.equal(civilResult.timeStandard, 'asia-seoul-civil');
+  assert.deepEqual(civilResult.calculationBasis, {
+    yearMonth: 'historical-civil-solar-terms',
+    dayHour: 'civil-wall-clock'
+  });
   assert.equal(adapter.calculate({
     year: 2300, month: 1, day: 1, hour: 12, minute: 0,
     calendar: 'solar', gender: 'M', unknown: false
@@ -411,6 +479,36 @@ test('browser calculation renders the precise KASI result contract', async () =>
       ohaeng: [2, 0, 1, 3, 2],
       gongmang: [10, 11]
     });
+  } finally {
+    await page.close();
+  }
+});
+
+test('browser labels pre-1908 KASI calculations as UTC+9 approximations', async () => {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
+      waitUntil: 'networkidle0'
+    });
+    await page.evaluate(() => {
+      document.querySelector('#segCal [data-val="solar"]').click();
+      document.getElementById('inBirth').value = '19000101';
+      document.getElementById('inTime').value = '1200';
+      document.getElementById('calcBtn').click();
+    });
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    const result = await page.evaluate(() => ({
+      mode: currentSaju?.calculationMode,
+      standard: currentSaju?.timeStandard,
+      provenance: document.querySelector('.result-source-legend')?.textContent
+        .replace(/\s+/g, ' ')
+        .trim()
+    }));
+    assert.equal(result.mode, 'kasi-solar-kst-fallback');
+    assert.equal(result.standard, 'kst-fallback');
+    assert.match(result.provenance, /1908년 4월 이전 UTC\+9 기준 근사/);
   } finally {
     await page.close();
   }
@@ -483,6 +581,7 @@ test('browser asks for time on a solar-term date but accepts an ordinary unknown
       waitUntil: 'networkidle0'
     });
     await page.evaluate(() => {
+      document.querySelector('#segDayBoundary [data-val="midnight"]').click();
       document.getElementById('inBirth').value = '20240204';
       document.getElementById('inTime').value = '';
       document.getElementById('calcBtn').click();

@@ -68,7 +68,7 @@ test('opens on a distinct current-era legend home instead of the inherited input
     html,
     /<section class="view active" id="view-legend"[^>]*>/
   );
-  assert.match(serviceWorker, /const VERSION = 'v9-20260727-calendar-ink'/);
+  assert.match(serviceWorker, /const VERSION = 'v10-20260727-opaque-mobile-nav'/);
   assert.match(serviceWorker, /const CACHE_PREFIX = 'legend-manse-'/);
   assert.match(legendView, /id\s*=\s*['"]legendLanding['"]/);
   assert.match(legendView, /id\s*=\s*['"]legendStartButton['"]/);

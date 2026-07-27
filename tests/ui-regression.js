@@ -175,6 +175,8 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [390, 744, 768, 1220]
   : TEST_GROUP === 'calendar-ink-controls'
     ? [390, 768]
+  : TEST_GROUP === 'mobile-nav-opaque'
+    ? [390, 744]
   : TEST_GROUP === 'fold-layout'
     ? [720, 884]
   : TEST_GROUP === 'calendar-shell-width'
@@ -612,6 +614,30 @@ async function inspectCalendarInkControls(page, width) {
   assert.ok(
     state.fontSizes[0] >= (width < 768 ? 14.3 : 16.3),
     `${width}px calendar Ganji was not enlarged by about 1pt: ${state.fontSizes[0]}px`
+  );
+}
+
+async function inspectMobileNavOpaque(page, width) {
+  await activateDestination(page, 'fortune');
+  await sleep(80);
+
+  const state = await page.$eval('#legendMobileNav', element => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      backdropFilter: style.backdropFilter || style.webkitBackdropFilter
+    };
+  });
+
+  assert.equal(
+    parseCssColor(state.background).a,
+    1,
+    `${width}px mobile navigation must be fully opaque`
+  );
+  assert.equal(
+    state.backdropFilter,
+    'none',
+    `${width}px opaque mobile navigation must not blur content behind it`
   );
 }
 
@@ -3394,6 +3420,12 @@ async function inspectWidth(browser, width) {
 
   if (TEST_GROUP === 'calendar-ink-controls') {
     await inspectCalendarInkControls(page, width);
+    await closeCleanPage(page, width, pageIssues);
+    return;
+  }
+
+  if (TEST_GROUP === 'mobile-nav-opaque') {
+    await inspectMobileNavOpaque(page, width);
     await closeCleanPage(page, width, pageIssues);
     return;
   }

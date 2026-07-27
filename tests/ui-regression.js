@@ -2025,6 +2025,15 @@ async function inspectLegendHome(page, width) {
   assert.match(initial.visibleEra, new RegExp(`${initial.currentEra.yunStart}.*${initial.currentEra.yunEnd}`));
   assert.match(initial.visibleEra, new RegExp(initial.currentEra.element));
 
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      handled: window.handleAppBack(),
+      selectedTab: document.querySelector('.tab.active')?.dataset.tab
+    })),
+    { handled: false, selectedTab: 'legend' },
+    'back at the first-load legend home must leave navigation to the browser'
+  );
+
   await page.click('#legendStartButton');
   await sleep(80);
   assert.deepEqual(

@@ -141,8 +141,8 @@
       if (candidate !== current) previous = candidate;
     }
     if (!previous) {
-      if (current === 'input') return false;
-      previous = 'input';
+      if (current === 'legend') return false;
+      previous = 'legend';
     }
     return window.activateLegendDestination(previous, {
       history: false,

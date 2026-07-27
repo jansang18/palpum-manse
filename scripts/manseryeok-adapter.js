@@ -165,6 +165,12 @@
     throw error;
   }
 
+  function usesRecordedKoreaCivilTime(dates) {
+    return dates.solar.y > 1908 ||
+      (dates.solar.y === 1908 &&
+        (dates.solar.m > 4 || (dates.solar.m === 4 && dates.solar.d >= 1)));
+  }
+
   function createAdapter(engine) {
     if (!engine || typeof engine.calculateFourPillars !== 'function' ||
         typeof engine.lunarToSolar !== 'function' ||
@@ -192,6 +198,7 @@
       const h = input.unknown
         ? { stem: -1, branch: -1 }
         : indexPillar(result.hour);
+      const recordedCivilTime = usesRecordedKoreaCivilTime(dates);
 
       return {
         year: dates.solar.y,
@@ -208,20 +215,14 @@
         hStem: h.stem,
         hBranch: h.branch,
         daeun: mapDaeun(result, result.month),
-        calculationMode: dates.solar.y < 1908 ||
-          (dates.solar.y === 1908 && (dates.solar.m < 4 ||
-            (dates.solar.m === 4 && dates.solar.d < 1)))
-          ? 'kasi-solar-kst-fallback'
-          : 'kasi-precise',
+        calculationMode: recordedCivilTime ? 'kasi-precise' : 'kasi-solar-kst-fallback',
         dayBoundary: input.dayBoundary || 'midnight',
-        timeStandard: dates.solar.y < 1908 ||
-          (dates.solar.y === 1908 && (dates.solar.m < 4 ||
-            (dates.solar.m === 4 && dates.solar.d < 1)))
-          ? 'kst-fallback'
-          : 'asia-seoul-civil',
+        timeStandard: recordedCivilTime ? 'asia-seoul-civil' : 'kst-fallback',
         trueSolarCorrection: false,
         calculationBasis: Object.freeze({
-          yearMonth: 'historical-civil-solar-terms',
+          yearMonth: recordedCivilTime
+            ? 'historical-civil-solar-terms'
+            : 'kst-fallback-solar-terms',
           dayHour: 'civil-wall-clock'
         })
       };

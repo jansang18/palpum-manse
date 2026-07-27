@@ -409,10 +409,12 @@ test('hides the hour pillar when birth time is unknown', () => {
 });
 
 test('uses the complete precise solar and lunar input ranges from the engine', () => {
-  assert.equal(adapter.calculate({
+  const fallbackResult = adapter.calculate({
     year: 1800, month: 1, day: 1, hour: 12, minute: 0,
     calendar: 'solar', gender: 'M', unknown: false
-  }).timeStandard, 'kst-fallback');
+  });
+  assert.equal(fallbackResult.timeStandard, 'kst-fallback');
+  assert.equal(fallbackResult.calculationBasis.yearMonth, 'kst-fallback-solar-terms');
   const civilResult = adapter.calculate({
     year: 1908, month: 4, day: 1, hour: 12, minute: 0,
     calendar: 'solar', gender: 'M', unknown: false
@@ -509,6 +511,58 @@ test('browser labels pre-1908 KASI calculations as UTC+9 approximations', async 
     assert.equal(result.mode, 'kasi-solar-kst-fallback');
     assert.equal(result.standard, 'kst-fallback');
     assert.match(result.provenance, /1908년 4월 이전 UTC\+9 기준 근사/);
+  } finally {
+    await page.close();
+  }
+});
+
+test('browser famous-person search auto-fills a complete local profile and calculates it', async () => {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
+      waitUntil: 'networkidle0'
+    });
+    await page.click('#personSearchBtn');
+    await page.evaluate(() => {
+      document.getElementById('psQuery').value = '반기문';
+      psSearch('반기문');
+    });
+    await page.waitForSelector('.ps-item[data-kind="local"][data-ymd="19440613"]');
+    await page.click('.ps-item[data-kind="local"][data-ymd="19440613"]');
+    await page.waitForSelector('#pcbApply');
+
+    const confirmation = await page.evaluate(() => ({
+      source: document.querySelector('.ps-confirm-box')?.textContent.replace(/\s+/g, ' ').trim(),
+      namuHref: document.querySelector('.ps-confirm-box .ps-namuwiki')?.href
+    }));
+    assert.match(confirmation.source, /앱 내장 정보\(Wikidata\)/);
+    assert.match(confirmation.namuHref, /^https:\/\/namu\.wiki\/Search\?q=/);
+
+    await page.click('#pcbApply');
+    await page.waitForFunction(() => currentSaju?.name === '반기문');
+    const applied = await page.evaluate(() => ({
+      name: document.getElementById('inputName').value,
+      birth: document.getElementById('inBirth').value,
+      time: document.getElementById('inTime').value,
+      gender: document.querySelector('#segGender .active')?.dataset.val,
+      genderChecked: document.querySelector('#segGender .active')?.getAttribute('aria-checked'),
+      calendar: document.querySelector('#segCal .active')?.dataset.val,
+      calendarChecked: document.querySelector('#segCal .active')?.getAttribute('aria-checked'),
+      resultName: currentSaju?.name,
+      unknown: currentSaju?.unknown
+    }));
+    assert.deepEqual(applied, {
+      name: '반기문',
+      birth: '19440613',
+      time: '',
+      gender: 'M',
+      genderChecked: 'true',
+      calendar: 'solar',
+      calendarChecked: 'true',
+      resultName: '반기문',
+      unknown: true
+    });
   } finally {
     await page.close();
   }

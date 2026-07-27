@@ -14,9 +14,9 @@
 
 ### 1. 절입일의 출생 시각 미상
 
-- 음력 입력도 먼저 양력으로 변환한 뒤 동일한 계산 엔진 옵션으로 해당 민간일의 `00:00`과 `23:59` 연주·월주를 비교한다.
-- 두 결과가 다르면 정오 결과를 확정하지 않고 `LEGEND_SOLAR_TERM_TIME_REQUIRED`를 발생시킨다.
-- UI는 `이 날짜에는 절입 시각이 있어 태어난 시간을 알아야 연주·월주와 대운을 확정할 수 있습니다.`를 표시하고 시간 입력으로 포커스를 옮긴다.
+- 음력 입력도 먼저 양력으로 변환한 뒤 해당 민간일의 `00:00`, `12:00`, `22:59`, `23:30`, `23:59` 연주·월주·일주를 비교한다.
+- 절입 시각이나 선택한 자시 일 경계로 어느 결과라도 다르면 정오 결과를 확정하지 않고 `LEGEND_SOLAR_TERM_TIME_REQUIRED`를 발생시킨다.
+- UI는 절입 또는 자시 경계 때문에 명식을 확정할 수 없음을 표시하고 시간 입력으로 포커스를 옮긴다.
 - 절입이 없는 일반 날짜는 이전처럼 시주만 미상으로 두고 정상 계산한다.
 - 2024년 월 절입 12개 날짜 전부와 평일 대조군을 고정 회귀로 추가했다.
 
@@ -34,8 +34,10 @@
 
 - `longitude: 135`는 한국 표준 자오선과 같으므로 경도 차 보정이 0이다.
 - `applyEquationOfTime: false`로 균시차 보정을 적용하지 않는다.
-- `applyHistoricalDst: true`만으로 패키지의 IANA `Asia/Seoul` 표준시 변경·서머타임 표를 적용한다.
-- 따라서 출생지 경도나 진태양시 보정을 기본 활성화하지 않으면서 역사적 민간시를 반영한다.
+- `applyHistoricalDst: true`는 연주·월주·대운의 절입 순간에만 패키지의 `Asia/Seoul` 표준시 변경·서머타임 표를 적용한다.
+- 일주·시주는 별도의 벽시계 계산 결과를 사용해 입력한 민간 시각을 그대로 유지한다.
+- 출생지 경도나 균시차에 따른 진태양시 보정은 기본 활성화하지 않는다.
+- 패키지 역사 시각표가 시작되기 전인 1908-04-01 이전은 UTC+9 기준 근사로 구분한다.
 
 권위·구현 근거:
 
@@ -50,7 +52,7 @@
 - 서머타임 대표 시점: 1955, 1988
 - 1955-06-06 `21:12 -> 21:13` 월주 경계
 - 1988-09-07 `20:11 -> 20:12` 월주 경계
-- 결과 계약: `timeStandard: "asia-seoul-civil"`, `trueSolarCorrection: false`
+- 결과 계약: 1908-04-01 이후 `timeStandard: "asia-seoul-civil"`, 이전 `timeStandard: "kst-fallback"`, 항상 `trueSolarCorrection: false`
 
 ### 3. 궁합 새 인물의 음력 평달·윤달
 
@@ -86,14 +88,14 @@
 
 ```text
 npm test
-core: 65 passed, 0 failed, 0 skipped
+core: 71 passed, 0 failed, 0 skipped
 UI regression PASS: 360, 390, 412, 768, 1220
 duration: 105.4s
 ```
 
 추가 검증:
 
-- `node --test tests/ganji-fixtures.test.js tests/final-fix-contracts.test.js tests/pwa-isolation.test.js`: 48개 통과
+- `node --test tests/ganji-fixtures.test.js tests/final-fix-contracts.test.js tests/pwa-isolation.test.js`: 통과
 - `npm run build:vendor`: 통과, 생성 번들 diff 없음
 - `npm audit`: 취약점 0건
 - `npm audit --omit=dev`: 취약점 0건
@@ -130,4 +132,4 @@ screenshots/final-fix-1220-evidence.png
 
 ## 배포
 
-배포하지 않았다. 원격 저장소, GitHub Pages, 서비스 운영 상태를 변경하지 않았다.
+이 보고서 작성 시점에는 배포하지 않았다. 이후 배포는 최종 릴리스 검증과 별도 저장소 확인 후 수행한다.

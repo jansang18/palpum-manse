@@ -65,6 +65,16 @@
     ctx.closePath();
   }
 
+  function calculationProvenance(s) {
+    if (s && s.timeStandard === 'kst-fallback') {
+      return '1908년 4월 이전 UTC+9 기준 근사';
+    }
+    if (s && s.timeStandard === 'asia-seoul-civil') {
+      return 'Asia/Seoul 역사 민간시';
+    }
+    return '역사 범위 근사';
+  }
+
   function drawCard(s) {
     var W = 1080, H = 1350;
     var cv = document.createElement('canvas');
@@ -108,9 +118,10 @@
     }[s.dayBoundary] || '자정 기준';
     c.font = '500 22px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif';
     c.fillText('일 경계 · ' + boundaryLabel, W / 2, 416);
+    c.fillText('계산 시간 기준 · ' + calculationProvenance(s), W / 2, 450);
 
     c.fillStyle = THEME.inset;
-    rr(c, 54, 446, W - 108, 704, 30); c.fill();
+    rr(c, 54, 482, W - 108, 704, 30); c.fill();
 
     // 사주 4기둥
     var labels = ['시주', '일주', '월주', '년주'];
@@ -123,7 +134,7 @@
       sip(s.sipsin && s.sipsin.year)
     ];
     var pad = 80, areaW = W - pad * 2, colW = areaW / 4, blk = Math.min(colW - 22, 168);
-    var topY = 512;
+    var topY = 548;
     for (var k = 0; k < 4; k++) {
       var cx = pad + colW * k + colW / 2;
       // 십신
@@ -216,6 +227,7 @@
       currentYear + '년 시대 · ' + era.yuan + ' ' + era.yun + '운 · ' + era.trigram + '(' + era.hanja + ') · ' + era.element,
       '시대 공명 관계 · ' + relation,
       '일 경계 관법 · ' + boundary,
+      '계산 시간 기준 · ' + calculationProvenance(s),
       pillars,
       'jansang18.github.io/legend-manse'
     ].join('\n');

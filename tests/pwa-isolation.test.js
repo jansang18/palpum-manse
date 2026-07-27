@@ -545,3 +545,22 @@ test('shares era, resonance relation, and all four pillars without guarantees', 
   assert.match(share, /시주.*일주.*월주.*년주/s);
   assert.doesNotMatch(share, /완치|치료|수명|질병|대박|부자\s*보장|재물\s*보장|확실한\s*수익/);
 });
+
+test('discloses pre-1908 UTC+9 approximation in About and every share surface', () => {
+  assert.match(html, /· 1908년 4월 이전 : UTC\+9 기준 근사/);
+  assert.match(share, /function\s+calculationProvenance\(/);
+  assert.match(share, /1908년 4월 이전 UTC\+9 기준 근사/);
+  assert.ok(
+    (share.match(/calculationProvenance\(s\)/g) || []).length >= 2,
+    'share image and text must use the same calculation provenance'
+  );
+});
+
+test('uses Wikimedia for structured people data and NamuWiki for detail lookup', () => {
+  assert.match(html, /function\s+buildNamuWikiUrl\(/);
+  assert.match(html, /https:\/\/namu\.wiki\/Search\?q=/);
+  assert.match(html, /class="ps-namuwiki"/);
+  assert.match(html, /나무위키에서 보기|나무위키 🔍/);
+  assert.match(html, /위키백과·위키데이터[^<]*생년월일/);
+  assert.doesNotMatch(html, /function\s+buildNaverUrl\(|class="ps-naver"|네이버 🔍/);
+});

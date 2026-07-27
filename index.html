@@ -428,19 +428,20 @@
     padding: 1px 6px; border-radius: 999px;
   }
   body.dark .ps-item .ps-src { color: var(--fire); background: rgba(255,255,255,0.08); }
-  .ps-naver {
+  .ps-namuwiki {
     display: inline-flex; align-items: center; gap: 4px;
     margin-top: 7px;
+    min-height: 44px;
     font-size: 11px; font-weight: 700;
-    color: #06a34a;
-    background: rgba(3,199,90,0.08);
-    padding: 3px 9px; border-radius: 999px;
-    border: 1px solid rgba(3,199,90,0.35);
+    color: #087f5b;
+    background: rgba(8,127,91,0.08);
+    padding: 0 12px; border-radius: 999px;
+    border: 1px solid rgba(8,127,91,0.35);
     cursor: pointer; user-select: none;
     text-decoration: none;
   }
-  body.dark .ps-naver { color: #2fd97a; background: rgba(3,199,90,0.13); border-color: rgba(3,199,90,0.4); }
-  .ps-naver:active { opacity: 0.65; }
+  body.dark .ps-namuwiki { color: #63e6be; background: rgba(99,230,190,0.12); border-color: rgba(99,230,190,0.38); }
+  .ps-namuwiki:active { opacity: 0.65; }
   .ps-online-note {
     text-align: center; padding: 10px 12px;
     color: var(--text-sub); font-size: 11px; font-weight: 500; line-height: 1.6;
@@ -2197,7 +2198,7 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="personSearchModalTitle" tabindex="-1">
     <h3 id="personSearchModalTitle">인물 검색</h3>
     <div style="font-size:12px; font-weight:500; color:var(--text-sub); line-height:1.6; margin-bottom:10px;">
-      국내 유명인은 <b>앱에 내장된 정보로 즉시</b> 자동 입력되고, 그 밖의 인물은 위키백과에서 찾습니다. 각 결과의 <b>네이버 🔍</b>로 인물정보·상세를 열 수 있어요.
+      국내 유명인은 <b>앱 내장 DB에서 즉시</b>, 그 밖의 인물은 <b>위키백과·위키데이터에서 생년월일과 성별</b>을 찾아 자동 입력합니다. 각 결과의 <b>나무위키 🔍</b>로 상세를 함께 확인할 수 있어요.
     </div>
     <div style="position:relative;">
       <input class="input" id="psQuery" placeholder="예: 아이유, 방탄소년단 뷔, 세종대왕" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding-right:44px;" />
@@ -12287,7 +12288,8 @@ Sigrid Niehaus|19641229|F|
     </div>
     <div style="font-size:13px; color:var(--text-sub); line-height:1.8; margin-top:12px; font-weight:500;">
       · 지원 기간 : 1026 ~ 2099년<br>
-      · 시간 기준 : Asia/Seoul 역사 표준시·서머타임<br>
+      · 시간 기준 : 1908년 4월 1일 이후 Asia/Seoul 역사 민간시<br>
+      · 1908년 4월 이전 : UTC+9 기준 근사<br>
       · 일 경계 : 자정·자시·야자시 분리 중 선택<br>
       · 월주 기준 : 절기<br>
       · 대운 : 남양녀음 순행 / 남음녀양 역행<br>
@@ -15582,10 +15584,10 @@ function searchLocalPeople(query, limit) {
   return starts.concat(incl).slice(0, limit);
 }
 
-function buildNaverUrl(name) {
-  // 뒤 괄호 동음이의 표기는 제거(검색 정확도↑). 네이버 통합검색은 404가 없고 유명인은 인물정보 카드가 뜸
+function buildNamuWikiUrl(name) {
+  // 동음이의 표기를 제거하고 검색 화면으로 보내 문서가 없거나 제목이 달라도 안전하게 확인한다.
   const base = (name || '').replace(/\s*\(.*$/, '').trim() || name;
-  return 'https://search.naver.com/search.naver?query=' + encodeURIComponent(base);
+  return 'https://namu.wiki/Search?q=' + encodeURIComponent(base);
 }
 
 function psItemHtml(o) {
@@ -15599,9 +15601,9 @@ function psItemHtml(o) {
       ${o.thumb ? '' : escapeHtml(initial)}
     </div>
     <div class="ps-info">
-      <div class="ps-title">${escapeHtml(o.title)}${o.kind === 'local' ? '<span class="ps-src">즉시</span>' : ''}</div>
+      <div class="ps-title">${escapeHtml(o.title)}<span class="ps-src">${o.kind === 'local' ? '내장' : '위키'}</span></div>
       <div class="ps-desc">${escapeHtml(o.desc || '설명 없음')}</div>
-      <a class="ps-naver" href="${escapeHtml(buildNaverUrl(o.title))}" target="_blank" rel="noopener noreferrer">네이버 🔍</a>
+      <a class="ps-namuwiki" href="${escapeHtml(buildNamuWikiUrl(o.title))}" target="_blank" rel="noopener noreferrer">나무위키 🔍</a>
     </div>
   </div>`;
 }
@@ -15610,9 +15612,9 @@ function psBindItems(scope) {
   scope = scope || document.getElementById('psResults');
   if (!scope) return;
   // 멱등 바인딩(__psBound): 이미 묶인 항목은 건너뜀 → 위키 결과 append 시 로컬 항목 재바인딩/교체 방지
-  // 네이버 링크는 네이티브 <a target=_blank>. 부모 item의 onTap(touchend preventDefault)이
+  // 나무위키 링크는 네이티브 <a target=_blank>. 부모 item의 onTap(touchend preventDefault)이
   // 링크 이동을 막지 않도록 전파만 차단(preventDefault 안 함) → 모바일에서도 확실히 열림
-  scope.querySelectorAll('.ps-naver').forEach(el => {
+  scope.querySelectorAll('.ps-namuwiki').forEach(el => {
     if (el.__psBound) return; el.__psBound = 1;
     el.addEventListener('touchend', e => e.stopPropagation(), { passive: true });
     el.addEventListener('click', e => e.stopPropagation());
@@ -15620,7 +15622,7 @@ function psBindItems(scope) {
   scope.querySelectorAll('.ps-item').forEach(el => {
     if (el.__psBound) return; el.__psBound = 1;
     onTap(el, function (e) {
-      if (e && e.target && e.target.closest && e.target.closest('.ps-naver')) return; // 네이버 링크 탭은 제외
+      if (e && e.target && e.target.closest && e.target.closest('.ps-namuwiki')) return;
       if (el.dataset.kind === 'local') {
         const ymd = el.dataset.ymd;
         psShowConfirm(el.dataset.name,
@@ -15699,13 +15701,12 @@ function psApply(name, year, month, day, gender) {
   $('#inputName').value = name;
   $('#inBirth').value = String(year).padStart(4, '0') + String(month).padStart(2, '0') + String(day).padStart(2, '0');
   $('#inTime').value = '';
-  if (gender === 'M') {
-    $$('#segGender button').forEach(b => b.classList.toggle('active', b.dataset.val === 'M'));
-  } else if (gender === 'F') {
-    $$('#segGender button').forEach(b => b.classList.toggle('active', b.dataset.val === 'F'));
-  }
-  $$('#segCal button').forEach(b => b.classList.toggle('active', b.dataset.val === 'solar'));
-  syncLunarMonthType();
+  const genderButton = gender === 'M' || gender === 'F'
+    ? $(`#segGender [data-val="${gender}"]`)
+    : null;
+  if (genderButton) genderButton.click();
+  const solarButton = $('#segCal [data-val="solar"]');
+  if (solarButton) solarButton.click();
   closePersonSearch();
   setTimeout(() => { const btn = $('#calcBtn'); if (btn) btn.click(); }, 100);
 }
@@ -15722,7 +15723,7 @@ function psShowConfirm(title, year, month, day, gender, source) {
       <div style="font-size:11px; color:var(--text-sub); line-height:1.6; margin-top:10px; font-weight:500;">
         ※ ${srcText} 입력 후 필요하면 수정하세요.
       </div>
-      <div style="margin-top:10px;"><a class="ps-naver" id="pcbNaver" href="${escapeHtml(buildNaverUrl(title))}" target="_blank" rel="noopener noreferrer">네이버에서 보기 🔍</a></div>
+      <div style="margin-top:10px;"><a class="ps-namuwiki" id="pcbNamuWiki" href="${escapeHtml(buildNamuWikiUrl(title))}" target="_blank" rel="noopener noreferrer">나무위키에서 보기 🔍</a></div>
       <div class="pcb-actions">
         <button type="button" id="pcbCancel">다시 검색</button>
         <button type="button" class="primary" id="pcbApply">자동 입력</button>

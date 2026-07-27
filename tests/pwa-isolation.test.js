@@ -10,6 +10,7 @@ const serviceWorker = fs.readFileSync('sw.js', 'utf8');
 const protectedBuild = fs.readFileSync('scripts/build-protected.ps1', 'utf8');
 const ganjiFixtures = fs.readFileSync('tests/ganji-fixtures.test.js', 'utf8');
 const uiRegression = fs.readFileSync('tests/ui-regression.js', 'utf8');
+const deploymentGuide = fs.readFileSync('웹배포_안내.md', 'utf8');
 
 const runtimeAssets = [
   'polish.css',
@@ -547,7 +548,8 @@ test('shares era, resonance relation, and all four pillars without guarantees', 
 });
 
 test('discloses pre-1908 UTC+9 approximation in About and every share surface', () => {
-  assert.match(html, /· 1908년 4월 이전 : UTC\+9 기준 근사/);
+  assert.match(html, /· 1800년 ~ 1908년 3월 : KASI 절기 · UTC\+9 기준 근사/);
+  assert.match(html, /· 1026년 ~ 1799년 : 역사 범위 근사/);
   assert.match(share, /function\s+calculationProvenance\(/);
   assert.match(share, /1908년 4월 이전 UTC\+9 기준 근사/);
   assert.ok(
@@ -562,5 +564,8 @@ test('uses Wikimedia for structured people data and NamuWiki for detail lookup',
   assert.match(html, /class="ps-namuwiki"/);
   assert.match(html, /나무위키에서 보기|나무위키 🔍/);
   assert.match(html, /위키백과·위키데이터[^<]*생년월일/);
+  assert.match(html, /class="ps-item"[^>]*role="button"[^>]*tabindex="0"/);
+  assert.match(html, /addEventListener\('keydown'/);
   assert.doesNotMatch(html, /function\s+buildNaverUrl\(|class="ps-naver"|네이버 🔍/);
+  assert.match(deploymentGuide, /브라우저[^.\n]*통합 회귀 8개/);
 });

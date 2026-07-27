@@ -529,7 +529,13 @@ test('browser famous-person search auto-fills a complete local profile and calcu
       psSearch('반기문');
     });
     await page.waitForSelector('.ps-item[data-kind="local"][data-ymd="19440613"]');
-    await page.click('.ps-item[data-kind="local"][data-ymd="19440613"]');
+    const itemA11y = await page.$eval(
+      '.ps-item[data-kind="local"][data-ymd="19440613"]',
+      item => ({ role: item.getAttribute('role'), tabIndex: item.tabIndex })
+    );
+    assert.deepEqual(itemA11y, { role: 'button', tabIndex: 0 });
+    await page.focus('.ps-item[data-kind="local"][data-ymd="19440613"]');
+    await page.keyboard.press('Enter');
     await page.waitForSelector('#pcbApply');
 
     const confirmation = await page.evaluate(() => ({
@@ -538,6 +544,22 @@ test('browser famous-person search auto-fills a complete local profile and calcu
     }));
     assert.match(confirmation.source, /앱 내장 정보\(Wikidata\)/);
     assert.match(confirmation.namuHref, /^https:\/\/namu\.wiki\/Search\?q=/);
+
+    const qidSafety = await page.evaluate(() => {
+      const host = document.createElement('div');
+      host.innerHTML = psItemHtml({
+        title: '안전 검사',
+        desc: '',
+        kind: 'wiki',
+        qid: 'Q1" onfocus="window.__qidInjection=1'
+      });
+      const item = host.querySelector('.ps-item');
+      return {
+        qid: item?.dataset.qid || '',
+        onfocus: item?.getAttribute('onfocus')
+      };
+    });
+    assert.deepEqual(qidSafety, { qid: '', onfocus: null });
 
     await page.click('#pcbApply');
     await page.waitForFunction(() => currentSaju?.name === '반기문');

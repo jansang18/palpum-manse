@@ -389,6 +389,10 @@
     transition: border-color 0.15s;
   }
   .ps-item:active { border-color: var(--line); }
+  .ps-item:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--apple-accent, #007aff) 45%, transparent);
+    outline-offset: 2px;
+  }
   @media (hover: hover) and (pointer: fine) {
     .ps-item:hover { border-color: var(--line); }
   }
@@ -12288,8 +12292,9 @@ Sigrid Niehaus|19641229|F|
     </div>
     <div style="font-size:13px; color:var(--text-sub); line-height:1.8; margin-top:12px; font-weight:500;">
       · 지원 기간 : 1026 ~ 2099년<br>
-      · 시간 기준 : 1908년 4월 1일 이후 Asia/Seoul 역사 민간시<br>
-      · 1908년 4월 이전 : UTC+9 기준 근사<br>
+      · 1908년 4월 이후 : KASI 절기 · Asia/Seoul 역사 민간시<br>
+      · 1800년 ~ 1908년 3월 : KASI 절기 · UTC+9 기준 근사<br>
+      · 1026년 ~ 1799년 : 역사 범위 근사<br>
       · 일 경계 : 자정·자시·야자시 분리 중 선택<br>
       · 월주 기준 : 절기<br>
       · 대운 : 남양녀음 순행 / 남음녀양 역행<br>
@@ -15593,10 +15598,11 @@ function buildNamuWikiUrl(name) {
 function psItemHtml(o) {
   // o: {title, desc, thumb, kind:'local'|'wiki', ymd, g, qid}
   const initial = (o.title || '?').charAt(0) || '?';
+  const safeQid = /^Q\d{1,12}$/.test(String(o.qid || '')) ? String(o.qid) : '';
   const data = o.kind === 'local'
     ? `data-kind="local" data-name="${escapeHtml(o.title)}" data-ymd="${o.ymd}" data-g="${o.g || ''}"`
-    : `data-kind="wiki" data-title="${escapeHtml(o.title)}" data-qid="${o.qid || ''}"`;
-  return `<div class="ps-item" ${data}>
+    : `data-kind="wiki" data-title="${escapeHtml(o.title)}" data-qid="${escapeHtml(safeQid)}"`;
+  return `<div class="ps-item" role="button" tabindex="0" ${data}>
     <div class="ps-thumb" ${o.thumb ? `style="background-image:url('${escapeHtml(o.thumb)}')"` : ''}>
       ${o.thumb ? '' : escapeHtml(initial)}
     </div>
@@ -15621,8 +15627,7 @@ function psBindItems(scope) {
   });
   scope.querySelectorAll('.ps-item').forEach(el => {
     if (el.__psBound) return; el.__psBound = 1;
-    onTap(el, function (e) {
-      if (e && e.target && e.target.closest && e.target.closest('.ps-namuwiki')) return;
+    const activate = () => {
       if (el.dataset.kind === 'local') {
         const ymd = el.dataset.ymd;
         psShowConfirm(el.dataset.name,
@@ -15631,6 +15636,15 @@ function psBindItems(scope) {
       } else {
         psSelectPerson(el.dataset.title, el.dataset.qid);
       }
+    };
+    onTap(el, function (e) {
+      if (e && e.target && e.target.closest && e.target.closest('.ps-namuwiki')) return;
+      activate();
+    });
+    el.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      activate();
     });
   });
 }

@@ -136,10 +136,16 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [320, 390]
   : TEST_GROUP === 'legend-accessibility'
     ? [390, 1220]
+  : TEST_GROUP === 'legend-navigation'
+    ? [390, 1220]
   : TEST_GROUP === 'repository-root'
     ? [390]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const activateDestination = (page, tab) => page.evaluate(
+  destination => window.activateLegendDestination(destination),
+  tab
+);
 const runsGroup = name => !TEST_GROUP || TEST_GROUP === name;
 const runsSecondaryApple = () => !TEST_GROUP || TEST_GROUP === 'task-5' || TEST_GROUP === 'secondary-apple';
 const runsAppleMotion = () => !TEST_GROUP || TEST_GROUP === 'motion-contract';
@@ -152,7 +158,7 @@ const runsResultHeaderCompact = () => !TEST_GROUP || TEST_GROUP === 'result-head
 const runsAndroidSafeArea = () => !TEST_GROUP || TEST_GROUP === 'android-safe-area';
 
 async function inspectCalendarShellWidth(page, width) {
-  await page.click('.tab[data-tab="calendar"]');
+  await activateDestination(page, 'calendar');
   await sleep(100);
   const geometry = await page.evaluate(() => {
     const box = selector => {
@@ -188,7 +194,7 @@ async function inspectAllTabShellWidths(page, width) {
     calendar: '.cal-grid'
   };
   for (const [tab, selector] of Object.entries(targets)) {
-    await page.click(`.tab[data-tab="${tab}"]`);
+    await activateDestination(page, tab);
     await sleep(60);
     const geometry = await page.evaluate(selector => {
       const rect = element => {
@@ -201,13 +207,13 @@ async function inspectAllTabShellWidths(page, width) {
         target: rect(document.querySelector(selector))
       };
     }, selector);
-    for (const name of ['header', 'tabs']) {
+    for (const name of width < 768 ? ['header'] : ['header', 'tabs']) {
       assert.ok(Math.abs(geometry[name].width - geometry.target.width) <= 1, `${width}px ${tab} ${name} width must match content`);
       assert.ok(Math.abs(geometry[name].left - geometry.target.left) <= 1, `${width}px ${tab} ${name} left edge must match content`);
     }
   }
 
-  await page.click('.tab[data-tab="saved"]');
+  await activateDestination(page, 'saved');
   await sleep(60);
   const savedGeometry = await page.evaluate(() => {
     const shell = element => {
@@ -220,7 +226,7 @@ async function inspectAllTabShellWidths(page, width) {
     const width = view.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     return { header: shell(document.querySelector('.top-bar')), tabs: shell(document.querySelector('.tabs')), target: { left, width } };
   });
-  for (const name of ['header', 'tabs']) {
+  for (const name of width < 768 ? ['header'] : ['header', 'tabs']) {
     assert.ok(Math.abs(savedGeometry[name].width - savedGeometry.target.width) <= 1, `${width}px saved ${name} width must match content`);
     assert.ok(Math.abs(savedGeometry[name].left - savedGeometry.target.left) <= 1, `${width}px saved ${name} left edge must match content`);
   }
@@ -287,7 +293,7 @@ async function inspectFrontendQuality(page, width) {
 }
 
 async function inspectShellWidth(page, width) {
-  await page.click('.tab[data-tab="input"]');
+  await activateDestination(page, 'input');
   await sleep(50);
   const geometry = await page.evaluate(() => {
     const box = selector => {
@@ -327,7 +333,7 @@ async function inspectShellWidth(page, width) {
 }
 
 async function inspectFoldLayout(page, width) {
-  await page.click('.tab[data-tab="input"]');
+  await activateDestination(page, 'input');
   await sleep(50);
   const geometry = await page.evaluate(() => {
     const rect = selector => {
@@ -1099,7 +1105,7 @@ async function inspectLegendFlow(page, width) {
     document.getElementById('calcBtn').click();
   });
   await sleep(500);
-  await page.click('.tab[data-tab="legend"]');
+  await activateDestination(page, 'legend');
   await sleep(100);
 
   const state = await page.evaluate(() => ({
@@ -1124,7 +1130,7 @@ async function inspectLegendFlow(page, width) {
   assert.equal(state.xss, 0, `${width}px user name executed markup`);
   assert.equal(state.hourlyApi, 'function', `${width}px hourly fortune API`);
 
-  await page.click('.tab[data-tab="result"]');
+  await activateDestination(page, 'result');
   await page.$eval('#seunScroll .luck-item', element => element.click());
   await sleep(60);
   await page.$eval('#woonScroll .luck-item', element => element.click());
@@ -1208,7 +1214,7 @@ async function inspectLegendFlow(page, width) {
   assert.equal(selectedDay.afterContent, 'none', `${width}px selected day after overlay`);
   assert.ok(selectedDay.contrast >= 3, `${width}px selected day outline contrast ${selectedDay.contrast}`);
 
-  await page.click('.tab[data-tab="legend"]');
+  await activateDestination(page, 'legend');
   const ownership = await page.evaluate(() => {
     const trigger = document.querySelector('[data-legend-evidence]');
     const dialog = document.querySelector('[data-legend-evidence-dialog]');
@@ -1237,7 +1243,7 @@ async function inspectLegendFlow(page, width) {
     document.getElementById('calcBtn').click();
   });
   await sleep(500);
-  await page.click('.tab[data-tab="legend"]');
+  await activateDestination(page, 'legend');
   await sleep(100);
   const unknownTime = await page.evaluate(() => ({
     natal: document.querySelector('[data-time-layer="natal"]')?.textContent,
@@ -1256,7 +1262,7 @@ async function inspectLegendAccessibility(page, width) {
     document.getElementById('calcBtn').click();
   });
   await sleep(500);
-  await page.click('.tab[data-tab="legend"]');
+  await activateDestination(page, 'legend');
   await sleep(100);
 
   const inspectTheme = async dark => page.evaluate(isDark => {
@@ -1354,6 +1360,241 @@ async function inspectLegendAccessibility(page, width) {
   }
   const dialog = reducedTransparency.find(surface => surface.selector === '.legend-evidence-dialog');
   assert.equal(dialog.backdropFilter, 'none', `${width}px dialog blur must be removed`);
+}
+
+async function inspectLegendNavigation(page, width) {
+  await page.evaluate(() => {
+    document.body.classList.remove('dark');
+    document.getElementById('inputName').value = '길잡이';
+    document.getElementById('inBirth').value = '19921024';
+    document.getElementById('inTime').value = '0530';
+    document.getElementById('calcBtn').click();
+  });
+  await sleep(500);
+
+  const source = await page.evaluate(() => ({
+    activate: typeof window.activateLegendDestination,
+    evidence: typeof window.openLegendEvidence,
+    primary: [...document.querySelectorAll('[data-legend-primary-nav]')]
+      .map(node => node.dataset.tab),
+    more: [...document.querySelectorAll('[data-legend-more-nav]')]
+      .map(node => node.dataset.tab),
+    targets: [...document.querySelectorAll('[data-legend-primary-nav]')].map(node => ({
+      tab: node.dataset.tab,
+      height: node.getBoundingClientRect().height,
+      controls: node.getAttribute('aria-controls')
+    })),
+    primaryDisplay: document.getElementById('legendMobileNav')
+      ? getComputedStyle(document.getElementById('legendMobileNav')).display
+      : null,
+    topDisplay: getComputedStyle(document.querySelector('.tabs')).display
+  }));
+  assert.equal(source.activate, 'function');
+  assert.equal(source.evidence, 'function');
+  assert.deepEqual(source.primary, ['input', 'result', 'legend', 'calendar', 'saved']);
+  assert.deepEqual(source.more, ['match', 'about']);
+  source.targets.forEach(target => {
+    assert.equal(target.controls, `view-${target.tab}`);
+    if (width < 768) assert.ok(target.height >= 44, `${target.tab} mobile target is ${target.height}px`);
+  });
+  assert.equal(source.primaryDisplay === 'none', width >= 768, `${width}px mobile navigation visibility`);
+  assert.equal(source.topDisplay === 'none', width < 768, `${width}px desktop tab visibility`);
+
+  await page.evaluate(() => window.activateLegendDestination('legend'));
+  await sleep(100);
+  const synchronized = await page.evaluate(() => ({
+    top: document.querySelector('.tab.active')?.dataset.tab,
+    topSelected: document.querySelector('.tab[data-tab="legend"]')?.getAttribute('aria-selected'),
+    bottom: document.querySelector('[data-legend-primary-nav][aria-current="page"]')?.dataset.tab,
+    panel: document.querySelector('.view.active')?.id,
+    hidden: document.getElementById('view-legend')?.hidden
+  }));
+  assert.deepEqual(synchronized, {
+    top: 'legend',
+    topSelected: 'true',
+    bottom: 'legend',
+    panel: 'view-legend',
+    hidden: false
+  });
+
+  if (width >= 768) {
+    await page.focus('.tab[data-tab="legend"]');
+    await page.keyboard.press('ArrowRight');
+    const keyboardTab = await page.evaluate(() => ({
+      active: document.querySelector('.tab.active')?.dataset.tab,
+      focused: document.activeElement?.dataset?.tab
+    }));
+    assert.deepEqual(keyboardTab, { active: 'fortune', focused: 'fortune' });
+  } else {
+    await page.focus('[data-legend-primary-nav][data-tab="calendar"]');
+    await page.keyboard.press('Enter');
+    assert.equal(
+      await page.evaluate(() => document.querySelector('.tab.active')?.dataset.tab),
+      'calendar',
+      'mobile destination must activate from the keyboard'
+    );
+  }
+  await page.evaluate(() => window.activateLegendDestination('legend'));
+
+  const moreButton = '#legendMoreButton';
+  await page.click(moreButton);
+  const menuOpen = await page.evaluate(() => {
+    const button = document.getElementById('legendMoreButton');
+    const menu = document.getElementById('legendMoreMenu');
+    const trigger = button.getBoundingClientRect();
+    const panel = menu.getBoundingClientRect();
+    return {
+      expanded: button.getAttribute('aria-expanded'),
+      hidden: menu.hidden,
+      role: menu.getAttribute('role'),
+      focused: document.activeElement?.dataset?.tab,
+      anchored: panel.right <= innerWidth + 1
+        && panel.top >= trigger.bottom - 2
+        && Math.abs(panel.right - trigger.right) <= 24
+    };
+  });
+  assert.deepEqual(menuOpen, {
+    expanded: 'true',
+    hidden: false,
+    role: 'menu',
+    focused: 'match',
+    anchored: true
+  });
+  await page.keyboard.press('Escape');
+  await sleep(180);
+  const menuClosed = await page.evaluate(() => ({
+    expanded: document.getElementById('legendMoreButton').getAttribute('aria-expanded'),
+    hidden: document.getElementById('legendMoreMenu').hidden,
+    focus: document.activeElement?.id
+  }));
+  assert.deepEqual(menuClosed, { expanded: 'false', hidden: true, focus: 'legendMoreButton' });
+
+  await page.click(moreButton);
+  await page.keyboard.press('Enter');
+  await sleep(100);
+  assert.equal(
+    await page.evaluate(() => document.querySelector('.tab.active')?.dataset.tab),
+    'match',
+    `${width}px more-menu match destination`
+  );
+  await page.evaluate(() => window.activateLegendDestination('legend'));
+
+  const evidenceTrigger = '[data-legend-evidence]';
+  await page.focus(evidenceTrigger);
+  await page.keyboard.press('Enter');
+  await sleep(80);
+  const dialog = await page.evaluate(() => {
+    const modal = document.getElementById('legendEvidenceModal');
+    const focusables = [...modal.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
+    return {
+      open: modal.open,
+      role: modal.getAttribute('role'),
+      modal: modal.getAttribute('aria-modal'),
+      labelledBy: modal.getAttribute('aria-labelledby'),
+      activeInside: modal.contains(document.activeElement),
+      first: focusables[0]?.className,
+      last: focusables.at(-1)?.className
+    };
+  });
+  assert.deepEqual(dialog, {
+    open: true,
+    role: 'dialog',
+    modal: 'true',
+    labelledBy: 'legendEvidenceTitle',
+    activeInside: true,
+    first: 'legend-dialog-close',
+    last: 'legend-dialog-close'
+  });
+  await page.keyboard.press('Tab');
+  assert.equal(
+    await page.evaluate(() => document.activeElement?.classList.contains('legend-dialog-close')),
+    true,
+    `${width}px evidence focus must wrap`
+  );
+  await page.keyboard.press('Escape');
+  await sleep(80);
+  const restored = await page.evaluate(() => ({
+    open: document.getElementById('legendEvidenceModal').open,
+    focus: document.activeElement?.hasAttribute('data-legend-evidence')
+  }));
+  assert.deepEqual(restored, { open: false, focus: true });
+
+  await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(() => window.handleAppBack()), true);
+  await sleep(80);
+  const evidenceBack = await page.evaluate(() => ({
+    open: document.getElementById('legendEvidenceModal').open,
+    active: document.querySelector('.tab.active')?.dataset.tab
+  }));
+  assert.deepEqual(evidenceBack, { open: false, active: 'legend' });
+
+  await page.click(moreButton);
+  assert.equal(await page.evaluate(() => window.handleAppBack()), true);
+  await sleep(180);
+  const menuBack = await page.evaluate(() => ({
+    hidden: document.getElementById('legendMoreMenu').hidden,
+    active: document.querySelector('.tab.active')?.dataset.tab
+  }));
+  assert.deepEqual(menuBack, { hidden: true, active: 'legend' });
+
+  await page.click(moreButton);
+  await page.focus('[data-legend-more-nav][data-tab="about"]');
+  await page.keyboard.press('Enter');
+  assert.equal(
+    await page.evaluate(() => document.getElementById('aboutModal').classList.contains('active')),
+    true,
+    `${width}px about form overlay opens from more`
+  );
+  assert.equal(await page.evaluate(() => window.handleAppBack()), true);
+  await sleep(260);
+  assert.equal(
+    await page.evaluate(() => document.getElementById('aboutModal').classList.contains('active')),
+    false,
+    `${width}px back closes an existing form overlay`
+  );
+
+  await page.evaluate(() => {
+    window.activateLegendDestination('result');
+    window.shareCard(window.getCurrentSaju());
+  });
+  assert.equal(await page.evaluate(() => window.handleAppBack()), true);
+  await sleep(260);
+  const shareBack = await page.evaluate(() => ({
+    open: !!document.getElementById('shareCardModal'),
+    active: document.querySelector('.tab.active')?.dataset.tab
+  }));
+  assert.deepEqual(shareBack, { open: false, active: 'result' });
+
+  await page.evaluate(() => {
+    window.activateLegendDestination('legend');
+    window.activateLegendDestination('calendar');
+    window.activateLegendDestination('saved');
+  });
+  assert.equal(await page.evaluate(() => window.handleAppBack()), true);
+  assert.equal(
+    await page.evaluate(() => document.querySelector('.tab.active')?.dataset.tab),
+    'calendar',
+    `${width}px back must restore the previous destination`
+  );
+
+  const overflow = await page.evaluate(() => ({
+    x: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    bodyX: document.body.scrollWidth - document.body.clientWidth
+  }));
+  assert.ok(overflow.x <= 1, `${width}px document overflow ${overflow.x}px`);
+  assert.ok(overflow.bodyX <= 1, `${width}px body overflow ${overflow.bodyX}px`);
+
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  await page.click(moreButton);
+  const reducedFrames = await page.evaluate(() => (
+    document.getElementById('legendMoreMenu').getAnimations()
+      .flatMap(animation => animation.effect?.getKeyframes() || [])
+      .map(frame => frame.transform || 'none')
+  ));
+  assert.ok(reducedFrames.length >= 2, `${width}px reduced-motion menu frames`);
+  assert.equal(new Set(reducedFrames).size, 1, `${width}px reduced-motion menu must not move`);
+  await page.keyboard.press('Escape');
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
 }
 
 async function collectAppleInspection(page, selectors) {
@@ -1471,7 +1712,7 @@ async function collectAppleComponentInspection(page) {
         input: rect('.input'),
         primary: rect('.primary-btn'),
         segmented: rect('.segmented'),
-        tabs: [...document.querySelectorAll('.tab')]
+        tabs: [...document.querySelectorAll('.tab, [data-legend-primary-nav]')]
           .filter(element => element.getBoundingClientRect().width > 0)
           .map(element => ({
             width: element.getBoundingClientRect().width,
@@ -1623,13 +1864,15 @@ async function inspectAppleDesign(page, width) {
   const inputSelectors = {
     styleSelectors: {
       topBar: '.top-bar',
-      activeTab: '.tab.active',
+      activeTab: width < 768
+        ? '[data-legend-primary-nav].active'
+        : '.tab.active',
       primaryButton: '.primary-btn',
       formFields: '.input'
     },
     geometrySelectors: {
       segmentedButtons: '.segmented button',
-      tabs: '.tab',
+      tabs: width < 768 ? '[data-legend-primary-nav]' : '.tab',
       primaryButtons: '.primary-btn'
     }
   };
@@ -1646,7 +1889,7 @@ async function inspectAppleDesign(page, width) {
 
   for (const [theme, accent] of Object.entries(expectedAccents)) {
     await page.evaluate(isDark => document.body.classList.toggle('dark', isDark), theme === 'dark');
-    await page.click('.tab[data-tab="input"]');
+    await activateDestination(page, 'input');
     await page.waitForFunction(() => document.querySelector('#view-input')?.classList.contains('active'));
     await sleep(250);
     const inputInspection = await collectAppleInspection(page, inputSelectors);
@@ -1732,21 +1975,23 @@ async function inspectAppleDesign(page, width) {
     }
 
     const activeTab = inspection.styles.activeTab[0];
-    const expectedColor = expectedAccentColors[theme];
-    const expectedTint = expectedAccentTints[theme];
     const activeTabTint = parseCssColor(activeTab.base.values.backgroundColor);
-    assert.equal(activeTab.base.values.color, expectedColor, `${width}px ${theme} active tab text color`);
     assert.ok(activeTabTint.a > 0.08, `${width}px ${theme} active tab capsule background is transparent: ${activeTab.base.values.backgroundColor}`);
-    assert.ok(
-      activeTabTint.b - activeTabTint.r >= 60 && activeTabTint.b - activeTabTint.g >= 60,
-      `${width}px ${theme} active tab capsule is not blue-tinted: ${activeTab.base.values.backgroundColor}`
-    );
-    assert.ok(
-      Math.abs(activeTabTint.r - expectedTint.r) <= 48 &&
-      Math.abs(activeTabTint.g - expectedTint.g) <= 48 &&
-      Math.abs(activeTabTint.b - expectedTint.b) <= 48,
-      `${width}px ${theme} active tab capsule is outside the system-blue family: ${activeTab.base.values.backgroundColor}`
-    );
+    if (width >= 768) {
+      const expectedColor = expectedAccentColors[theme];
+      const expectedTint = expectedAccentTints[theme];
+      assert.equal(activeTab.base.values.color, expectedColor, `${width}px ${theme} active tab text color`);
+      assert.ok(
+        activeTabTint.b - activeTabTint.r >= 60 && activeTabTint.b - activeTabTint.g >= 60,
+        `${width}px ${theme} active tab capsule is not blue-tinted: ${activeTab.base.values.backgroundColor}`
+      );
+      assert.ok(
+        Math.abs(activeTabTint.r - expectedTint.r) <= 48 &&
+        Math.abs(activeTabTint.g - expectedTint.g) <= 48 &&
+        Math.abs(activeTabTint.b - expectedTint.b) <= 48,
+        `${width}px ${theme} active tab capsule is outside the system-blue family: ${activeTab.base.values.backgroundColor}`
+      );
+    }
 
     for (const [group, blocks] of Object.entries({
       pillarBlocks: inspection.geometry.pillarBlocks,
@@ -2370,6 +2615,12 @@ async function inspectWidth(browser, width) {
 
   if (TEST_GROUP === 'legend-accessibility') {
     await inspectLegendAccessibility(page, width);
+    await page.close();
+    return;
+  }
+
+  if (TEST_GROUP === 'legend-navigation') {
+    await inspectLegendNavigation(page, width);
     await page.close();
     return;
   }

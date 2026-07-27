@@ -1981,8 +1981,9 @@
         <svg id="themeIconSun" viewBox="0 0 24 24" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         <svg id="themeIconMoon" viewBox="0 0 24 24" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
-      <button type="button" class="icon-btn" id="aboutBtn" aria-label="앱 정보">
-        <svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <button type="button" class="icon-btn" id="legendMoreButton" aria-label="더보기"
+        aria-haspopup="menu" aria-controls="legendMoreMenu" aria-expanded="false">
+        <svg viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
       </button>
     </div>
   </header>
@@ -2078,6 +2079,43 @@
   <section class="view" id="view-saved" role="tabpanel" aria-labelledby="tab-saved" hidden>
     <div id="savedContent" style="padding-top: 12px;"></div>
   </section>
+</div>
+
+<nav class="legend-mobile-nav" id="legendMobileNav" aria-label="모바일 주요 화면">
+  <button type="button" data-legend-primary-nav data-tab="input" aria-controls="view-input">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5v8.25A1.25 1.25 0 0 1 18.75 20H5.25A1.25 1.25 0 0 1 4 18.75Z"/><path d="M9 20v-6h6v6"/></svg>
+    <span>입력</span>
+  </button>
+  <button type="button" data-legend-primary-nav data-tab="result" aria-controls="view-result">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9.5 4v16M14.5 4v16M5 9.3h14M5 14.7h14"/></svg>
+    <span>원국</span>
+  </button>
+  <button type="button" data-legend-primary-nav data-tab="legend" aria-controls="view-legend">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18.5 9.5 8l3.2 5 2.2-3.5L20 18.5Z"/><path d="M7 18.5h10M16.5 5.5v2M15.5 6.5h2"/></svg>
+    <span>전설</span>
+  </button>
+  <button type="button" data-legend-primary-nav data-tab="calendar" aria-controls="view-calendar">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16M8 13h2M14 13h2M8 17h2M14 17h2"/></svg>
+    <span>만세력</span>
+  </button>
+  <button type="button" data-legend-primary-nav data-tab="saved" aria-controls="view-saved">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16l-6-3.5L6 20Z"/></svg>
+    <span>저장</span>
+  </button>
+</nav>
+
+<div class="legend-more-menu" id="legendMoreMenu" role="menu"
+  aria-labelledby="legendMoreButton" hidden>
+  <button type="button" role="menuitem" data-legend-more-nav data-tab="match"
+    aria-controls="view-match">
+    <span class="legend-more-symbol" aria-hidden="true">合</span>
+    <span><strong>궁합</strong><small>두 명반의 흐름 비교</small></span>
+  </button>
+  <button type="button" role="menuitem" id="aboutBtn" data-legend-more-nav data-tab="about"
+    aria-controls="aboutModal" aria-label="앱 정보">
+    <span class="legend-more-symbol" aria-hidden="true">傳</span>
+    <span><strong>앱 정보</strong><small>계산 기준과 안내</small></span>
+  </button>
 </div>
 
 <div class="bottom-bar" id="bottomBar" style="display:none">
@@ -12703,37 +12741,9 @@ function syncTabA11y(activeTab) {
   });
 }
 
-$$('.tab').forEach(t => {
-  t.addEventListener('keydown', event => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const tabs = [...$$('.tab')];
-    const current = tabs.indexOf(t);
-    const next = event.key === 'Home' ? 0
-      : event.key === 'End' ? tabs.length - 1
-      : (current + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-    tabs[next].focus();
-    tabs[next].click();
-  });
-  onTap(t, () => {
-  const tab = t.dataset.tab;
-  $$('.tab').forEach(x => x.classList.remove('active'));
-  t.classList.add('active');
-  $$('.view').forEach(v => v.classList.remove('active'));
-  $('#view-' + tab).classList.add('active');
-  syncTabA11y(t);
-  $('#bottomBar').style.display = (tab === 'result' && currentSaju) ? 'flex' : 'none';
-  if (tab === 'calendar') {
-    initializeCalendarSession();
-    renderCalendar();
-  }
-  if (tab === 'saved') renderSaved();
-  if (tab === 'fortune') renderFortune();
-  if (tab === 'match') renderMatch();
-  if (tab === 'legend' && typeof window.renderLegend === 'function') window.renderLegend(currentSaju);
-  });
-});
 syncTabA11y($('.tab.active'));
+window.hasCurrentSaju = () => !!currentSaju;
+window.getCurrentSaju = () => currentSaju;
 
 // 세그먼트 버튼 (양력/음력, 남자/여자 등)
 function bindSegmented(root) {
@@ -12839,12 +12849,7 @@ onTap($('#calcBtn'), () => {
     currentSaju = saju;
     selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
     renderResult();
-    $$('.tab').forEach(x => x.classList.remove('active'));
-    $$('.tab')[1].classList.add('active');
-    $$('.view').forEach(v => v.classList.remove('active'));
-    $('#view-result').classList.add('active');
-    syncTabA11y($$('.tab')[1]);
-    $('#bottomBar').style.display = 'flex';
+    window.activateLegendDestination('result');
     window.scrollTo({top: 0, behavior: 'smooth'});
   } catch (e) {
     console.error(e);
@@ -13449,7 +13454,12 @@ function topAppOverlay() {
 }
 
 function appBackgroundTargets() {
-  return [document.querySelector('.app'), document.getElementById('bottomBar')].filter(Boolean);
+  return [
+    document.querySelector('.app'),
+    document.getElementById('bottomBar'),
+    document.getElementById('legendMobileNav'),
+    document.getElementById('legendMoreMenu')
+  ].filter(Boolean);
 }
 
 window.refreshAppOverlayAccessibility = function refreshAppOverlayAccessibility() {
@@ -13770,12 +13780,7 @@ async function renderSaved() {
         currentSaju = rec;
         selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
         renderResult();
-        $$('.tab').forEach(x => x.classList.remove('active'));
-        $$('.tab')[1].classList.add('active');
-        $$('.view').forEach(v => v.classList.remove('active'));
-        $('#view-result').classList.add('active');
-        syncTabA11y($$('.tab')[1]);
-        $('#bottomBar').style.display = 'flex';
+        window.activateLegendDestination('result');
         window.scrollTo(0, 0);
       }
     });
@@ -13921,12 +13926,7 @@ async function findSimilarSaju() {
         selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
         renderResult(item.rec);
         window.closeAppModal($('#similarModal'));
-        // 원국 탭으로
-        $$('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelector('.tab[data-tab="result"]').classList.add('active');
-        $$('.view').forEach(v => v.classList.remove('active'));
-        $('#view-result').classList.add('active');
-        syncTabA11y(document.querySelector('.tab[data-tab="result"]'));
+        window.activateLegendDestination('result');
       }
     });
   });
@@ -14271,7 +14271,6 @@ function changeCalendarMonth(delta) {
 onTap($('#calPrev'), () => changeCalendarMonth(-1));
 onTap($('#calNext'), () => changeCalendarMonth(1));
 
-onTap($('#aboutBtn'), () => window.openAppModal($('#aboutModal')));
 onTap($('#aboutClose'), () => window.closeAppModal($('#aboutModal')));
 $$('.modal-bg').forEach(m => {
   m.addEventListener('click', e => { if (e.target === m) window.closeAppModal(m); });
@@ -15661,6 +15660,7 @@ if ('serviceWorker' in navigator) {
 <script src="scripts/legend-resonance.js"></script>
 <script src="scripts/legend-copy.js"></script>
 <script src="scripts/legend-view.js"></script>
+<script src="scripts/legend-nav.js"></script>
 <script src="share.js"></script>
 <script src="nav.js"></script>
 </body>

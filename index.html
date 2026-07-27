@@ -12324,6 +12324,13 @@ const LEGEND_FALLBACK_KEY = 'legend-saju:records';
 const LEGEND_THEME_KEY = 'legend-saju:theme';
 const recordStore = window.LegendStorage.createRecordStore(window.storage, localStorage);
 
+function reportLegendStorageError(error) {
+  const message = error && error.message
+    ? error.message
+    : '저장소를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.';
+  window.showAppToast(message);
+}
+
 /* 계산 엔진 */
 const STEM = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
 const STEM_KOR = ['갑','을','병','정','무','기','경','신','임','계'];
@@ -13736,7 +13743,10 @@ async function renderSaved() {
   let list = [];
   try {
     list = await recordStore.listRecords();
-  } catch (error) {}
+  } catch (error) {
+    reportLegendStorageError(error);
+    return;
+  }
 
   list = list.filter(record => record && typeof record === 'object');
   const content = $('#savedContent');
@@ -13779,7 +13789,12 @@ async function renderSaved() {
       if (e.target.classList.contains('sdelete')) return;
       const id = c.dataset.id;
       let rec;
-      try { rec = await recordStore.getRecord(id); } catch (error) {}
+      try {
+        rec = await recordStore.getRecord(id);
+      } catch (error) {
+        reportLegendStorageError(error);
+        return;
+      }
       if (rec) {
         currentSaju = rec;
         selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
@@ -13806,7 +13821,12 @@ async function renderSaved() {
   $$('.sfav').forEach(btn => {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
-      await toggleFav(btn.dataset.fav);
+      try {
+        await toggleFav(btn.dataset.fav);
+      } catch (error) {
+        reportLegendStorageError(error);
+        return;
+      }
       renderSaved();
     });
   });
@@ -13864,7 +13884,12 @@ async function findSimilarSaju() {
   if (!currentSaju) { alert('먼저 사주를 펼쳐주세요.'); return; }
   // 저장 목록 불러오기
   let list = [];
-  try { list = await recordStore.listRecords(); } catch (error) {}
+  try {
+    list = await recordStore.listRecords();
+  } catch (error) {
+    reportLegendStorageError(error);
+    return;
+  }
 
   if (list.length === 0) {
     $('#similarModal .similar-body').innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text-sub);font-size:14px;font-weight:600;line-height:1.7;">저장된 명반이 없습니다.<br>저장 탭에서 사주를 모아두면<br>여기서 비교할 수 있어요.</div>`;
@@ -14840,7 +14865,12 @@ function renderSlotFilled(person, key) {
 async function openMatchPicker() {
   // 모달로 저장된 명반 리스트 + 현재 사주 + 새로 입력 옵션
   let list = [];
-  try { list = await recordStore.listRecords(); } catch (error) {}
+  try {
+    list = await recordStore.listRecords();
+  } catch (error) {
+    reportLegendStorageError(error);
+    return;
+  }
   list.sort((a,b) => (b.savedAt || 0) - (a.savedAt || 0));
 
   let itemsHtml = '';
@@ -14889,7 +14919,12 @@ async function openMatchPicker() {
     el.addEventListener('click', async () => {
       const id = el.dataset.id;
       let rec;
-      try { rec = await recordStore.getRecord(id); } catch (error) {}
+      try {
+        rec = await recordStore.getRecord(id);
+      } catch (error) {
+        reportLegendStorageError(error);
+        return;
+      }
       if (rec) { setMatchSlot(matchPickerTarget, rec); closeMatchPicker(); }
     });
   });

@@ -303,6 +303,113 @@ test('incomplete import rollback reports residual count and ids', async () => {
   assert.equal(primary.has(`${RECORD_PREFIX}first`), true);
 });
 
+test('fallback read failure blocks get, list, and delete decisions', async () => {
+  const { createRecordStore, RECORD_PREFIX } = require('../scripts/legend-storage.js');
+  const primary = new Map([
+    [`${RECORD_PREFIX}same`, JSON.stringify({ id: 'same', memo: 'stale' })]
+  ]);
+  let deleteCalls = 0;
+  const storage = {
+    list: async prefix => ({ keys: [...primary.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async (key, value) => { primary.set(key, value); },
+    delete: async key => {
+      deleteCalls++;
+      primary.delete(key);
+    }
+  };
+  const fallbackStorage = {
+    getItem: () => { throw new Error('local storage blocked'); },
+    setItem: () => {}
+  };
+  const recordStore = createRecordStore(storage, fallbackStorage);
+
+  for (const operation of [
+    () => recordStore.getRecord('same'),
+    () => recordStore.listRecords(),
+    () => recordStore.deleteRecord('same')
+  ]) {
+    await assert.rejects(operation, error => {
+      assert.equal(error.code, 'LEGEND_STORAGE_UNAVAILABLE');
+      return true;
+    });
+  }
+
+  assert.equal(deleteCalls, 0);
+  assert.equal(primary.has(`${RECORD_PREFIX}same`), true);
+});
+
+test('storage read failures are not rendered as empty UI state', () => {
+  assert.doesNotMatch(
+    html,
+    /recordStore\.listRecords\(\);\s*\}\s*catch\s*\(error\)\s*\{\s*\}/
+  );
+  assert.doesNotMatch(
+    html,
+    /recordStore\.getRecord\(id\);\s*\}\s*catch\s*\(error\)\s*\{\s*\}/
+  );
+  assert.match(html, /function\s+reportLegendStorageError\(error\)/);
+});
+
+test('write-then-throw import rolls back every attempted id', async () => {
+  const { createRecordStore, RECORD_PREFIX } = require('../scripts/legend-storage.js');
+  const primary = new Map();
+  let deleteCalls = 0;
+  const storage = {
+    list: async prefix => ({ keys: [...primary.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async (key, value) => {
+      primary.set(key, value);
+      throw new Error('persisted then rejected');
+    },
+    delete: async key => {
+      deleteCalls++;
+      primary.delete(key);
+    }
+  };
+  const recordStore = createRecordStore(storage, {
+    getItem: () => null,
+    setItem: () => {}
+  });
+
+  const error = await recordStore
+    .importRecords([{ id: 'write-then-throw' }])
+    .then(() => null, reason => reason);
+
+  assert.equal(error.rollbackIncomplete, undefined);
+  assert.equal(deleteCalls, 1);
+  assert.equal(primary.has(`${RECORD_PREFIX}write-then-throw`), false);
+});
+
+test('post-rollback verification reports write-then-throw residual values', async () => {
+  const { createRecordStore, RECORD_PREFIX } = require('../scripts/legend-storage.js');
+  const primary = new Map();
+  const storage = {
+    list: async prefix => ({ keys: [...primary.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async (key, value) => {
+      primary.set(key, value);
+      throw new Error('persisted then rejected');
+    },
+    delete: async () => {}
+  };
+  const recordStore = createRecordStore(storage, {
+    getItem: () => null,
+    setItem: () => {}
+  });
+
+  const error = await recordStore
+    .importRecords([{ id: 'write-then-throw' }])
+    .then(() => null, reason => reason);
+
+  assert.equal(error.rollbackIncomplete, true);
+  assert.equal(error.residualCount, 1);
+  assert.deepEqual(error.residualIds, ['write-then-throw']);
+  assert.match(error.message, /1/);
+  assert.match(error.message, /write-then-throw/);
+  assert.equal(primary.has(`${RECORD_PREFIX}write-then-throw`), true);
+});
+
 test('exports exact product schema and rule metadata', () => {
   assert.match(html, /product:\s*['"]legend-manse['"]/);
   assert.match(html, /schemaVersion:\s*2/);

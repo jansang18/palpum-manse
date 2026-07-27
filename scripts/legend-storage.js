@@ -22,13 +22,29 @@
     }
   }
 
+  function storageUnavailable(cause) {
+    const error = new Error('저장소 상태를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+    error.name = 'LegendStorageUnavailableError';
+    error.code = 'LEGEND_STORAGE_UNAVAILABLE';
+    error.cause = cause;
+    return error;
+  }
+
   function createRecordStore(storage, fallbackStorage) {
     function readFallbackRecords() {
+      let value;
       try {
-        const records = JSON.parse(fallbackStorage.getItem(FALLBACK_KEY) || '[]');
-        return Array.isArray(records) ? records.filter(validRecord) : [];
+        value = fallbackStorage.getItem(FALLBACK_KEY);
       } catch (error) {
-        return [];
+        throw storageUnavailable(error);
+      }
+      if (value === null || value === '') return [];
+      try {
+        const records = JSON.parse(value);
+        if (!Array.isArray(records)) throw new TypeError('Fallback records must be an array.');
+        return records.filter(validRecord);
+      } catch (error) {
+        throw storageUnavailable(error);
       }
     }
 
@@ -36,8 +52,7 @@
       fallbackStorage.setItem(FALLBACK_KEY, JSON.stringify(records));
     }
 
-    function removeFallbackRecord(id) {
-      const records = readFallbackRecords();
+    function removeFallbackRecord(id, records = readFallbackRecords()) {
       const next = records.filter(record => record.id !== id);
       if (next.length !== records.length) writeFallbackRecords(next);
     }
@@ -110,13 +125,14 @@
     }
 
     async function deleteRecord(id) {
+      const fallbackRecords = readFallbackRecords();
       try {
         await storage.delete(RECORD_PREFIX + id);
       } catch (error) {
         throw new Error('명반을 삭제하지 못했습니다. 최신 저장본을 유지합니다.');
       }
       try {
-        removeFallbackRecord(id);
+        removeFallbackRecord(id, fallbackRecords);
       } catch (error) {
         throw new Error('명반을 완전히 삭제하지 못했습니다. 복구 가능한 저장본을 유지합니다.');
       }
@@ -131,26 +147,42 @@
 
     async function importRecords(records) {
       if (!Array.isArray(records)) throw new Error('가져올 명반 형식이 올바르지 않습니다.');
-      const writes = [];
+      const attempts = [];
       try {
         for (const record of records) {
           if (!validRecord(record)) throw new Error('가져올 명반 형식이 올바르지 않습니다.');
           const key = RECORD_PREFIX + record.id;
           const previous = await storage.get(key);
+          attempts.push({ key, id: record.id, previous });
           await storage.set(key, JSON.stringify(record));
-          writes.push({ key, id: record.id, previous });
         }
       } catch (error) {
-        const residualIds = [];
-        for (const write of writes.reverse()) {
+        for (const attempt of [...attempts].reverse()) {
           try {
-            if (write.previous && typeof write.previous.value === 'string') {
-              await storage.set(write.key, write.previous.value);
+            if (attempt.previous && typeof attempt.previous.value === 'string') {
+              await storage.set(attempt.key, attempt.previous.value);
             } else {
-              await storage.delete(write.key);
+              await storage.delete(attempt.key);
             }
           } catch (rollbackError) {
-            residualIds.push(write.id);
+            // Verification below determines whether the failed operation restored the value.
+          }
+        }
+
+        const baselines = new Map();
+        for (const attempt of attempts) {
+          if (!baselines.has(attempt.key)) baselines.set(attempt.key, attempt);
+        }
+        const residualIds = [];
+        for (const baseline of baselines.values()) {
+          try {
+            const current = await storage.get(baseline.key);
+            const restored = baseline.previous && typeof baseline.previous.value === 'string'
+              ? current && current.value === baseline.previous.value
+              : current === null || current === undefined;
+            if (!restored) residualIds.push(baseline.id);
+          } catch (verificationError) {
+            residualIds.push(baseline.id);
           }
         }
         if (residualIds.length) {
@@ -158,6 +190,7 @@
             `가져오기를 저장하지 못했습니다. 롤백이 완료되지 않았습니다. 잔여 ${residualIds.length}개: ${residualIds.join(', ')}`
           );
           rollbackError.rollbackIncomplete = true;
+          rollbackError.residualCount = residualIds.length;
           rollbackError.residualIds = residualIds;
           throw rollbackError;
         }

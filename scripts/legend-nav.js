@@ -33,7 +33,7 @@
     var activeView = document.querySelector('.view.active');
     return activeView && activeView.id.indexOf('view-') === 0
       ? activeView.id.slice(5)
-      : 'legend';
+      : 'input';
   }
 
   function groupDestination(tabName) {
@@ -51,6 +51,9 @@
     }
     if (tabName === 'saved' && typeof window.renderSaved === 'function') {
       window.renderSaved();
+    }
+    if (tabName === 'result' && typeof window.renderResult === 'function') {
+      window.renderResult();
     }
     if (tabName === 'fortune' && typeof window.renderFortune === 'function') {
       window.renderFortune();

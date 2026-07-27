@@ -2018,12 +2018,12 @@
   </nav>
 
   <nav class="legend-saju-nav" id="legendSajuNav" aria-label="전설사주 메뉴">
-    <button type="button" data-legend-saju-nav data-tab="input" aria-controls="view-input">사주 입력</button>
+    <button type="button" data-legend-saju-nav data-tab="input" aria-controls="view-input" class="active" aria-current="page">사주 입력</button>
     <button type="button" data-legend-saju-nav data-tab="result" aria-controls="view-result">원국</button>
-    <button type="button" data-legend-saju-nav data-tab="legend" aria-controls="view-legend" class="active" aria-current="page">전설</button>
+    <button type="button" data-legend-saju-nav data-tab="legend" aria-controls="view-legend">전설</button>
   </nav>
 
-  <section class="view" id="view-input" role="tabpanel" aria-labelledby="tab-legend" hidden>
+  <section class="view active" id="view-input" role="tabpanel" aria-labelledby="tab-legend">
     <div class="input-intro">
       <img class="intro-logo-img" src="main-logo.png" alt="취명선 전설의 만세력">
       <img class="legend-input-seal" src="assets/legend-seal.webp" alt="" aria-hidden="true">
@@ -2096,7 +2096,7 @@
     </details>
     </div>
 
-    <button type="button" class="primary-btn" id="calcBtn">사주 펼치기</button>
+    <button type="button" class="primary-btn" id="calcBtn">팔품 운세 펼치기</button>
     <div id="inErr" role="alert"></div>
 
     <div class="note-text" style="margin-top: 20px;">
@@ -2106,7 +2106,7 @@
 
   <section class="view" id="view-result" role="tabpanel" aria-labelledby="tab-legend" hidden></section>
 
-  <section class="view active" id="view-legend" role="tabpanel" aria-labelledby="tab-legend">
+  <section class="view" id="view-legend" role="tabpanel" aria-labelledby="tab-legend" hidden>
     <div id="legendContent" aria-live="polite"></div>
   </section>
 
@@ -12338,6 +12338,8 @@ Sigrid Niehaus|19641229|F|
 <script src="scripts/vendor/manseryeok.browser.js"></script>
 <script src="scripts/manseryeok-adapter.js"></script>
 <script src="scripts/legend-storage.js"></script>
+<script src="scripts/legend-palpum.js"></script>
+<script src="scripts/legend-palpum-fortune.js"></script>
 <script>
 /* 전역 에러 핸들러 — 콘솔에만 기록 (화면 오버레이는 iOS에서 인터랙션을 막을 수 있어 제거) */
 window.addEventListener('error', function(e) {
@@ -12835,6 +12837,7 @@ function onTap(el, fn) {
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 let currentSaju = null;
+let currentPalpum = null;
 let selectedDaeun = null, selectedSeun = null, selectedWoon = null;
 let selectedLegendDay = null;
 
@@ -13022,10 +13025,15 @@ onTap($('#calcBtn'), () => {
     });
     saju.name = name || '이름 없음';
     currentSaju = saju;
+    if (typeof buildCurrentPalpum === 'function') {
+      currentPalpum = buildCurrentPalpum(saju);
+    } else {
+      currentPalpum = null;
+    }
     selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
-    renderResult();
-    window.activateLegendDestination('result');
-    window.scrollTo({top: 0, behavior: 'smooth'});
+    setFortuneQuickPeriod('this-year', { render: false });
+    window.activateLegendDestination('fortune');
+    window.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
   } catch (e) {
     if (e && e.code === 'LEGEND_SOLAR_TERM_TIME_REQUIRED') {
       return showInErr(e.message, '#inTime');
@@ -14553,6 +14561,13 @@ const fortuneToday = new Date();
 let fortunePeriodMode = 'month';
 let fortuneCursorYear = fortuneToday.getFullYear();
 let fortuneCursorMonth = fortuneToday.getMonth() + 1;
+
+function setFortuneQuickPeriod(period, options) {
+  if (period !== 'this-year') return;
+  fortunePeriodMode = 'year';
+  fortuneCursorYear = fortuneToday.getFullYear();
+  if (!options || options.render !== false) renderFortune();
+}
 
 // 오행 상생/상극 관계
 // 상생: 목→화→토→금→수→목

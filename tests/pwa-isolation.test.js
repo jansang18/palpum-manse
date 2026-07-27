@@ -12,6 +12,7 @@ const ganjiFixtures = fs.readFileSync('tests/ganji-fixtures.test.js', 'utf8');
 const uiRegression = fs.readFileSync('tests/ui-regression.js', 'utf8');
 const deploymentGuide = fs.readFileSync('웹배포_안내.md', 'utf8');
 const legendView = fs.readFileSync('scripts/legend-view.js', 'utf8');
+const legendNav = fs.readFileSync('scripts/legend-nav.js', 'utf8');
 
 const runtimeAssets = [
   'polish.css',
@@ -55,19 +56,30 @@ test('uses legend-specific PWA identity and colors', () => {
   assert.doesNotMatch(serviceWorker, /chwimyeongseon-manse-/);
 });
 
-test('opens on a distinct current-era legend home instead of the inherited input screen', () => {
-  assert.match(
-    html,
-    /class="tab active"[^>]*aria-selected="true"[^>]*data-tab="legend"/
+test('starts at Saju input and labels calculation as Palpum fortune', () => {
+  assert.match(html, /<section class="view active" id="view-input"/);
+  assert.match(html, /<section class="view" id="view-legend"[^>]*hidden/);
+  assert.match(html, /id="calcBtn"[^>]*>팔품 운세 펼치기/);
+});
+
+test('loads Palpum modules before the inline app controller', () => {
+  assert.match(html, /scripts\/legend-palpum\.js[\s\S]+scripts\/legend-palpum-fortune\.js[\s\S]+<script>/);
+});
+
+test('routes successful calculation to this-year Palpum fortune', () => {
+  const calculationHandler = html.slice(
+    html.indexOf("onTap($('#calcBtn')"),
+    html.indexOf('\nfunction renderResult()')
   );
-  assert.match(
-    html,
-    /<section class="view" id="view-input"[^>]*hidden/
-  );
-  assert.match(
-    html,
-    /<section class="view active" id="view-legend"[^>]*>/
-  );
+
+  assert.match(html, /currentPalpum\s*=\s*buildCurrentPalpum\(saju\)/);
+  assert.match(html, /setFortuneQuickPeriod\(['"]this-year['"],\s*\{\s*render:\s*false\s*\}\)/);
+  assert.match(calculationHandler, /activateLegendDestination\(['"]fortune['"]\)/);
+  assert.doesNotMatch(calculationHandler, /activateLegendDestination\(['"]result['"]\)/);
+  assert.match(legendNav, /tabName === 'result'[\s\S]+window\.renderResult\(\)/);
+});
+
+test('keeps the current-era legend and PWA identity available', () => {
   assert.match(serviceWorker, /const VERSION = 'v10-20260727-opaque-mobile-nav'/);
   assert.match(serviceWorker, /const CACHE_PREFIX = 'legend-manse-'/);
   assert.match(legendView, /id\s*=\s*['"]legendLanding['"]/);

@@ -1,7 +1,7 @@
 // 취명선 전설의 만세력 서비스워커
 // 전략: HTML/CSS/JS = 네트워크 우선(항상 최신 디자인), 이미지/아이콘 = 캐시 우선(빠름).
 // 오프라인일 때만 캐시로 폴백한다. 배포 시 VERSION만 올리면 옛 캐시는 자동 삭제됨.
-const VERSION = 'v10-20260727-opaque-mobile-nav';
+const VERSION = 'v11-20260727-palpum-saved-offline';
 const CACHE_PREFIX = 'legend-manse-';
 const CACHE = CACHE_PREFIX + VERSION;
 
@@ -22,6 +22,8 @@ const PRECACHE = [
   './scripts/vendor/manseryeok.browser.js',
   './scripts/manseryeok-adapter.js',
   './scripts/legend-storage.js',
+  './scripts/legend-palpum.js',
+  './scripts/legend-palpum-fortune.js',
   './scripts/legend-era.js',
   './scripts/legend-resonance.js',
   './scripts/legend-copy.js',

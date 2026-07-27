@@ -80,7 +80,7 @@ test('routes successful calculation to this-year Palpum fortune', () => {
 });
 
 test('keeps the current-era legend and PWA identity available', () => {
-  assert.match(serviceWorker, /const VERSION = 'v10-20260727-opaque-mobile-nav'/);
+  assert.match(serviceWorker, /const VERSION = 'v11-20260727-palpum-saved-offline'/);
   assert.match(serviceWorker, /const CACHE_PREFIX = 'legend-manse-'/);
   assert.match(legendView, /id\s*=\s*['"]legendLanding['"]/);
   assert.match(legendView, /id\s*=\s*['"]legendStartButton['"]/);
@@ -94,6 +94,13 @@ test('precaches every legend runtime asset for an offline first visit', () => {
   for (const asset of runtimeAssets) {
     assert.match(serviceWorker, escaped(`./${asset}`), `${asset} must be precached`);
   }
+});
+
+test('precaches Palpum modules without weakening cache isolation', () => {
+  assert.match(serviceWorker, /scripts\/legend-palpum\.js/);
+  assert.match(serviceWorker, /scripts\/legend-palpum-fortune\.js/);
+  assert.match(serviceWorker, /url\.origin !== self\.location\.origin/);
+  assert.match(serviceWorker, /startsWith\(CACHE_PREFIX\)/);
 });
 
 test('activation preserves caches owned by other deployments', () => {

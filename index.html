@@ -13083,8 +13083,7 @@ onTap($('#calcBtn'), () => {
       return showInErr(e.message, '#inTime');
     }
     if (e instanceof RangeError) return showInErr(e.message, '#inBirth');
-    console.error(e);
-    alert('계산 오류: ' + e.message);
+    return showInErr('계산 중 오류가 발생했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.');
   }
 });
 
@@ -14015,9 +14014,10 @@ async function renderSaved() {
       }
       if (rec) {
         currentSaju = rec;
+        rebuildCurrentPalpum(currentSaju);
         selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
-        renderResult();
-        window.activateLegendDestination('result');
+        setFortuneQuickPeriod('this-year', { render: false });
+        window.activateLegendDestination('fortune');
         window.scrollTo(0, 0);
       }
     });
@@ -14761,7 +14761,7 @@ function buildCurrentPalpum(saju) {
     saju.hour,
     saju.minute
   );
-  return globalThis.LegendPalpum.classifyPalpum({
+  const classification = globalThis.LegendPalpum.classifyPalpum({
     instantMs,
     boundaries,
     accuracy: historical ? 'historical-approximation' : 'exact',
@@ -14770,6 +14770,7 @@ function buildCurrentPalpum(saju) {
       ? { startMs: dayStartMs, endMs: dayEndMs - 1 }
       : undefined
   });
+  return Object.freeze({ version: 'palpum-v1', ...classification });
 }
 
 function rebuildCurrentPalpum(saju) {
@@ -15271,9 +15272,16 @@ function _renderFortuneInner() {
     ? `${currentPalpum.candidates.join(' · ')} 후보`
     : `${currentPalpum.type} · 당령 ${currentPalpum.ruler}`;
   const badges = [
-    ...(currentPalpum.boundaryUncertain ? ['팔품 경계 가능성'] : []),
-    ...(currentPalpum.accuracy === 'historical-approximation' ? ['역사 범위 근사'] : [])
+    ...(currentPalpum.boundaryUncertain ? [{ className: 'palpum-boundary', label: '팔품 경계 가능성' }] : []),
+    ...(currentPalpum.accuracy === 'historical-approximation'
+      ? [{ className: 'palpum-accuracy', accuracy: 'historical-approximation', label: '역사 범위 근사' }]
+      : [])
   ];
+  const timeNote = !s.unknown
+    ? null
+    : currentPalpum.boundaryUncertain
+      ? { kind: 'time-required', text: '출생 시간을 알려주시면 팔품 후보를 하나로 확인할 수 있습니다.' }
+      : { kind: 'hour-excluded', text: '시주 제외로 팔품을 계산했습니다.' };
   const areaDefinitions = [
     { key: 'relationship', title: '관계', seal: '緣' },
     { key: 'career', title: '직업', seal: '業' },
@@ -15350,9 +15358,10 @@ function _renderFortuneInner() {
       <p class="palpum-role">${escapeHtml(roleEvidence?.detail || interpretation.headline)}</p>
       ${badges.length ? `
         <div class="palpum-badges">
-          ${badges.map(badge => `<span class="${badge === '팔품 경계 가능성' ? 'palpum-boundary' : 'palpum-accuracy'}">${badge}</span>`).join('')}
+          ${badges.map(badge => `<span class="${badge.className}"${badge.accuracy ? ` data-palpum-accuracy="${badge.accuracy}"` : ''}>${badge.label}</span>`).join('')}
         </div>
       ` : ''}
+      ${timeNote ? `<p class="palpum-time-note" data-palpum-time-note="${timeNote.kind}" role="status">${timeNote.text}</p>` : ''}
     </section>
 
     <section class="palpum-triad" aria-label="이번 시기의 기회, 부담, 준비">

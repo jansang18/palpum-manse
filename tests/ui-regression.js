@@ -12,6 +12,7 @@ const GREP_GROUPS = {
   'Palpum quick periods': 'palpum-quick-periods',
   'Palpum result rendering': 'palpum-result-rendering',
   'Palpum period boundaries': 'palpum-period-boundaries',
+  'legacy saved chart derives Palpum': 'task-7',
   'Palpum ink wash': 'palpum-layout',
   'navigation never covers': 'palpum-layout',
   'Palpum ink wash|navigation never covers': 'palpum-layout'
@@ -1712,6 +1713,105 @@ async function inspectPalpumIntegration(page, width) {
   await inspectHistoricalPalpumDisclosure(page, width);
   await inspectUnknownTimePalpumBoundary(page, width);
   await inspectPalpumHourRecalculation(page, width);
+}
+
+async function inspectSavedChartPalpumStates(page, width) {
+  const legacyRecord = await page.evaluate(async () => {
+    const id = 'legacy-pre-palpum';
+    const record = {
+      ...calcSaju({
+        year: 1986,
+        month: 2,
+        day: 19,
+        hour: 14,
+        minute: 30,
+        calendar: 'solar',
+        isLeapMonth: false,
+        gender: 'M',
+        unknown: false,
+        dayBoundary: 'midnight'
+      }),
+      id,
+      name: 'Legacy fixture',
+      memo: 'Pre-Palpum saved chart',
+      fav: false,
+      savedAt: 1700000000000
+    };
+    await window.storage.set(`legend-saju:record:${id}`, JSON.stringify(record));
+    window.activateLegendDestination('saved');
+    await renderSaved();
+    return JSON.stringify(record);
+  });
+
+  await page.click('.saved-card[data-id="legacy-pre-palpum"]');
+  await sleep(100);
+  const savedResult = await page.evaluate(async () => ({
+    destination: document.querySelector('.tab.active')?.dataset.tab,
+    version: currentPalpum?.version,
+    type: currentPalpum?.type,
+    ruler: currentPalpum?.ruler,
+    stored: (await window.storage.get('legend-saju:record:legacy-pre-palpum'))?.value
+  }));
+  assert.deepEqual({
+    destination: savedResult.destination,
+    version: savedResult.version,
+    type: savedResult.type,
+    ruler: savedResult.ruler
+  }, {
+    destination: 'fortune',
+    version: 'palpum-v1',
+    type: '인묘품',
+    ruler: '갑목'
+  }, `${width}px legacy saved chart derives Palpum`);
+  assert.equal(savedResult.stored, legacyRecord, `${width}px saved source record remains unchanged`);
+
+  await calculateFixture(page, { birth: '19860219', time: '' });
+  assert.deepEqual(await page.evaluate(() => ({
+    uncertain: currentPalpum?.boundaryUncertain,
+    note: document.querySelector('[data-palpum-time-note]')?.dataset.palpumTimeNote
+  })), {
+    uncertain: false,
+    note: 'hour-excluded'
+  }, `${width}px missing time away from a boundary is disclosed`);
+
+  await calculateFixture(page, { birth: '20260204', time: '' });
+  assert.deepEqual(await page.evaluate(() => ({
+    candidates: currentPalpum?.candidates,
+    note: document.querySelector('[data-palpum-time-note]')?.dataset.palpumTimeNote
+  })), {
+    candidates: ['자축품', '인묘품'],
+    note: 'time-required'
+  }, `${width}px missing time across a boundary requests time`);
+
+  await calculateFixture(page, { birth: '17990219', time: '1430' });
+  assert.equal(
+    await page.$eval('[data-palpum-accuracy="historical-approximation"]', element => element.textContent.includes('역사 범위 근사')),
+    true,
+    `${width}px historical approximation is visible`
+  );
+
+  await activateDestination(page, 'input');
+  const calculationError = await page.evaluate(() => {
+    const originalGanji = window.LegendGanji;
+    window.LegendGanji = { calculate: () => { throw new Error('forced calculation failure'); } };
+    document.getElementById('inBirth').value = '19860219';
+    document.getElementById('inTime').value = '1430';
+    document.getElementById('calcBtn').click();
+    const state = {
+      birth: document.getElementById('inBirth').value,
+      time: document.getElementById('inTime').value,
+      errorVisible: document.getElementById('inErr').classList.contains('show'),
+      retryEnabled: !document.getElementById('calcBtn').disabled
+    };
+    window.LegendGanji = originalGanji;
+    return state;
+  });
+  assert.deepEqual(calculationError, {
+    birth: '19860219',
+    time: '1430',
+    errorVisible: true,
+    retryEnabled: true
+  }, `${width}px calculation errors retain input and allow retry`);
 }
 
 async function inspectPalpumPeriodBoundaries(page, width) {
@@ -4451,6 +4551,12 @@ async function inspectWidth(browser, width) {
     }
     await page.reload({ waitUntil: 'networkidle0' });
     await page.evaluate(() => document.body.classList.add('dark'));
+  }
+
+  if (TEST_GROUP === 'task-7') {
+    await inspectSavedChartPalpumStates(page, width);
+    await closeCleanPage(page, width, pageIssues);
+    return;
   }
 
   if (TEST_GROUP === 'palpum-period-boundaries' || (!TEST_GROUP && width === 390)) {

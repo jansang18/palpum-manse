@@ -31,7 +31,12 @@ function inspectLegendSourceContracts() {
   assert.match(html, /alt="취명선 전설의 만세력"/);
   assert.equal((html.match(/rel="manifest"/g) || []).length, 1);
   assert.doesNotMatch(html, /data:application\/json/);
-  assert.doesNotMatch(html, /취명선 만세력|취명선만세력|정재훈 만세력/);
+  assert.doesNotMatch(html, /정재훈 만세력|신의음성만세력/);
+  assert.doesNotMatch(
+    html.match(/<head>[\s\S]*?<\/head>/)?.[0] || '',
+    /취명선 만세력|취명선만세력/,
+    'legacy import aliases must not appear in user-visible app identity'
+  );
   assert.doesNotMatch(shareSource, /취명선 만세력|sineum-manse/);
   assert.match(shareSource, /취명선 전설의 만세력/);
   assert.match(shareSource, /jansang18\.github\.io\/legend-manse/);
@@ -143,6 +148,8 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [390, 1220]
   : TEST_GROUP === 'release-audit'
     ? [360, 390, 412, 768, 1220]
+  : TEST_GROUP === 'lunar-input' || TEST_GROUP === 'legacy-import'
+    ? [390]
   : TEST_GROUP === 'repository-root'
     ? [390]
   : TEST_GROUP ? [390] : [360, 390, 412, 768, 1220];
@@ -1192,6 +1199,204 @@ async function inspectExactReleaseAssertions(page, width) {
     release.documentWidth <= release.viewportWidth + 1,
     `${width}px release document overflows by ${release.documentWidth - release.viewportWidth}px`
   );
+}
+
+async function inspectLunarMonthInput(page, width) {
+  await activateDestination(page, 'input');
+  await page.click('#segCal [data-val="solar"]');
+  const solarState = await page.evaluate(() => {
+    const field = document.getElementById('lunarMonthTypeField');
+    return {
+      hidden: field.hidden,
+      disabled: [...field.querySelectorAll('button')].map(button => button.disabled)
+    };
+  });
+  assert.deepEqual(solarState, { hidden: true, disabled: [true, true] });
+
+  await page.click('#segCal [data-val="lunar"]');
+  await page.focus('#segLeapMonth [data-val="normal"]');
+  await page.keyboard.press('ArrowRight');
+  const lunarState = await page.evaluate(() => {
+    const field = document.getElementById('lunarMonthTypeField');
+    const group = document.getElementById('segLeapMonth');
+    return {
+      hidden: field.hidden,
+      role: group.getAttribute('role'),
+      selected: group.querySelector('[aria-checked="true"]')?.dataset.val,
+      buttons: [...group.querySelectorAll('button')].map(button => {
+        const rect = button.getBoundingClientRect();
+        return {
+          role: button.getAttribute('role'),
+          disabled: button.disabled,
+          width: rect.width,
+          height: rect.height
+        };
+      })
+    };
+  });
+  assert.equal(lunarState.hidden, false);
+  assert.equal(lunarState.role, 'radiogroup');
+  assert.equal(lunarState.selected, 'leap');
+  for (const button of lunarState.buttons) {
+    assert.equal(button.role, 'radio');
+    assert.equal(button.disabled, false);
+    assert.ok(button.width >= 44, `${width}px lunar month button width ${button.width}`);
+    assert.ok(button.height >= 44, `${width}px lunar month button height ${button.height}`);
+  }
+
+  await page.evaluate(() => {
+    document.getElementById('inputName').value = '윤달fixture';
+    document.getElementById('inBirth').value = '20230201';
+    document.getElementById('inTime').value = '1200';
+    document.getElementById('calcBtn').click();
+  });
+  await sleep(400);
+  const calculated = await page.evaluate(() => ({
+    calendar: currentSaju?.calendar,
+    isLeapMonth: currentSaju?.isLeapMonth,
+    lunar: currentSaju?.lunar,
+    solar: [currentSaju?.year, currentSaju?.month, currentSaju?.day]
+  }));
+  assert.deepEqual(calculated, {
+    calendar: 'lunar',
+    isLeapMonth: true,
+    lunar: { y: 2023, m: 2, d: 1, isLeap: true },
+    solar: [2023, 3, 22]
+  });
+
+  await page.$eval('#saveBtn', button => button.click());
+  await page.$eval('#saveName', input => { input.value = '윤달 저장'; });
+  await page.$eval('#saveConfirm', button => button.click());
+  await sleep(150);
+  const persistence = await page.evaluate(async () => {
+    const records = await recordStore.listRecords();
+    window.activateLegendDestination('saved');
+    await renderSaved();
+    window.__lunarExportBlob = null;
+    URL.createObjectURL = blob => {
+      window.__lunarExportBlob = blob;
+      return 'blob:lunar-export';
+    };
+    HTMLAnchorElement.prototype.click = function () {};
+    document.getElementById('savedExportBtn').click();
+    const payload = JSON.parse(await window.__lunarExportBlob.text());
+    const keys = (await window.storage.list('legend-saju:record:')).keys;
+    for (const key of keys) await window.storage.delete(key);
+    return {
+      saved: records.map(record => ({
+        calendar: record.calendar,
+        isLeapMonth: record.isLeapMonth,
+        lunar: record.lunar
+      })),
+      exported: payload.records.map(record => ({
+        calendar: record.calendar,
+        isLeapMonth: record.isLeapMonth,
+        lunar: record.lunar
+      }))
+    };
+  });
+  assert.deepEqual(persistence.saved, [{
+    calendar: 'lunar',
+    isLeapMonth: true,
+    lunar: { y: 2023, m: 2, d: 1, isLeap: true }
+  }]);
+  assert.deepEqual(persistence.exported, persistence.saved);
+
+  await activateDestination(page, 'input');
+  await page.$eval('#segCal [data-val="solar"]', button => button.click());
+  const hiddenAgain = await page.evaluate(() => ({
+    hidden: document.getElementById('lunarMonthTypeField').hidden,
+    disabled: [...document.querySelectorAll('#segLeapMonth button')].every(button => button.disabled)
+  }));
+  assert.deepEqual(hiddenAgain, { hidden: true, disabled: true });
+
+  await page.$eval('#segCal [data-val="lunar"]', button => button.click());
+  await page.$eval('#segLeapMonth [data-val="leap"]', button => button.click());
+  await page.evaluate(() => {
+    document.getElementById('inBirth').value = '20240201';
+    document.getElementById('inTime').value = '1200';
+    document.getElementById('calcBtn').click();
+  });
+  await sleep(100);
+  const invalidLeap = await page.evaluate(() => ({
+    message: document.getElementById('inErr').textContent.trim(),
+    inputActive: document.getElementById('view-input').classList.contains('active')
+  }));
+  assert.match(invalidLeap.message, /2024년에는 윤2월이 존재하지 않습니다/);
+  assert.equal(invalidLeap.inputActive, true);
+}
+
+async function inspectLegacyBackupImport(page) {
+  const state = await page.evaluate(async () => {
+    const existing = (await window.storage.list('legend-saju:record:')).keys;
+    for (const key of existing) await window.storage.delete(key);
+    const sample = {
+      id: 'legacy-id',
+      name: '구 백업',
+      year: 1989,
+      month: 3,
+      day: 19,
+      hour: 14,
+      minute: 30,
+      gender: 'M',
+      unknown: false,
+      memo: '정규화',
+      fav: true,
+      savedAt: 1700000000000,
+      unexpected: '<script>must be dropped</script>'
+    };
+    const arrayResult = await importSavedRecords(normalizeImportedBackup([sample]));
+    const objectResult = await importSavedRecords(normalizeImportedBackup({
+      app: '취명선 만세력',
+      version: 1,
+      records: [{ ...sample, id: 'legacy-object', name: '구 객체 백업' }]
+    }));
+    const malformedResult = await importSavedRecords(normalizeImportedBackup({
+      app: '취명선 만세력',
+      version: 1,
+      records: [{ ...sample, gender: 'X' }]
+    }));
+    const rejected = [];
+    for (const payload of [
+      { app: 'untrusted-product', version: 1, records: [sample] },
+      { app: '취명선 만세력', records: [sample] },
+      { app: '취명선 만세력', version: 1, records: 'not-an-array' }
+    ]) {
+      try {
+        normalizeImportedBackup(payload);
+      } catch (error) {
+        rejected.push(error.message);
+      }
+    }
+    const records = await recordStore.listRecords();
+    const keys = (await window.storage.list('legend-saju:record:')).keys;
+    for (const key of keys) await window.storage.delete(key);
+    return {
+      arrayResult,
+      objectResult,
+      malformedResult,
+      rejected,
+      keys,
+      records: records.map(record => ({
+        id: record.id,
+        name: record.name,
+        unexpected: record.unexpected,
+        calculationMode: record.calculationMode
+      }))
+    };
+  });
+
+  assert.deepEqual(state.arrayResult, { added: 1, skipped: 0 });
+  assert.deepEqual(state.objectResult, { added: 1, skipped: 0 });
+  assert.deepEqual(state.malformedResult, { added: 0, skipped: 1 });
+  assert.equal(state.rejected.length, 3);
+  assert.ok(state.rejected.every(message => /지원하지 않는 백업/.test(message)));
+  assert.equal(state.keys.length, 2);
+  assert.ok(state.keys.every(key => key.startsWith('legend-saju:record:')));
+  assert.equal(state.records.length, 2);
+  assert.ok(state.records.every(record => record.id !== 'legacy-id' && record.id !== 'legacy-object'));
+  assert.ok(state.records.every(record => record.unexpected === undefined));
+  assert.ok(state.records.every(record => record.calculationMode));
 }
 
 async function inspectLegendFlow(page, width) {
@@ -2748,6 +2953,26 @@ async function inspectWidth(browser, width) {
   await page.goto(URL, { waitUntil: 'networkidle0' });
   console.log(`[ui] ${width}px: loaded`);
   await page.evaluate(() => document.body.classList.add('dark'));
+
+  if (TEST_GROUP === 'lunar-input' || (!TEST_GROUP && width === 390)) {
+    await inspectLunarMonthInput(page, width);
+    if (TEST_GROUP === 'lunar-input') {
+      await closeCleanPage(page, width, pageIssues);
+      return;
+    }
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
+  }
+
+  if (TEST_GROUP === 'legacy-import' || (!TEST_GROUP && width === 390)) {
+    await inspectLegacyBackupImport(page);
+    if (TEST_GROUP === 'legacy-import') {
+      await closeCleanPage(page, width, pageIssues);
+      return;
+    }
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
+  }
 
   if (TEST_GROUP === 'legend-flow') {
     await inspectLegendFlow(page, width);

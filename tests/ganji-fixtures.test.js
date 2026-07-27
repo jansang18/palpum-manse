@@ -1,11 +1,62 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const puppeteer = require('puppeteer-core');
 const manseryeok = require('manseryeok');
 const { createAdapter } = require('../scripts/manseryeok-adapter.js');
 
 const adapter = createAdapter(manseryeok);
+let browserPromise = null;
+
+function findChromeExecutable() {
+  if (process.env.CHROME_PATH) {
+    if (fs.existsSync(process.env.CHROME_PATH)) return process.env.CHROME_PATH;
+    throw new Error(`CHROME_PATH does not exist: ${process.env.CHROME_PATH}`);
+  }
+
+  const candidates = process.platform === 'win32'
+    ? [
+        process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe')
+      ]
+    : process.platform === 'darwin'
+      ? [
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+          '/Applications/Chromium.app/Contents/MacOS/Chromium',
+          '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+        ]
+      : [
+          '/usr/bin/google-chrome',
+          '/usr/bin/google-chrome-stable',
+          '/usr/bin/chromium',
+          '/usr/bin/chromium-browser',
+          '/snap/bin/chromium'
+        ];
+  const executable = candidates.filter(Boolean).find(candidate => fs.existsSync(candidate));
+  if (!executable) {
+    throw new Error('Chrome/Chromium executable not found. Set CHROME_PATH to run browser Ganji fixtures.');
+  }
+  return executable;
+}
+
+function getBrowser() {
+  if (!browserPromise) {
+    browserPromise = puppeteer.launch({
+      executablePath: findChromeExecutable(),
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+  }
+  return browserPromise;
+}
+
+test.after(async () => {
+  if (browserPromise) await (await browserPromise).close();
+});
 
 test('maps a normal KST birth to numeric pillar indexes and legacy daewoon', () => {
   const result = adapter.calculate({
@@ -49,6 +100,20 @@ test('preserves lunar input and its converted solar date', () => {
       result.dStem, result.dBranch, result.hStem, result.hBranch],
     [8, 8, 6, 10, 9, 9, 1, 3]
   );
+});
+
+test('requires an explicit normal or leap month choice for lunar input', () => {
+  assert.throws(() => adapter.calculate({
+    year: 2023, month: 2, day: 1, hour: 12, minute: 0,
+    calendar: 'lunar', gender: 'F', unknown: false
+  }), /평달.*윤달|isLeapMonth/);
+});
+
+test('rejects a leap month that does not exist instead of using the normal month', () => {
+  assert.throws(() => adapter.calculate({
+    year: 2024, month: 2, day: 1, hour: 12, minute: 0,
+    calendar: 'lunar', isLeapMonth: true, gender: 'F', unknown: false
+  }), /윤2월이 존재하지 않습니다/);
 });
 
 test('changes the year pillar across the exact 2024 ipchun boundary', () => {
@@ -113,28 +178,18 @@ test('uses the complete precise solar and lunar input ranges from the engine', (
 
   assert.equal(adapter.calculate({
     year: 2100, month: 1, day: 1, hour: 12, minute: 0,
-    calendar: 'lunar', gender: 'F', unknown: false
+    calendar: 'lunar', isLeapMonth: false, gender: 'F', unknown: false
   }).calculationMode, 'kasi-precise');
   assert.throws(() => adapter.calculate({
     year: 2101, month: 1, day: 1, hour: 12, minute: 0,
-    calendar: 'lunar', gender: 'F', unknown: false
+    calendar: 'lunar', isLeapMonth: false, gender: 'F', unknown: false
   }), /1800~2100/);
 });
 
-test('browser calculation renders the precise KASI result contract', {
-  skip: process.env.RUN_UI_GANJI !== '1'
-}, async () => {
-  const puppeteer = require('puppeteer-core');
-  const chrome = process.env.CHROME_PATH ||
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await puppeteer.launch({
-    executablePath: chrome,
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-
+test('browser calculation renders the precise KASI result contract', async () => {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
       waitUntil: 'networkidle0'
     });
@@ -169,24 +224,14 @@ test('browser calculation renders the precise KASI result contract', {
       gongmang: [10, 11]
     });
   } finally {
-    await browser.close();
+    await page.close();
   }
 });
 
-test('browser rejects pre-1800 lunar dates but preserves solar legacy mode', {
-  skip: process.env.RUN_UI_GANJI !== '1'
-}, async () => {
-  const puppeteer = require('puppeteer-core');
-  const chrome = process.env.CHROME_PATH ||
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-  const browser = await puppeteer.launch({
-    executablePath: chrome,
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-
+test('browser rejects pre-1800 lunar dates but preserves solar legacy mode', async () => {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
     await page.goto(pathToFileURL(path.resolve(__dirname, '..', 'index.html')).href, {
       waitUntil: 'networkidle0'
     });
@@ -239,6 +284,6 @@ test('browser rejects pre-1800 lunar dates but preserves solar legacy mode', {
       birthInvalid: true
     });
   } finally {
-    await browser.close();
+    await page.close();
   }
 });

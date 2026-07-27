@@ -42,7 +42,7 @@
         input.year,
         input.month,
         input.day,
-        Boolean(input.isLeapMonth)
+        input.isLeapMonth
       );
       return {
         solar: mapSolar(solar),
@@ -50,7 +50,7 @@
           year: input.year,
           month: input.month,
           day: input.day,
-          isLeapMonth: Boolean(input.isLeapMonth)
+          isLeapMonth: input.isLeapMonth
         })
       };
     }
@@ -105,6 +105,9 @@
 
     function calculate(input) {
       validatePreciseYear(engine, input);
+      if (input.calendar === 'lunar' && typeof input.isLeapMonth !== 'boolean') {
+        throw new TypeError('음력은 평달 또는 윤달을 선택해야 합니다 (isLeapMonth).');
+      }
       const dates = convertedDates(engine, input);
       const result = engine.calculateFourPillars({
         year: input.year,
@@ -113,7 +116,7 @@
         hour: input.unknown ? 12 : input.hour,
         minute: input.unknown ? 0 : input.minute,
         isLunar: input.calendar === 'lunar',
-        isLeapMonth: Boolean(input.isLeapMonth),
+        isLeapMonth: input.calendar === 'lunar' ? input.isLeapMonth : false,
         dayBoundary: input.dayBoundary || 'midnight',
         gender: input.gender === 'M' ? 'male' : 'female'
       });

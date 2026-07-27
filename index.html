@@ -2032,6 +2032,14 @@
       </div>
     </div>
 
+    <div class="field" id="lunarMonthTypeField" hidden>
+      <label class="field-label" id="segLeapMonthLabel">음력 월 구분</label>
+      <div class="segmented" id="segLeapMonth" role="radiogroup" aria-labelledby="segLeapMonthLabel">
+        <button type="button" role="radio" aria-checked="true" data-val="normal" class="active" disabled>평달</button>
+        <button type="button" role="radio" aria-checked="false" data-val="leap" disabled>윤달</button>
+      </div>
+    </div>
+
     <div class="field field-row">
       <div class="field-half">
         <label class="field-label" for="inBirth">생년월일 <span style="font-size:12px; font-weight:500; color:var(--text-sub);">(YYYYMMDD)</span></label>
@@ -12517,10 +12525,17 @@ function solarToLunar(y, m, d) {
 }
 
 function calcSaju(opts) {
-  let { year, month, day, hour, minute, calendar, gender, unknown } = opts;
+  let { year, month, day, hour, minute, calendar, gender, unknown, isLeapMonth } = opts;
+  const inputYear = year;
+  const inputMonth = month;
+  const inputDay = day;
   if (calendar === 'lunar' && year < 1800) {
     throw new RangeError('1800년 이전 음력 생년월일은 지원하지 않습니다. 양력으로 입력해주세요.');
   }
+  if (calendar === 'lunar' && typeof isLeapMonth !== 'boolean') {
+    throw new TypeError('음력은 평달 또는 윤달을 선택해야 합니다 (isLeapMonth).');
+  }
+  isLeapMonth = calendar === 'lunar' ? isLeapMonth : false;
   let lunar = null;
   let yi, mi, mStem, di;
   let hBranch = -1, hStem = -1;
@@ -12594,6 +12609,7 @@ function calcSaju(opts) {
 
   return {
     year, month, day, hour, minute, lunar,
+    inputYear, inputMonth, inputDay, calendar, isLeapMonth,
     yStem: yi.stem, yBranch: yi.branch,
     mStem, mBranch: mi.branch,
     dStem: di.stem, dBranch: di.branch,
@@ -12764,6 +12780,17 @@ syncTabA11y($('.tab.active'));
 window.hasCurrentSaju = () => !!currentSaju;
 window.getCurrentSaju = () => currentSaju;
 
+function syncLunarMonthType() {
+  const field = $('#lunarMonthTypeField');
+  if (!field) return;
+  const isLunar = $('#segCal .active')?.dataset.val === 'lunar';
+  field.hidden = !isLunar;
+  field.querySelectorAll('button').forEach(button => {
+    button.disabled = !isLunar;
+    if (!isLunar) button.classList.toggle('active', button.dataset.val === 'normal');
+  });
+}
+
 // 세그먼트 버튼 (양력/음력, 남자/여자 등)
 function bindSegmented(root) {
   (root || document).querySelectorAll('.segmented').forEach(seg => {
@@ -12782,6 +12809,7 @@ function bindSegmented(root) {
         seg.querySelectorAll('button').forEach(x => x.classList.remove('active'));
         b.classList.add('active');
         sync();
+        if (seg.id === 'segCal') syncLunarMonthType();
       });
       b.addEventListener('keydown', event => {
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
@@ -12801,6 +12829,7 @@ function bindSegmented(root) {
   });
 }
 bindSegmented();
+syncLunarMonthType();
 
 // 숫자만 허용하는 input 처리 (iOS에서 type=tel만으로는 비숫자 입력이 막히지 않음)
 document.addEventListener('input', e => {
@@ -12829,6 +12858,9 @@ onTap($('#calcBtn'), () => {
   const name = $('#inputName').value.trim();
   const gender = $('#segGender .active').dataset.val;
   const calendar = $('#segCal .active').dataset.val;
+  const isLeapMonth = calendar === 'lunar'
+    ? $('#segLeapMonth .active')?.dataset.val === 'leap'
+    : false;
   const birthRaw = $('#inBirth').value.trim();
   const timeRaw = $('#inTime').value.trim();
 
@@ -12863,7 +12895,17 @@ onTap($('#calcBtn'), () => {
   }
   clearInErr();
   try {
-    const saju = calcSaju({ year: y, month: m, day: d, hour: h, minute: mi, calendar, gender, unknown });
+    const saju = calcSaju({
+      year: y,
+      month: m,
+      day: d,
+      hour: h,
+      minute: mi,
+      calendar,
+      isLeapMonth,
+      gender,
+      unknown
+    });
     saju.name = name || '이름 없음';
     currentSaju = saju;
     selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
@@ -12871,8 +12913,8 @@ onTap($('#calcBtn'), () => {
     window.activateLegendDestination('result');
     window.scrollTo({top: 0, behavior: 'smooth'});
   } catch (e) {
-    console.error(e);
     if (e instanceof RangeError) return showInErr(e.message, '#inBirth');
+    console.error(e);
     alert('계산 오류: ' + e.message);
   }
 });
@@ -13972,36 +14014,66 @@ function normalizeImportedRecord(input) {
   const integer = (value, min, max) => (
     Number.isInteger(value) && value >= min && value <= max ? value : null
   );
-  const year = integer(input.year, 1026, 2099);
-  const month = integer(input.month, 1, 12);
-  const day = integer(input.day, 1, 31);
+  const calendar = input.calendar === undefined ? 'solar' : input.calendar;
+  if (calendar !== 'solar' && calendar !== 'lunar') return null;
+  if (calendar === 'lunar' && typeof input.isLeapMonth !== 'boolean') return null;
+  const isLeapMonth = calendar === 'lunar' ? input.isLeapMonth : false;
+  const inputDate = calendar === 'lunar'
+    ? {
+        year: input.inputYear ?? input.lunar?.y,
+        month: input.inputMonth ?? input.lunar?.m,
+        day: input.inputDay ?? input.lunar?.d
+      }
+    : { year: input.year, month: input.month, day: input.day };
+  const year = integer(inputDate.year, 1026, 2099);
+  const month = integer(inputDate.month, 1, 12);
+  const day = integer(inputDate.day, 1, calendar === 'lunar' ? 30 : 31);
   const unknown = typeof input.unknown === 'boolean' ? input.unknown : null;
   const gender = input.gender === 'M' || input.gender === 'F' ? input.gender : null;
   const hour = unknown === true ? integer(input.hour ?? 0, 0, 23) : integer(input.hour, 0, 23);
   const minute = unknown === true ? integer(input.minute ?? 0, 0, 59) : integer(input.minute, 0, 59);
   if ([year, month, day, unknown, gender, hour, minute].includes(null)) return null;
 
-  const date = new Date(Date.UTC(year, month - 1, day));
+  if (calendar === 'solar') {
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) return null;
+  }
   if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
+    calendar === 'lunar' &&
+    input.lunar !== undefined &&
+    (
+      !input.lunar ||
+      typeof input.lunar !== 'object' ||
+      Array.isArray(input.lunar) ||
+      input.lunar.isLeap !== isLeapMonth
+    )
   ) return null;
   if (input.name !== undefined && typeof input.name !== 'string') return null;
   if (input.memo !== undefined && typeof input.memo !== 'string') return null;
   if (input.fav !== undefined && typeof input.fav !== 'boolean') return null;
   if (input.savedAt !== undefined && (!Number.isFinite(input.savedAt) || input.savedAt < 0)) return null;
 
-  const calculated = calcSaju({
-    year,
-    month,
-    day,
-    hour,
-    minute,
-    calendar: 'solar',
-    gender,
-    unknown
-  });
+  let calculated;
+  try {
+    calculated = calcSaju({
+      year,
+      month,
+      day,
+      hour,
+      minute,
+      calendar,
+      isLeapMonth,
+      gender,
+      unknown
+    });
+  } catch (error) {
+    if (error instanceof RangeError || error instanceof TypeError) return null;
+    throw error;
+  }
   return {
     ...calculated,
     id: createSecureUuid(),
@@ -14036,7 +14108,7 @@ function normalizeImportedBackup(data) {
     data.product === 'legend-manse' &&
     data.schemaVersion === 2 &&
     data.ruleVersion === 'legend-1';
-  const legacyProducts = new Set(['취명선 전설의 만세력']);
+  const legacyProducts = new Set(['취명선 전설의 만세력', '취명선 만세력']);
   const isLegacyBackup =
     data.version === 1 &&
     typeof data.app === 'string' &&
@@ -15510,6 +15582,7 @@ function psApply(name, year, month, day, gender) {
     $$('#segGender button').forEach(b => b.classList.toggle('active', b.dataset.val === 'F'));
   }
   $$('#segCal button').forEach(b => b.classList.toggle('active', b.dataset.val === 'solar'));
+  syncLunarMonthType();
   closePersonSearch();
   setTimeout(() => { const btn = $('#calcBtn'); if (btn) btn.click(); }, 100);
 }

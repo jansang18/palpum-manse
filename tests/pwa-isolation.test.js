@@ -8,6 +8,7 @@ const share = fs.readFileSync('share.js', 'utf8');
 const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
 const serviceWorker = fs.readFileSync('sw.js', 'utf8');
 const protectedBuild = fs.readFileSync('scripts/build-protected.ps1', 'utf8');
+const ganjiFixtures = fs.readFileSync('tests/ganji-fixtures.test.js', 'utf8');
 
 const runtimeAssets = [
   'polish.css',
@@ -425,6 +426,13 @@ test('normalizes validated legacy backups into the legend namespace', () => {
   assert.match(html, /data\.schemaVersion\s*===\s*2/);
   assert.match(html, /data\.version\s*===\s*1/);
   assert.match(html, /recordStore\.importRecords\(accepted\)/);
+});
+
+test('runs browser Ganji integration fixtures in the default cross-platform gate', () => {
+  assert.doesNotMatch(ganjiFixtures, /RUN_UI_GANJI|skip:\s*process\.env/);
+  assert.match(ganjiFixtures, /process\.platform/);
+  assert.match(ganjiFixtures, /CHROME_PATH/);
+  assert.match(ganjiFixtures, /test\.after/);
 });
 
 test('shares era, resonance relation, and all four pillars without guarantees', () => {

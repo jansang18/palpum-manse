@@ -11,9 +11,17 @@ const TEST_GREP = grepIndex >= 0 ? process.argv[grepIndex + 1] : '';
 const GREP_GROUPS = {
   'Palpum quick periods': 'palpum-quick-periods',
   'Palpum result rendering': 'palpum-result-rendering',
-  'Palpum period boundaries': 'palpum-period-boundaries'
+  'Palpum period boundaries': 'palpum-period-boundaries',
+  'Palpum ink wash': 'palpum-layout',
+  'navigation never covers': 'palpum-layout',
+  'Palpum ink wash|navigation never covers': 'palpum-layout'
 };
 const TEST_GROUP = process.env.TEST_GROUP || GREP_GROUPS[TEST_GREP] || '';
+const PALPUM_LAYOUT_VIEWPORTS = Object.freeze([
+  Object.freeze({ name: 'mobile', width: 412, height: 915 }),
+  Object.freeze({ name: 'tablet', width: 1152, height: 768 }),
+  Object.freeze({ name: 'desktop', width: 1440, height: 1000 })
+]);
 
 if (TEST_GREP && !GREP_GROUPS[TEST_GREP] && !process.env.TEST_GROUP) {
   throw new Error(`Unknown UI test grep: ${TEST_GREP}`);
@@ -3825,6 +3833,383 @@ async function inspectAppleMotion(page, width) {
   }
 }
 
+const overlap = (a, b) =>
+  Boolean(a && b) &&
+  Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)) > 0 &&
+  Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) > 0;
+
+async function inspectPalpumInkWash(page, viewport) {
+  const label = `${viewport.name} ${viewport.width}x${viewport.height}`;
+
+  await page.click('[data-palpum-period="monthly"]');
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  const styles = await page.evaluate(() => {
+    const surface = document.getElementById('fortuneContent');
+    const hero = document.querySelector('.palpum-hero');
+    const title = document.getElementById('palpumResultTitle');
+    const seal = document.querySelector('.palpum-seal');
+    const activePeriod = document.querySelector('[data-palpum-period][aria-pressed="true"]');
+    const targets = [
+      ...document.querySelectorAll('[data-palpum-period]'),
+      ...document.querySelectorAll('[data-palpum-month]'),
+      ...document.querySelectorAll('.palpum-evidence > summary, .palpum-sources > summary')
+    ];
+    const targetStyles = targets.map(element => {
+      const style = getComputedStyle(element);
+      return {
+        selector: element.matches('[data-palpum-month]')
+          ? 'month'
+          : element.matches('summary')
+            ? 'disclosure'
+            : 'period',
+        height: element.getBoundingClientRect().height,
+        transitionDuration: style.transitionDuration,
+        animationDuration: style.animationDuration
+      };
+    });
+    const surfaceStyle = getComputedStyle(surface);
+    const heroStyle = getComputedStyle(hero);
+    const titleStyle = getComputedStyle(title);
+    const sealStyle = getComputedStyle(seal);
+    const activePeriodStyle = getComputedStyle(activePeriod);
+    const actionBarStyle = getComputedStyle(document.getElementById('bottomBar'));
+
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      surface: {
+        color: surfaceStyle.color,
+        backgroundColor: surfaceStyle.backgroundColor,
+        backgroundImage: surfaceStyle.backgroundImage
+      },
+      fibers: getComputedStyle(surface, '::before').backgroundImage,
+      hero: {
+        color: heroStyle.color,
+        backgroundColor: heroStyle.backgroundColor
+      },
+      titleFontFamily: titleStyle.fontFamily,
+      sealBackgroundImage: sealStyle.backgroundImage,
+      activePeriodBackground: activePeriodStyle.backgroundColor,
+      actionBarPosition: actionBarStyle.position,
+      targets: targetStyles
+    };
+  });
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+
+  assert.deepEqual(
+    styles.viewport,
+    { width: viewport.width, height: viewport.height },
+    `${label} must use the requested viewport`
+  );
+  assert.match(
+    styles.surface.backgroundImage,
+    /legend-landscape\.webp/,
+    `${label} Palpum surface must carry one restrained landscape wash`
+  );
+  assert.match(
+    styles.surface.backgroundImage,
+    /gradient/i,
+    `${label} Palpum surface must soften the landscape with warm paper`
+  );
+  assert.notEqual(styles.fibers, 'none', `${label} Palpum surface must retain faint paper fibers`);
+  assert.match(
+    styles.sealBackgroundImage,
+    /legend-seal\.webp/,
+    `${label} Palpum seal must use the existing seal asset`
+  );
+  assert.match(
+    styles.titleFontFamily,
+    /Iowan Old Style|AppleMyungjo|Nanum Myeongjo|Noto Serif KR|Batang|serif/i,
+    `${label} Palpum title must use the existing serif display stack`
+  );
+  assert.equal(styles.surface.color, 'rgb(32, 35, 31)', `${label} Palpum copy must use ink black`);
+  assert.equal(styles.hero.color, 'rgb(32, 35, 31)', `${label} Palpum hero copy must use ink black`);
+  assert.equal(
+    styles.activePeriodBackground,
+    'rgb(158, 62, 50)',
+    `${label} active period must use muted seal red`
+  );
+  assert.equal(styles.actionBarPosition, 'static', `${label} result actions must remain in document flow`);
+  assert.ok(styles.targets.length >= 18, `${label} interactive Palpum targets are missing`);
+  for (const target of styles.targets) {
+    assert.ok(target.height >= 44, `${label} ${target.selector} target is ${target.height}px tall`);
+    assert.ok(
+      target.transitionDuration.split(',').every(value => parseFloat(value) === 0),
+      `${label} reduced-motion ${target.selector} retains transition ${target.transitionDuration}`
+    );
+    assert.ok(
+      target.animationDuration.split(',').every(value => parseFloat(value) === 0),
+      `${label} reduced-motion ${target.selector} retains animation ${target.animationDuration}`
+    );
+  }
+}
+
+async function inspectNavigationNeverCovers(page, viewport) {
+  const label = `${viewport.name} ${viewport.width}x${viewport.height}`;
+
+  await activateDestination(page, 'result');
+  await sleep(80);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await sleep(40);
+
+  const topGeometry = await page.evaluate(() => {
+    const rect = element => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom,
+        left: bounds.left,
+        width: bounds.width,
+        height: bounds.height
+      };
+    };
+    const visibleRect = element => {
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      const bounds = element.getBoundingClientRect();
+      return style.display === 'none' || style.visibility === 'hidden' || bounds.width === 0 || bounds.height === 0
+        ? null
+        : rect(element);
+    };
+    return {
+      chartFirstRow: rect(document.querySelector('#view-result .pillars-4')),
+      topHeader: visibleRect(document.querySelector('.top-bar')),
+      tabs: visibleRect(document.querySelector('.tabs')),
+      chartNavigation: visibleRect(document.getElementById('legendSajuNav'))
+    };
+  });
+
+  assert.equal(overlap(topGeometry.chartFirstRow, topGeometry.topHeader), false, `${label} header covers natal chart`);
+  assert.equal(overlap(topGeometry.chartFirstRow, topGeometry.tabs), false, `${label} tabs cover natal chart`);
+  assert.equal(
+    overlap(topGeometry.chartFirstRow, topGeometry.chartNavigation),
+    false,
+    `${label} chart navigation covers natal chart`
+  );
+
+  const resultGeometry = await page.evaluate(() => {
+    const rect = element => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom,
+        left: bounds.left,
+        width: bounds.width,
+        height: bounds.height
+      };
+    };
+    const visibleRect = element => {
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      const bounds = element.getBoundingClientRect();
+      return style.display === 'none' || style.visibility === 'hidden' || bounds.width === 0 || bounds.height === 0
+        ? null
+        : rect(element);
+    };
+    const daeun = document.getElementById('daeunScroll');
+    const annual = document.getElementById('seunScroll');
+    daeun.scrollLeft = daeun.scrollWidth;
+    annual.scrollLeft = annual.scrollWidth;
+    document.documentElement.style.scrollBehavior = 'auto';
+    document.body.style.scrollBehavior = 'auto';
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => {
+      const mobileNav = visibleRect(document.getElementById('legendMobileNav'));
+      const actionBar = visibleRect(document.getElementById('bottomBar'));
+      const lastContent = document.getElementById('view-result');
+      resolve({
+        counts: {
+          daeun: daeun.querySelectorAll('.luck-item').length,
+          annual: annual.querySelectorAll('.luck-item').length
+        },
+        chartLastRow: rect(daeun.querySelector('.luck-item:last-child')),
+        annualLastRow: rect(annual.querySelector('.luck-item:last-child')),
+        mobileNav,
+        actionBar,
+        paddingBottom: parseFloat(getComputedStyle(lastContent).paddingBottom),
+        scrollY,
+        maxScroll: document.documentElement.scrollHeight - innerHeight
+      });
+    })));
+  });
+
+  assert.ok(resultGeometry.counts.daeun >= 10, `${label} full Daeun row was not populated`);
+  assert.equal(resultGeometry.counts.annual, 10, `${label} full annual row was not populated`);
+  assert.ok(
+    Math.abs(resultGeometry.scrollY - resultGeometry.maxScroll) <= 1,
+    `${label} result did not reach the final chart row (${resultGeometry.scrollY}/${resultGeometry.maxScroll})`
+  );
+  assert.equal(
+    overlap(resultGeometry.chartLastRow, resultGeometry.mobileNav),
+    false,
+    `${label} mobile navigation covers the final Daeun item`
+  );
+  assert.equal(
+    overlap(resultGeometry.annualLastRow, resultGeometry.actionBar),
+    false,
+    `${label} result actions cover the final annual item`
+  );
+  assert.equal(
+    overlap(resultGeometry.annualLastRow, resultGeometry.mobileNav),
+    false,
+    `${label} mobile navigation covers the final annual item`
+  );
+  assert.ok(
+    resultGeometry.paddingBottom >= (resultGeometry.mobileNav?.height || 0) + 24,
+    `${label} result safe padding ${resultGeometry.paddingBottom}px is too small`
+  );
+
+  const hanjaSamples = await page.evaluate(() => {
+    const canvas = getComputedStyle(document.querySelector('#view-result .oguk-card')).backgroundColor;
+    return [...document.querySelectorAll(
+      '#view-result .pillar-block .han, #daeunScroll .luck-block .han, #seunScroll .luck-block .han'
+    )].map((element, index) => ({
+      name: `${element.textContent.trim()}-${index}`,
+      foreground: getComputedStyle(element).color,
+      background: getComputedStyle(element.closest('.pillar-block, .luck-block')).backgroundColor,
+      canvas
+    }));
+  });
+  assert.ok(hanjaSamples.length >= 28, `${label} core Hanja samples are missing`);
+  for (const sample of hanjaSamples) {
+    const ratio = contrastRatio(sample.foreground, sample.background, sample.canvas);
+    assert.ok(ratio >= 4.5, `${label} Hanja ${sample.name} contrast is ${ratio.toFixed(2)}:1`);
+  }
+
+  await activateDestination(page, 'fortune');
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await sleep(60);
+  const fortuneGeometry = await page.evaluate(() => {
+    const rect = element => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom,
+        left: bounds.left,
+        width: bounds.width,
+        height: bounds.height
+      };
+    };
+    const nav = document.getElementById('legendMobileNav');
+    const navStyle = getComputedStyle(nav);
+    const navRect = nav.getBoundingClientRect();
+    const mobileNav = navStyle.display === 'none' || navRect.height === 0 ? null : rect(nav);
+    const view = document.getElementById('view-fortune');
+    return {
+      palpumLastCard: rect(document.querySelector('.palpum-sources')),
+      lastContent: rect(document.querySelector('.fortune-disclaimer')),
+      mobileNav,
+      paddingBottom: parseFloat(getComputedStyle(view).paddingBottom)
+    };
+  });
+  assert.equal(
+    overlap(fortuneGeometry.palpumLastCard, fortuneGeometry.mobileNav),
+    false,
+    `${label} mobile navigation covers the final Palpum card`
+  );
+  assert.equal(
+    overlap(fortuneGeometry.lastContent, fortuneGeometry.mobileNav),
+    false,
+    `${label} mobile navigation covers the Palpum disclaimer`
+  );
+  assert.ok(
+    fortuneGeometry.paddingBottom >= (fortuneGeometry.mobileNav?.height || 0) + 24,
+    `${label} fortune safe padding ${fortuneGeometry.paddingBottom}px is too small`
+  );
+
+  await activateDestination(page, 'calendar');
+  await page.evaluate(() => {
+    const day = [...document.querySelectorAll('#calGrid .cal-day.clickable')]
+      .find(element => !element.classList.contains('other'));
+    day?.click();
+  });
+  await sleep(80);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await sleep(60);
+  const calendarGeometry = await page.evaluate(() => {
+    const rect = element => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        top: bounds.top,
+        right: bounds.right,
+        bottom: bounds.bottom,
+        left: bounds.left,
+        width: bounds.width,
+        height: bounds.height
+      };
+    };
+    const nav = document.getElementById('legendMobileNav');
+    const navStyle = getComputedStyle(nav);
+    const navRect = nav.getBoundingClientRect();
+    const mobileNav = navStyle.display === 'none' || navRect.height === 0 ? null : rect(nav);
+    const detail = document.querySelector('#calDayDetail .day-detail');
+    const view = document.getElementById('view-calendar');
+    return {
+      detail: detail ? rect(detail) : null,
+      mobileNav,
+      paddingBottom: parseFloat(getComputedStyle(view).paddingBottom)
+    };
+  });
+  assert.ok(calendarGeometry.detail, `${label} calendar detail did not render`);
+  assert.equal(
+    overlap(calendarGeometry.detail, calendarGeometry.mobileNav),
+    false,
+    `${label} mobile navigation covers calendar details`
+  );
+  assert.ok(
+    calendarGeometry.paddingBottom >= (calendarGeometry.mobileNav?.height || 0) + 24,
+    `${label} calendar safe padding ${calendarGeometry.paddingBottom}px is too small`
+  );
+
+  await activateDestination(page, 'input');
+  const inputSamples = await page.evaluate(() => {
+    const canvas = getComputedStyle(document.querySelector('#view-input .input-card')).backgroundColor;
+    return ['#inBirth', '#inTime'].map(selector => {
+      const element = document.querySelector(selector);
+      const style = getComputedStyle(element);
+      return {
+        selector,
+        value: element.value,
+        foreground: style.color,
+        background: style.backgroundColor,
+        canvas
+      };
+    });
+  });
+  for (const sample of inputSamples) {
+    assert.match(sample.value, /^\d+$/, `${label} ${sample.selector} must contain numeric input`);
+    const ratio = contrastRatio(sample.foreground, sample.background, sample.canvas);
+    assert.ok(ratio >= 4.5, `${label} ${sample.selector} contrast is ${ratio.toFixed(2)}:1`);
+  }
+}
+
+async function inspectPalpumLayoutViewport(browser, viewport) {
+  const label = `${viewport.width}x${viewport.height}`;
+  console.log(`[ui] ${label}: opening Palpum layout page`);
+  const page = await browser.newPage();
+  const pageIssues = collectPageIssues(page);
+  await page.setViewport({
+    width: viewport.width,
+    height: viewport.height,
+    deviceScaleFactor: 1,
+    isMobile: viewport.width < 768,
+    hasTouch: true
+  });
+  await page.goto(URL, { waitUntil: 'networkidle0' });
+  await page.evaluate(() => document.body.classList.add('dark'));
+  await calculateFixture(page, { birth: '19860219', time: '1430' });
+
+  if (!TEST_GREP || TEST_GREP.includes('Palpum ink wash')) {
+    await inspectPalpumInkWash(page, viewport);
+  }
+  if (!TEST_GREP || TEST_GREP.includes('navigation never covers')) {
+    await inspectNavigationNeverCovers(page, viewport);
+  }
+  await closeCleanPage(page, label, pageIssues);
+}
+
 function collectPageIssues(page) {
   const issues = [];
   page.on('pageerror', error => {
@@ -4809,8 +5194,23 @@ async function inspectWidth(browser, width) {
       args: ['--hide-scrollbars']
     });
     console.log('[ui] Chrome launched');
-    for (const width of widths) await inspectWidth(browser, width);
-    console.log('UI regression PASS:', widths.join(', '));
+    if (TEST_GROUP === 'palpum-layout') {
+      for (const viewport of PALPUM_LAYOUT_VIEWPORTS) {
+        await inspectPalpumLayoutViewport(browser, viewport);
+      }
+      console.log(
+        'UI regression PASS: Palpum layout',
+        PALPUM_LAYOUT_VIEWPORTS.map(({ width, height }) => `${width}x${height}`).join(', ')
+      );
+    } else {
+      for (const width of widths) await inspectWidth(browser, width);
+      if (!TEST_GROUP) {
+        for (const viewport of PALPUM_LAYOUT_VIEWPORTS) {
+          await inspectPalpumLayoutViewport(browser, viewport);
+        }
+      }
+      console.log('UI regression PASS:', widths.join(', '));
+    }
   } finally {
     if (browser) await browser.close();
     await new Promise(resolve => staticSite.server.close(resolve));

@@ -128,7 +128,46 @@ const WEB_ROOT = process.env.WEB_ROOT
   : fs.existsSync(path.join(repoRoot, 'index.html'))
     ? repoRoot
     : path.join(APP_ROOT, 'web');
-const CHROME = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+
+function findChromeExecutable() {
+  if (process.env.CHROME_PATH) {
+    if (fs.existsSync(process.env.CHROME_PATH)) return process.env.CHROME_PATH;
+    throw new Error(`CHROME_PATH does not exist: ${process.env.CHROME_PATH}`);
+  }
+
+  const candidates = process.platform === 'win32'
+    ? [
+        process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Chromium', 'Application', 'chrome.exe'),
+        process.env.PROGRAMFILES && path.join(process.env.PROGRAMFILES, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        process.env['PROGRAMFILES(X86)'] && path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+        process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Microsoft', 'Edge', 'Application', 'msedge.exe')
+      ]
+    : process.platform === 'darwin'
+      ? [
+          '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+          '/Applications/Chromium.app/Contents/MacOS/Chromium',
+          '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge'
+        ]
+      : [
+          '/usr/bin/google-chrome',
+          '/usr/bin/google-chrome-stable',
+          '/usr/bin/chromium',
+          '/usr/bin/chromium-browser',
+          '/snap/bin/chromium',
+          '/usr/bin/microsoft-edge',
+          '/usr/bin/microsoft-edge-stable'
+        ];
+  const executable = candidates.filter(Boolean).find(candidate => fs.existsSync(candidate));
+  if (executable) return executable;
+  throw new Error(
+    'No installed Chrome, Chromium, or Edge browser found. ' +
+    'Set CHROME_PATH to an existing browser executable; browser downloads are disabled.'
+  );
+}
+
 let URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
 const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-width'
   ? [390, 1220]
@@ -1351,6 +1390,11 @@ async function inspectLegacyBackupImport(page) {
       version: 1,
       records: [{ ...sample, id: 'legacy-object', name: '구 객체 백업' }]
     }));
+    const historicalResult = await importSavedRecords(normalizeImportedBackup({
+      app: '신의 음성 만세력',
+      version: 1,
+      records: [{ ...sample, id: 'historical-object', name: '실제 구형 백업' }]
+    }));
     const malformedResult = await importSavedRecords(normalizeImportedBackup({
       app: '취명선 만세력',
       version: 1,
@@ -1359,6 +1403,7 @@ async function inspectLegacyBackupImport(page) {
     const rejected = [];
     for (const payload of [
       { app: 'untrusted-product', version: 1, records: [sample] },
+      { app: '신의음성만세력', version: 1, records: [sample] },
       { app: '취명선 만세력', records: [sample] },
       { app: '취명선 만세력', version: 1, records: 'not-an-array' }
     ]) {
@@ -1374,6 +1419,7 @@ async function inspectLegacyBackupImport(page) {
     return {
       arrayResult,
       objectResult,
+      historicalResult,
       malformedResult,
       rejected,
       keys,
@@ -1388,13 +1434,18 @@ async function inspectLegacyBackupImport(page) {
 
   assert.deepEqual(state.arrayResult, { added: 1, skipped: 0 });
   assert.deepEqual(state.objectResult, { added: 1, skipped: 0 });
+  assert.deepEqual(state.historicalResult, { added: 1, skipped: 0 });
   assert.deepEqual(state.malformedResult, { added: 0, skipped: 1 });
-  assert.equal(state.rejected.length, 3);
+  assert.equal(state.rejected.length, 4);
   assert.ok(state.rejected.every(message => /지원하지 않는 백업/.test(message)));
-  assert.equal(state.keys.length, 2);
+  assert.equal(state.keys.length, 3);
   assert.ok(state.keys.every(key => key.startsWith('legend-saju:record:')));
-  assert.equal(state.records.length, 2);
-  assert.ok(state.records.every(record => record.id !== 'legacy-id' && record.id !== 'legacy-object'));
+  assert.equal(state.records.length, 3);
+  assert.ok(state.records.every(record => (
+    record.id !== 'legacy-id' &&
+    record.id !== 'legacy-object' &&
+    record.id !== 'historical-object'
+  )));
   assert.ok(state.records.every(record => record.unexpected === undefined));
   assert.ok(state.records.every(record => record.calculationMode));
 }
@@ -3834,7 +3885,7 @@ async function inspectWidth(browser, width) {
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: CHROME,
+      executablePath: findChromeExecutable(),
       headless: 'new',
       args: ['--hide-scrollbars']
     });

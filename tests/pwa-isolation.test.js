@@ -9,6 +9,7 @@ const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
 const serviceWorker = fs.readFileSync('sw.js', 'utf8');
 const protectedBuild = fs.readFileSync('scripts/build-protected.ps1', 'utf8');
 const ganjiFixtures = fs.readFileSync('tests/ganji-fixtures.test.js', 'utf8');
+const uiRegression = fs.readFileSync('tests/ui-regression.js', 'utf8');
 
 const runtimeAssets = [
   'polish.css',
@@ -433,6 +434,30 @@ test('runs browser Ganji integration fixtures in the default cross-platform gate
   assert.match(ganjiFixtures, /process\.platform/);
   assert.match(ganjiFixtures, /CHROME_PATH/);
   assert.match(ganjiFixtures, /test\.after/);
+});
+
+test('discovers an installed UI browser across supported desktop platforms', () => {
+  assert.match(uiRegression, /function\s+findChromeExecutable\(/);
+  assert.match(uiRegression, /process\.env\.CHROME_PATH/);
+  assert.match(uiRegression, /process\.platform\s*===\s*['"]win32['"]/);
+  assert.match(uiRegression, /process\.platform\s*===\s*['"]darwin['"]/);
+  for (const browserName of ['Google Chrome', 'Chromium', 'Microsoft Edge']) {
+    assert.match(uiRegression, new RegExp(browserName));
+  }
+  for (const linuxCandidate of [
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/microsoft-edge'
+  ]) {
+    assert.match(uiRegression, new RegExp(linuxCandidate.replaceAll('/', '\\/')));
+  }
+  assert.match(uiRegression, /fs\.existsSync/);
+  assert.match(uiRegression, /Set CHROME_PATH/);
+  assert.doesNotMatch(
+    uiRegression,
+    /const CHROME\s*=\s*process\.env\.CHROME_PATH\s*\|\|\s*['"]C:\\\\/
+  );
+  assert.doesNotMatch(uiRegression, /puppeteer\s+browsers\s+install|npx\s+puppeteer/i);
 });
 
 test('shares era, resonance relation, and all four pillars without guarantees', () => {

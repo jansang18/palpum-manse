@@ -14108,7 +14108,11 @@ function normalizeImportedBackup(data) {
     data.product === 'legend-manse' &&
     data.schemaVersion === 2 &&
     data.ruleVersion === 'legend-1';
-  const legacyProducts = new Set(['취명선 전설의 만세력', '취명선 만세력']);
+  const legacyProducts = new Set([
+    '취명선 전설의 만세력',
+    '취명선 만세력',
+    '신의 음성 만세력'
+  ]);
   const isLegacyBackup =
     data.version === 1 &&
     typeof data.app === 'string' &&

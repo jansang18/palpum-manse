@@ -1606,6 +1606,72 @@ async function inspectUnknownTimePalpumBoundary(page, width) {
     visiblePillars: 0
   }, `${width}px provisional Palpum pillars are guarded from the original chart`);
 
+  await calculateFixture(page, { birth: '17990204', time: '' });
+  const historicalUnknownBoundary = await page.evaluate(async () => {
+    const originalShareCard = window.shareCard;
+    let shareCalled = false;
+    window.shareCard = () => { shareCalled = true; };
+    document.getElementById('shareBtn').click();
+    document.getElementById('saveBtn').click();
+    const saveOpened = document.getElementById('saveModal').classList.contains('active');
+    if (saveOpened) window.closeAppModal(document.getElementById('saveModal'));
+
+    await openMatchPicker();
+    const matchExposed = Boolean(document.querySelector('#matchPickerBody [data-use-current]'));
+    closeMatchPicker();
+    window.shareCard = originalShareCard;
+
+    window.activateLegendDestination('result');
+    return {
+      boundaryUncertain: currentPalpum?.boundaryUncertain,
+      provisional: currentSaju?.palpumProvisional === true,
+      daeun: currentSaju?.daeun ?? null,
+      hasCurrent: window.hasCurrentSaju(),
+      evidenceHasDaeun: [...document.querySelectorAll('[data-palpum-evidence-kind]')]
+        .some(element => element.dataset.palpumEvidenceKind === '\uB300\uC6B4'),
+      timingClaimsDaeun: document.getElementById('fortuneContent')?.textContent.includes('\uD604\uC7AC \uB300\uC6B4'),
+      timeRequired: document.querySelector('[data-palpum-time-note]')?.dataset.palpumTimeNote,
+      shareCalled,
+      saveOpened,
+      matchExposed,
+      activePanel: document.querySelector('.view.active')?.id
+    };
+  });
+  assert.deepEqual(historicalUnknownBoundary, {
+    boundaryUncertain: true,
+    provisional: false,
+    daeun: null,
+    hasCurrent: false,
+    evidenceHasDaeun: false,
+    timingClaimsDaeun: false,
+    timeRequired: 'time-required',
+    shareCalled: false,
+    saveOpened: false,
+    matchExposed: false,
+    activePanel: 'view-input'
+  }, `${width}px historical unknown-time boundary guards Daeun from every downstream workflow`);
+
+  await calculateFixture(page, { birth: '17990204', time: '1430' });
+  const historicalKnownTime = await page.evaluate(() => {
+    const evidenceHasDaeun = [...document.querySelectorAll('[data-palpum-evidence-kind]')]
+      .some(element => element.dataset.palpumEvidenceKind === '\uB300\uC6B4');
+    window.activateLegendDestination('result');
+    return {
+      boundaryUncertain: currentPalpum?.boundaryUncertain,
+      hasDaeun: Array.isArray(currentSaju?.daeun?.list) && currentSaju.daeun.list.length > 0,
+      evidenceHasDaeun,
+      hasCurrent: window.hasCurrentSaju(),
+      activePanel: document.querySelector('.view.active')?.id
+    };
+  });
+  assert.deepEqual(historicalKnownTime, {
+    boundaryUncertain: false,
+    hasDaeun: true,
+    evidenceHasDaeun: true,
+    hasCurrent: true,
+    activePanel: 'view-result'
+  }, `${width}px known-time historical chart retains Daeun and original-chart access`);
+
   await page.reload({ waitUntil: 'networkidle0' });
   await page.click('#advancedCalculationSettings > summary');
   await page.click('#segDayBoundary [data-val="jasi"]');
@@ -5131,6 +5197,7 @@ async function inspectWidth(browser, width) {
       'toast animation must preserve horizontal centering'
     );
 
+    await calculateFixture(page, { birth: '19860219', time: '1430' });
     const saveFeedback = await page.evaluate(async () => {
       const nativeAlert = window.alert;
       let alerts = 0;

@@ -12900,7 +12900,9 @@ function syncTabA11y(activeTab) {
 }
 
 syncTabA11y($('.tab.active'));
-window.hasCurrentSaju = () => !!currentSaju && currentSaju.palpumProvisional !== true;
+window.hasCurrentSaju = () => !!currentSaju &&
+  currentSaju.palpumProvisional !== true &&
+  currentSaju.palpumBoundaryUncertain !== true;
 window.getCurrentSaju = () => window.hasCurrentSaju() ? currentSaju : null;
 
 function syncLunarMonthType() {
@@ -13860,7 +13862,7 @@ document.addEventListener('keydown', event => {
 
 /* 저장 */
 onTap($('#saveBtn'), () => {
-  if (!currentSaju) return;
+  if (!window.hasCurrentSaju()) return;
   $('#saveName').value = currentSaju.name !== '이름 없음' ? currentSaju.name : '';
   $('#saveMemo').value = '';
   window.openAppModal($('#saveModal'));
@@ -13868,6 +13870,7 @@ onTap($('#saveBtn'), () => {
 onTap($('#saveCancel'), () => window.closeAppModal($('#saveModal')));
 onTap($('#similarClose'), () => window.closeAppModal($('#similarModal')));
 onTap($('#saveConfirm'), async () => {
+  if (!window.hasCurrentSaju()) return;
   const name = $('#saveName').value.trim() || '이름 없음';
   const memo = $('#saveMemo').value.trim();
   const record = { ...currentSaju, name, memo, savedAt: Date.now(), id: 'saju_' + Date.now() };
@@ -13882,7 +13885,7 @@ onTap($('#saveConfirm'), async () => {
 });
 
 onTap($('#shareBtn'), () => {
-  if (!currentSaju) return;
+  if (!window.hasCurrentSaju()) return;
   if (window.shareCard) { window.shareCard(currentSaju); return; }
   const s = currentSaju;
   const txt = `${s.name}의 사주\n${s.year}.${pad(s.month)}.${pad(s.day)} ${s.unknown?'시 모름':(pad(s.hour)+':'+pad(s.minute))}\n일 경계: ${DAY_BOUNDARY_LABELS[s.dayBoundary] || DAY_BOUNDARY_LABELS.midnight}\n${STEM[s.yStem]}${BRANCH[s.yBranch]} ${STEM[s.mStem]}${BRANCH[s.mBranch]} ${STEM[s.dStem]}${BRANCH[s.dBranch]} ${s.hStem>=0?STEM[s.hStem]+BRANCH[s.hBranch]:'시간모름'}\n\n취명선 전설의 만세력`;
@@ -14102,7 +14105,7 @@ function calcSajuSimilarity(a, b) {
 }
 
 async function findSimilarSaju() {
-  if (!currentSaju) { alert('먼저 사주를 펼쳐주세요.'); return; }
+  if (!window.hasCurrentSaju()) { alert('먼저 사주를 펼쳐주세요.'); return; }
   // 저장 목록 불러오기
   let list = [];
   try {
@@ -14782,6 +14785,10 @@ function buildCurrentPalpum(saju) {
 
 function rebuildCurrentPalpum(saju) {
   currentPalpum = buildCurrentPalpum(saju);
+  if (saju) {
+    saju.palpumBoundaryUncertain = currentPalpum?.boundaryUncertain === true;
+    if (saju.palpumBoundaryUncertain) saju.daeun = null;
+  }
   currentPalpumSignature = palpumClassificationInputSignature(saju);
   return currentPalpum;
 }
@@ -15318,7 +15325,8 @@ function _renderFortuneInner(focusIdentity) {
     } : null,
     era: globalThis.LegendEra.getLegendEra(fortune.year)
   };
-  if (!s.palpumProvisional && fortune.curDaeun) {
+  const timingUncertain = s.palpumProvisional || currentPalpum.boundaryUncertain;
+  if (!timingUncertain && fortune.curDaeun) {
     composerInput.daeun = {
       stem: fortune.curDaeun.stem,
       branch: fortune.curDaeun.branch
@@ -15347,14 +15355,14 @@ function _renderFortuneInner(focusIdentity) {
     : currentPalpum.boundaryUncertain
       ? { kind: 'time-required', text: '출생 시간을 알려주시면 팔품 후보를 하나로 확인할 수 있습니다.' }
       : { kind: 'hour-excluded', text: '시주 제외로 팔품을 계산했습니다.' };
-  const timingSummary = s.palpumProvisional
+  const timingSummary = timingUncertain
     ? `${isMonth ? '월운' : '세운'} ${STEM[fortune.seun.stem]}${BRANCH[fortune.seun.branch]} · 출생 시간 확인 전 관계 판정 보류`
     : [
         `${isMonth ? '월운' : '세운'} 천간 ${SIPSIN_KOR[fortune.seunStemSipsin]} · 지지 ${SIPSIN_KOR[fortune.seunBranchSipsin]}`,
         ...(isMonth ? [
           `세운 ${STEM[annualFortune.seun.stem]}${BRANCH[annualFortune.seun.branch]}(${SIPSIN_KOR[annualFortune.seunStemSipsin]})`
         ] : []),
-        ...(fortune.curDaeun ? [
+        ...(!timingUncertain && fortune.curDaeun ? [
           `현재 대운 ${STEM[fortune.curDaeun.stem]}${BRANCH[fortune.curDaeun.branch]}(${SIPSIN_KOR[fortune.daeunStemSipsin]})`
         ] : [])
       ].join(' · ');
@@ -15616,7 +15624,7 @@ async function openMatchPicker() {
     return;
   }
   list.sort((a,b) => (b.savedAt || 0) - (a.savedAt || 0));
-  const currentForMatch = currentSaju?.palpumProvisional === true ? null : currentSaju;
+  const currentForMatch = window.getCurrentSaju();
 
   let itemsHtml = '';
   if (currentForMatch) {

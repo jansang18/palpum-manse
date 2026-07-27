@@ -161,7 +161,7 @@ test('uses Palpum-specific package and PWA identity while preserving the visible
   assert.equal(packageLock.packages[''].name, 'palpum-manse');
   assert.equal(manifest.name, '취명선 전설의 만세력');
   assert.equal(manifest.short_name, '전설의 만세력');
-  assert.equal(manifest.id, './');
+  assert.equal(manifest.id, '/palpum-manse/');
   assert.equal(manifest.start_url, './');
   assert.equal(manifest.scope, './');
   assert.equal(manifest.background_color, '#F2ECDD');
@@ -171,6 +171,16 @@ test('uses Palpum-specific package and PWA identity while preserving the visible
   assert.match(share, /jansang18\.github\.io\/palpum-manse/);
   assert.match(deploymentGuide, /jansang18\.github\.io\/palpum-manse/);
   assert.match(deploymentGuide, /git remote add palpum/);
+});
+
+test('resolves the install identity to the Palpum deployment rather than another path or origin root', () => {
+  const manifestUrl = new URL('https://jansang18.github.io/palpum-manse/manifest.webmanifest');
+  const resolvedId = new URL(manifest.id, manifestUrl);
+
+  assert.equal(resolvedId.origin, manifestUrl.origin);
+  assert.equal(resolvedId.pathname, '/palpum-manse/');
+  assert.notEqual(resolvedId.pathname, '/legend-manse/');
+  assert.notEqual(resolvedId.pathname, '/');
 });
 
 test('starts at Saju input and labels calculation as Palpum fortune', () => {
@@ -365,9 +375,16 @@ test('copies legacy Legend records once and mutates only Palpum-owned keys after
   assert.equal(LEGACY_COPY_KEY, 'palpum-manse:legacy-copy-v1');
 
   const legacyPrimary = JSON.stringify({ id: 'legacy-primary', name: '기존 원본', fav: false });
-  const legacyFallback = JSON.stringify([{ id: 'legacy-fallback', name: '기존 보조', fav: false }]);
+  const legacyFallback = JSON.stringify([
+    { id: 'legacy-fallback', name: '기존 보조', fav: false },
+    { id: 'legacy-invalid-fallback', name: { nested: 'invalid' }, fav: false }
+  ]);
   const primary = new Map([
-    [`${LEGACY_RECORD_PREFIX}legacy-primary`, legacyPrimary]
+    [`${LEGACY_RECORD_PREFIX}legacy-primary`, legacyPrimary],
+    [
+      `${LEGACY_RECORD_PREFIX}legacy-invalid-primary`,
+      JSON.stringify({ id: 'legacy-invalid-primary', name: 'invalid', fav: 'yes' })
+    ]
   ]);
   const fallback = new Map([
     [LEGACY_FALLBACK_KEY, legacyFallback]

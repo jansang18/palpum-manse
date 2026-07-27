@@ -16,10 +16,18 @@
       typeof record.id === 'string' && record.id.length > 0;
   }
 
-  function parseRecord(value) {
+  function validLegacyRecord(record) {
+    return validRecord(record) &&
+      (record.name === undefined || typeof record.name === 'string') &&
+      (record.memo === undefined || typeof record.memo === 'string') &&
+      (record.fav === undefined || typeof record.fav === 'boolean') &&
+      (record.savedAt === undefined || (Number.isFinite(record.savedAt) && record.savedAt >= 0));
+  }
+
+  function parseRecord(value, validator = validRecord) {
     try {
       const record = JSON.parse(value);
-      return validRecord(record) ? record : null;
+      return validator(record) ? record : null;
     } catch (error) {
       return null;
     }
@@ -34,7 +42,7 @@
   }
 
   function createRecordStore(storage, fallbackStorage) {
-    function readFallbackRecordsAt(key, strict) {
+    function readFallbackRecordsAt(key, strict, validator = validRecord) {
       let value;
       try {
         value = fallbackStorage.getItem(key);
@@ -45,7 +53,7 @@
       try {
         const records = JSON.parse(value);
         if (!Array.isArray(records)) throw new TypeError('Fallback records must be an array.');
-        return records.filter(validRecord);
+        return records.filter(validator);
       } catch (error) {
         if (!strict) return [];
         throw storageUnavailable(error);
@@ -107,10 +115,10 @@
         } catch (error) {
           throw storageUnavailable(error);
         }
-        const record = stored && parseRecord(stored.value);
+        const record = stored && parseRecord(stored.value, validLegacyRecord);
         if (record) discovered.set(record.id, record);
       }
-      for (const record of readFallbackRecordsAt(LEGACY_FALLBACK_KEY, false)) {
+      for (const record of readFallbackRecordsAt(LEGACY_FALLBACK_KEY, false, validLegacyRecord)) {
         discovered.set(record.id, record);
       }
       if (discovered.size === 0) return;

@@ -12501,7 +12501,15 @@ function findJeolgiJD(year, targetLon) {
   const mi = ms.indexOf(targetLon);
   const am = [2,3,4,5,6,7,8,9,10,11,12,1];
   const da = [4,6,5,6,6,7,8,8,8,7,7,6];
-  let jd = toJD(year, am[mi], da[mi]) + 0.5;
+  const additionalSeeds = {
+    0: [3, 21],
+    90: [6, 21],
+    180: [9, 23],
+    270: [12, 22]
+  };
+  const seed = mi >= 0 ? [am[mi], da[mi]] : additionalSeeds[targetLon];
+  if (!seed) throw new RangeError(`지원하지 않는 절기 황경입니다: ${targetLon}`);
+  let jd = toJD(year, seed[0], seed[1]) + 0.5;
   for (let i = 0; i < 30; i++) {
     const lon = sunLon(jd);
     let diff = lon - targetLon;
@@ -12613,10 +12621,32 @@ function calcSaju(opts) {
     if (!globalThis.LegendGanji || typeof globalThis.LegendGanji.calculate !== 'function') {
       throw new Error('정밀 만세력 계산 모듈을 불러오지 못했습니다.');
     }
-    const precise = globalThis.LegendGanji.calculate({
-      ...opts,
-      dayBoundary
-    });
+    let precise;
+    try {
+      precise = globalThis.LegendGanji.calculate({
+        ...opts,
+        dayBoundary
+      });
+    } catch (error) {
+      const boundaryDate = calendar === 'lunar'
+        ? globalThis.Manseryeok.lunarToSolar(year, month, day, isLeapMonth)
+        : { year, month, day };
+      if (
+        !unknown
+        || dayBoundary !== 'midnight'
+        || error?.code !== 'LEGEND_SOLAR_TERM_TIME_REQUIRED'
+        || !palpumBoundaryIntersectsDay(boundaryDate.year, boundaryDate.month, boundaryDate.day)
+      ) {
+        throw error;
+      }
+      precise = globalThis.LegendGanji.calculate({
+        ...opts,
+        hour: 12,
+        minute: 0,
+        unknown: false,
+        dayBoundary
+      });
+    }
     year = precise.year;
     month = precise.month;
     day = precise.day;
@@ -12625,8 +12655,8 @@ function calcSaju(opts) {
     mi = { branch: precise.mBranch };
     mStem = precise.mStem;
     di = { stem: precise.dStem, branch: precise.dBranch };
-    hStem = precise.hStem;
-    hBranch = precise.hBranch;
+    hStem = unknown ? -1 : precise.hStem;
+    hBranch = unknown ? -1 : precise.hBranch;
     daeun = precise.daeun;
     calculationMode = precise.calculationMode;
     timeStandard = precise.timeStandard;
@@ -12838,6 +12868,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 let currentSaju = null;
 let currentPalpum = null;
+let currentPalpumSource = null;
 let selectedDaeun = null, selectedSeun = null, selectedWoon = null;
 let selectedLegendDay = null;
 
@@ -13027,8 +13058,10 @@ onTap($('#calcBtn'), () => {
     currentSaju = saju;
     if (typeof buildCurrentPalpum === 'function') {
       currentPalpum = buildCurrentPalpum(saju);
+      currentPalpumSource = saju;
     } else {
       currentPalpum = null;
+      currentPalpumSource = null;
     }
     selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
     setFortuneQuickPeriod('this-year', { render: false });
@@ -14558,15 +14591,177 @@ function applyTheme(theme) {
    ============================================ */
 
 const fortuneToday = new Date();
-let fortunePeriodMode = 'month';
+let fortuneQuickPeriod = 'this-year';
 let fortuneCursorYear = fortuneToday.getFullYear();
 let fortuneCursorMonth = fortuneToday.getMonth() + 1;
+let palpumGanjiAdapter = null;
 
-function setFortuneQuickPeriod(period, options) {
-  if (period !== 'this-year') return;
-  fortunePeriodMode = 'year';
-  fortuneCursorYear = fortuneToday.getFullYear();
-  if (!options || options.render !== false) renderFortune();
+const PALPUM_TERM_SPECS = Object.freeze([
+  Object.freeze({ name: '입춘', index: 2, longitude: 315 }),
+  Object.freeze({ name: '춘분', index: 5, longitude: 0 }),
+  Object.freeze({ name: '입하', index: 8, longitude: 45 }),
+  Object.freeze({ name: '하지', index: 11, longitude: 90 }),
+  Object.freeze({ name: '입추', index: 14, longitude: 135 }),
+  Object.freeze({ name: '추분', index: 17, longitude: 180 }),
+  Object.freeze({ name: '입동', index: 20, longitude: 225 }),
+  Object.freeze({ name: '동지', index: 23, longitude: 270 })
+]);
+
+const PALPUM_PUBLIC_SOURCES = Object.freeze([
+  Object.freeze({
+    title: '[자평명리학] 팔품(八稟) 명리학의 첫 걸음',
+    url: 'https://www.youtube.com/watch?v=GrhmwgAcriU'
+  }),
+  Object.freeze({
+    title: '용신과 희기신으로 운세보는법 | 창광 운세추명법 8',
+    url: 'https://www.youtube.com/watch?v=iwStEECtqIE'
+  }),
+  Object.freeze({
+    title: '팔품, 격국이 끝이 아니다',
+    url: 'https://www.youtube.com/watch?v=4Apx9ioMvc0'
+  }),
+  Object.freeze({
+    title: '2026 팔품 운세 · 자축품·인묘품',
+    url: 'https://www.youtube.com/watch?v=cMpJSb52i9Q'
+  }),
+  Object.freeze({
+    title: '2026 팔품 운세 · 묘진품·사오품·오미품',
+    url: 'https://www.youtube.com/watch?v=pspvs3uNi8g'
+  }),
+  Object.freeze({
+    title: '2026 팔품 운세 · 신유품·유술품·해자품',
+    url: 'https://www.youtube.com/watch?v=2i8XPVCfXDw'
+  })
+]);
+
+// Mirrors manseryeok 2.0.0's IANA-derived Korean civil-time rules.
+const KOREA_STANDARD_OFFSET_EPOCHS = [
+  [1908, 4, 1, 510],
+  [1912, 1, 1, 540],
+  [1954, 3, 21, 510],
+  [1961, 8, 10, 540]
+];
+const KOREA_DST_INTERVALS = [
+  [1948, 6, 1, 0, 1948, 9, 13, 0],
+  [1949, 4, 3, 0, 1949, 9, 11, 0],
+  [1950, 4, 1, 0, 1950, 9, 10, 0],
+  [1951, 5, 6, 0, 1951, 9, 9, 0],
+  [1955, 5, 5, 0, 1955, 9, 9, 0],
+  [1956, 5, 20, 0, 1956, 9, 30, 0],
+  [1957, 5, 5, 0, 1957, 9, 22, 0],
+  [1958, 5, 4, 0, 1958, 9, 21, 0],
+  [1959, 5, 3, 0, 1959, 9, 20, 0],
+  [1960, 5, 1, 0, 1960, 9, 18, 0],
+  [1987, 5, 10, 2, 1987, 10, 11, 3],
+  [1988, 5, 8, 2, 1988, 10, 9, 3]
+];
+
+function koreaCivilTimeKey(year, month, day, hour) {
+  return ((year * 12 + month - 1) * 31 + day - 1) * 24 + hour;
+}
+
+function koreaCivilOffsetMinutes(year, month, day, hour) {
+  const instantKey = koreaCivilTimeKey(year, month, day, hour);
+  let offset = 540;
+  KOREA_STANDARD_OFFSET_EPOCHS.forEach(([startYear, startMonth, startDay, minutes]) => {
+    if (instantKey >= koreaCivilTimeKey(startYear, startMonth, startDay, 0)) offset = minutes;
+  });
+  const daylight = KOREA_DST_INTERVALS.some(interval => {
+    const [startYear, startMonth, startDay, startHour, endYear, endMonth, endDay, endHour] = interval;
+    return instantKey >= koreaCivilTimeKey(startYear, startMonth, startDay, startHour)
+      && instantKey < koreaCivilTimeKey(endYear, endMonth, endDay, endHour);
+  });
+  return offset + (daylight ? 60 : 0);
+}
+
+function koreaCivilInstantMs(year, month, day, hour = 0, minute = 0) {
+  const normalized = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  const wallClockMs = normalized.getTime();
+  const offsetMinutes = koreaCivilOffsetMinutes(
+    normalized.getUTCFullYear(),
+    normalized.getUTCMonth() + 1,
+    normalized.getUTCDate(),
+    normalized.getUTCHours()
+  );
+  return wallClockMs - offsetMinutes * 60000;
+}
+
+function precisePalpumTermInstant(year, index) {
+  if (typeof globalThis.LegendGanji?.getSolarTermInstant === 'function') {
+    return globalThis.LegendGanji.getSolarTermInstant(year, index);
+  }
+  if (!palpumGanjiAdapter) {
+    palpumGanjiAdapter = globalThis.LegendGanji.createAdapter(globalThis.Manseryeok);
+  }
+  return palpumGanjiAdapter.getSolarTermInstant(year, index);
+}
+
+function collectPalpumBoundaries(year, historical) {
+  const boundaries = [];
+  for (let boundaryYear = year - 1; boundaryYear <= year + 1; boundaryYear++) {
+    PALPUM_TERM_SPECS.forEach(term => {
+      boundaries.push({
+        name: term.name,
+        instantMs: historical
+          ? (findJeolgiJD(boundaryYear, term.longitude) - 2440587.5) * 86400000
+          : precisePalpumTermInstant(boundaryYear, term.index)
+      });
+    });
+  }
+  boundaries.sort((left, right) => left.instantMs - right.instantMs);
+  return boundaries;
+}
+
+function palpumBoundaryIntersectsDay(year, month, day) {
+  const dayStartMs = koreaCivilInstantMs(year, month, day);
+  const dayEndMs = koreaCivilInstantMs(year, month, day + 1);
+  return collectPalpumBoundaries(year, false).some(
+    boundary => boundary.instantMs >= dayStartMs && boundary.instantMs < dayEndMs
+  );
+}
+
+function buildCurrentPalpum(saju) {
+  if (!saju) return null;
+  const historical = saju.year < 1800;
+  const boundaries = collectPalpumBoundaries(saju.year, historical);
+  const dayStartMs = koreaCivilInstantMs(saju.year, saju.month, saju.day);
+  const dayEndMs = koreaCivilInstantMs(saju.year, saju.month, saju.day + 1);
+  const instantMs = koreaCivilInstantMs(
+    saju.year,
+    saju.month,
+    saju.day,
+    saju.hour,
+    saju.minute
+  );
+  return globalThis.LegendPalpum.classifyPalpum({
+    instantMs,
+    boundaries,
+    accuracy: historical ? 'historical-approximation' : 'exact',
+    unknownTime: saju.unknown,
+    possibleRange: saju.unknown
+      ? { startMs: dayStartMs, endMs: dayEndMs - 1 }
+      : undefined
+  });
+}
+
+function nextFortuneMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 1);
+}
+
+function setFortuneQuickPeriod(mode, options = {}) {
+  if (!['this-year', 'next-month', 'monthly', 'next-year'].includes(mode)) return;
+  fortuneQuickPeriod = mode;
+  if (mode === 'this-year') {
+    fortuneCursorYear = fortuneToday.getFullYear();
+    fortuneCursorMonth = fortuneToday.getMonth() + 1;
+  } else if (mode === 'next-month') {
+    const next = nextFortuneMonth(fortuneToday);
+    fortuneCursorYear = next.getFullYear();
+    fortuneCursorMonth = next.getMonth() + 1;
+  } else if (mode === 'next-year') {
+    fortuneCursorYear = Math.min(2099, fortuneToday.getFullYear() + 1);
+  }
+  if (options.render !== false) renderFortune();
 }
 
 // 오행 상생/상극 관계
@@ -14980,30 +15175,7 @@ function genMonthlyOverallText(fortune) {
 }
 
 function moveFortunePeriod(direction) {
-  if (fortunePeriodMode === 'month') {
-    const moved = new Date(fortuneCursorYear, fortuneCursorMonth - 1 + direction, 1);
-    const nextYear = Math.max(1026, Math.min(2099, moved.getFullYear()));
-    fortuneCursorYear = nextYear;
-    fortuneCursorMonth = nextYear === moved.getFullYear()
-      ? moved.getMonth() + 1
-      : direction > 0 ? 12 : 1;
-  } else {
-    fortuneCursorYear = Math.max(1026, Math.min(2099, fortuneCursorYear + direction));
-  }
-  renderFortune();
-}
-
-function jumpFortunePeriod(target) {
-  if (target === 'next-year') {
-    fortunePeriodMode = 'year';
-    fortuneCursorYear = Math.min(2099, fortuneToday.getFullYear() + 1);
-  } else {
-    const monthOffset = target === 'next-month' ? 1 : 0;
-    const moved = new Date(fortuneToday.getFullYear(), fortuneToday.getMonth() + monthOffset, 1);
-    fortunePeriodMode = 'month';
-    fortuneCursorYear = moved.getFullYear();
-    fortuneCursorMonth = moved.getMonth() + 1;
-  }
+  fortuneCursorYear = Math.max(1026, Math.min(2099, fortuneCursorYear + direction));
   renderFortune();
 }
 
@@ -15032,11 +15204,27 @@ function _renderFortuneInner() {
   }
 
   const s = currentSaju;
-  const isMonth = fortunePeriodMode === 'month';
+  const isMonth = fortuneQuickPeriod === 'next-month' || fortuneQuickPeriod === 'monthly';
   const fortune = isMonth
     ? calcMonthFortune(s, fortuneCursorYear, fortuneCursorMonth)
     : calcYearFortune(s, fortuneCursorYear);
-  const overallGrade = gradeFromScore(fortune.scores.overall);
+  if (currentPalpumSource !== s) {
+    currentPalpum = buildCurrentPalpum(s);
+    currentPalpumSource = s;
+  }
+  const target = {
+    year: fortune.year,
+    ...(isMonth ? { month: fortune.month } : {}),
+    stem: fortune.seun.stem,
+    branch: fortune.seun.branch
+  };
+  const interpretation = globalThis.LegendPalpumFortune.composePalpumFortune({
+    palpum: currentPalpum,
+    saju: s,
+    target,
+    daeun: fortune.curDaeun,
+    era: globalThis.LegendEra.getLegendEra(fortune.year)
+  });
   const ga = STEM_KOR[fortune.seun.stem] + BRANCH_KOR[fortune.seun.branch];
   const seunClsS = EL_CLASS[STEM_EL[fortune.seun.stem]].replace('el-', 'gj-s-');
   const seunClsB = EL_CLASS[BRANCH_EL[fortune.seun.branch]].replace('el-', 'gj-b-');
@@ -15044,58 +15232,69 @@ function _renderFortuneInner() {
     ? `${fortune.year}년 ${fortune.month}월`
     : `${fortune.year}년`;
   const periodSubtitle = isMonth ? '월운' : '연운';
-
-  const areas = [
-    { key: 'love', ico: '緣', title: '인연운' },
-    { key: 'job', ico: '業', title: '직업운' },
-    { key: 'money', ico: '財', title: '재물운' },
-    { key: 'health', ico: '身', title: '건강운' },
-    { key: 'move', ico: '行', title: '변화운' }
+  const roleEvidence = interpretation.evidence.find(item => item.kind === '팔품');
+  const palpumType = currentPalpum.boundaryUncertain
+    ? `${currentPalpum.candidates.join(' · ')} 후보`
+    : `${currentPalpum.type} · 당령 ${currentPalpum.ruler}`;
+  const badges = [
+    ...(currentPalpum.boundaryUncertain ? ['팔품 경계 가능성'] : []),
+    ...(currentPalpum.accuracy === 'historical-approximation' ? ['역사 범위 근사'] : [])
   ];
-
-  const cardsHtml = areas.map(a => {
-    const sc = fortune.scores[a.key];
-    const grade = gradeFromScore(sc);
-    const text = isMonth
-      ? genMonthlyFortuneText(a.key, fortune)
-      : genFortuneText(a.key, fortune, s);
-    const tips = genFortuneTips(a.key, fortune, s);
-    return `<div class="f-card">
-      <div class="f-card-head">
-        <div class="f-card-title"><span class="f-ico">${a.ico}</span>${a.title}</div>
-        <div class="f-score-box">
-          <div class="f-score-num">${sc}<span class="pt">점</span></div>
-          <div class="f-grade ${grade.cls}">${grade.g}</div>
-        </div>
-      </div>
-      <div class="f-bar"><div class="f-bar-fill" style="width:${sc}%; background:${barColorByScore(sc)};"></div></div>
-      <div class="f-text">${text}</div>
-      ${tips.length ? `<div class="f-tips">${tips.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
-    </div>`;
-  }).join('');
+  const areaDefinitions = [
+    { key: 'relationship', title: '관계', seal: '緣' },
+    { key: 'career', title: '직업', seal: '業' },
+    { key: 'money', title: '재물', seal: '財' },
+    { key: 'health', title: '건강', seal: '身' }
+  ];
+  const areaCards = areaDefinitions.map(area => `
+    <article class="palpum-area-card f-card" data-palpum-area="${area.key}">
+      <div class="f-card-title"><span class="f-ico" aria-hidden="true">${area.seal}</span><h3>${area.title}</h3></div>
+      <p class="palpum-area-copy f-text">${escapeHtml(interpretation.areas[area.key])}</p>
+    </article>
+  `).join('');
+  const evidenceItems = interpretation.evidence.map(item => `
+    <li data-palpum-evidence-kind="${escapeHtml(item.kind)}">
+      <strong>${escapeHtml(item.kind)} · ${escapeHtml(item.label)}</strong>
+      <p>${escapeHtml(item.detail)}</p>
+    </li>
+  `).join('');
+  const sourceLinks = PALPUM_PUBLIC_SOURCES.map(source => `
+    <li><a href="${source.url}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title)}</a></li>
+  `).join('');
 
   $('#fortuneContent').innerHTML = `
     <section class="fortune-period-panel" aria-label="운세 기간 선택">
-      <div class="fortune-period-switch" role="tablist" aria-label="월운 또는 연운">
-        <button type="button" role="tab" data-fortune-mode="month" aria-selected="${isMonth}" class="${isMonth ? 'active' : ''}">월운</button>
-        <button type="button" role="tab" data-fortune-mode="year" aria-selected="${!isMonth}" class="${!isMonth ? 'active' : ''}">연운</button>
+      <div class="fortune-period-shortcuts" role="group" aria-label="빠른 기간 이동">
+        <button type="button" data-palpum-period="this-year" aria-pressed="${fortuneQuickPeriod === 'this-year'}" class="${fortuneQuickPeriod === 'this-year' ? 'active' : ''}">올해</button>
+        <button type="button" data-palpum-period="next-month" aria-pressed="${fortuneQuickPeriod === 'next-month'}" class="${fortuneQuickPeriod === 'next-month' ? 'active' : ''}">다음 달</button>
+        <button type="button" data-palpum-period="monthly" aria-pressed="${fortuneQuickPeriod === 'monthly'}" class="${fortuneQuickPeriod === 'monthly' ? 'active' : ''}">월별</button>
+        <button type="button" data-palpum-period="next-year" aria-pressed="${fortuneQuickPeriod === 'next-year'}" class="${fortuneQuickPeriod === 'next-year' ? 'active' : ''}">내년</button>
       </div>
-      <div class="fortune-period-navigator">
-        <button type="button" id="fortunePeriodPrev" aria-label="${isMonth ? '이전 달' : '이전 해'}">‹</button>
+      ${fortuneQuickPeriod === 'monthly' ? `
+      <div class="fortune-period-navigator" aria-label="월별 연도 이동">
+        <button type="button" id="fortunePeriodPrev" aria-label="이전 해">‹</button>
         <div class="fortune-period-title">
-          <span>${periodSubtitle}</span>
-          <strong>${periodTitle}</strong>
+          <span>월별 운세</span>
+          <strong>${fortuneCursorYear}년</strong>
         </div>
-        <button type="button" id="fortunePeriodNext" aria-label="${isMonth ? '다음 달' : '다음 해'}">›</button>
+        <button type="button" id="fortunePeriodNext" aria-label="다음 해">›</button>
       </div>
-      <div class="fortune-period-shortcuts" aria-label="빠른 기간 이동">
-        <button type="button" data-fortune-jump="now">이번 달</button>
-        <button type="button" data-fortune-jump="next-month">다음 달</button>
-        <button type="button" data-fortune-jump="next-year">내년</button>
+      <div id="palpumMonthGrid" aria-label="${fortuneCursorYear}년 월 선택">
+        ${Array.from({ length: 12 }, (_, index) => {
+          const month = index + 1;
+          const selected = month === fortuneCursorMonth;
+          return `<button type="button" data-palpum-month="${month}" aria-pressed="${selected}" class="${selected ? 'active' : ''}">${month}월</button>`;
+        }).join('')}
       </div>
+      ` : `
+      <div class="fortune-period-title">
+        <span>${periodSubtitle}</span>
+        <strong>${periodTitle}</strong>
+      </div>
+      `}
     </section>
 
-    <div class="fortune-head">
+    <div class="fortune-head palpum-period-context">
       <div class="nm">${escapeHtml(s.name)}님의 ${periodSubtitle}</div>
       <div class="year-tag">${periodTitle} · ${STEM[fortune.seun.stem]}${BRANCH[fortune.seun.branch]}</div>
       <div class="ganji-big">
@@ -15108,32 +15307,60 @@ function _renderFortuneInner() {
       </div>
     </div>
 
-    <div class="overall-card">
-      <div class="ov-label">종합 ${periodSubtitle}</div>
-      <div class="ov-score">${fortune.scores.overall}<span class="pt">점</span></div>
-      <div class="ov-grade">${overallGrade.g}</div>
-      <div class="ov-text">${isMonth ? genMonthlyOverallText(fortune) : genOverallText(fortune, s)}</div>
-    </div>
+    <section class="palpum-hero" aria-labelledby="palpumResultTitle">
+      <span class="palpum-attribution">팔품 운세 · 취명선 창작 해석</span>
+      <div class="palpum-seal" aria-hidden="true">品</div>
+      <p class="palpum-type">${escapeHtml(palpumType)}</p>
+      <h2 id="palpumResultTitle">${escapeHtml(interpretation.headline)}</h2>
+      <span class="palpum-state">${escapeHtml(interpretation.state)}</span>
+      <p class="palpum-role">${escapeHtml(roleEvidence?.detail || interpretation.headline)}</p>
+      ${badges.length ? `
+        <div class="palpum-badges">
+          ${badges.map(badge => `<span class="${badge === '팔품 경계 가능성' ? 'palpum-boundary' : 'palpum-accuracy'}">${badge}</span>`).join('')}
+        </div>
+      ` : ''}
+    </section>
 
-    <div class="fortune-cards">
-      ${cardsHtml}
-    </div>
+    <section class="palpum-triad" aria-label="이번 시기의 기회, 부담, 준비">
+      <article><h3>기회</h3><p>${escapeHtml(interpretation.opportunity)}</p></article>
+      <article><h3>부담</h3><p>${escapeHtml(interpretation.burden)}</p></article>
+      <article><h3>준비</h3><p>${escapeHtml(interpretation.preparation)}</p></article>
+    </section>
+
+    <section class="palpum-areas" aria-label="영역별 관찰점">
+      ${areaCards}
+    </section>
+
+    <details class="palpum-evidence">
+      <summary>왜 이렇게 보나요?</summary>
+      <ol>${evidenceItems}</ol>
+    </details>
+
+    <details class="palpum-sources">
+      <summary>해석 기준과 출처</summary>
+      <div>
+        <strong>취명선 창작 해석</strong>
+        <p>팔품은 사계절의 기운과 형상을 여덟 절기 구간으로 나누어 보는 공개 명리 개념을 참고했습니다. 이 앱의 조합 규칙, 문장, 점수와 조언은 취명선 전설의 만세력을 위한 창작 해석이며 특정 학파나 강의자의 공식 판정이 아닙니다.</p>
+        <p>참고한 더큼학당 공개 1차 자료</p>
+        <ul>${sourceLinks}</ul>
+      </div>
+    </details>
 
     <div class="fortune-disclaimer">
-      본 풀이는 ${isMonth ? '월운·세운' : '세운'}·대운·간이 용신 후보·십신·합충을 종합한 참고용 창작 해석입니다. 실제 삶의 흐름은 선택과 환경에 따라 달라집니다.
+      본 풀이는 팔품을 중심으로 ${isMonth ? '월운·세운' : '세운'}·대운·삼원구운을 구분해 살피는 비공식 참고용 창작 해석입니다. 건강 내용은 생활 관리 참고이며 진단이 아니고, 재물 내용은 수익이나 손실을 보장하지 않습니다.
     </div>
   `;
 
-  $$('[data-fortune-mode]').forEach(button => {
-    onTap(button, () => {
-      fortunePeriodMode = button.dataset.fortuneMode;
-      renderFortune();
-    });
+  $$('[data-palpum-period]').forEach(button => {
+    onTap(button, () => setFortuneQuickPeriod(button.dataset.palpumPeriod));
   });
   onTap($('#fortunePeriodPrev'), () => moveFortunePeriod(-1));
   onTap($('#fortunePeriodNext'), () => moveFortunePeriod(1));
-  $$('[data-fortune-jump]').forEach(button => {
-    onTap(button, () => jumpFortunePeriod(button.dataset.fortuneJump));
+  $$('[data-palpum-month]').forEach(button => {
+    onTap(button, () => {
+      fortuneCursorMonth = Number(button.dataset.palpumMonth);
+      renderFortune();
+    });
   });
 }
 

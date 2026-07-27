@@ -6,7 +6,18 @@ const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const vm = require('node:vm');
-const TEST_GROUP = process.env.TEST_GROUP || '';
+const grepIndex = process.argv.indexOf('--grep');
+const TEST_GREP = grepIndex >= 0 ? process.argv[grepIndex + 1] : '';
+const GREP_GROUPS = {
+  'Palpum quick periods': 'palpum-quick-periods',
+  'Palpum result rendering': 'palpum-result-rendering',
+  'Palpum period boundaries': 'palpum-period-boundaries'
+};
+const TEST_GROUP = process.env.TEST_GROUP || GREP_GROUPS[TEST_GREP] || '';
+
+if (TEST_GREP && !GREP_GROUPS[TEST_GREP] && !process.env.TEST_GROUP) {
+  throw new Error(`Unknown UI test grep: ${TEST_GREP}`);
+}
 
 function inspectRepositoryRootInference() {
   const source = fs.readFileSync(__filename, 'utf8');
@@ -1319,6 +1330,312 @@ async function fillAndCalculate(page) {
   await sleep(600);
 }
 
+async function calculateFixture(page, { birth, time }) {
+  await activateDestination(page, 'input');
+  await page.evaluate(({ fixtureBirth, fixtureTime }) => {
+    document.getElementById('inputName').value = '팔품 테스트';
+    document.querySelector('#segGender [data-val="M"]').click();
+    document.querySelector('#segCal [data-val="solar"]').click();
+
+    const birthInput = document.getElementById('inBirth');
+    birthInput.value = fixtureBirth;
+    birthInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const timeInput = document.getElementById('inTime');
+    timeInput.value = fixtureTime;
+    timeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    document.getElementById('calcBtn').click();
+  }, { fixtureBirth: birth, fixtureTime: time });
+  await sleep(600);
+}
+
+const activeDestination = page => page.$eval(
+  '.tab.active',
+  element => element.dataset.tab
+);
+
+const selectedQuickPeriod = page => page.evaluate(
+  () => document.querySelector('[data-palpum-period][aria-pressed="true"]')?.dataset.palpumPeriod || null
+);
+
+async function inspectPalpumQuickPeriods(page, width) {
+  await calculateFixture(page, { birth: '19860219', time: '1430' });
+  assert.equal(await activeDestination(page), 'fortune', `${width}px calculation destination`);
+  assert.equal(await selectedQuickPeriod(page), 'this-year', `${width}px this-year period`);
+
+  await page.click('[data-palpum-period="next-month"]');
+  assert.equal(await selectedQuickPeriod(page), 'next-month', `${width}px next-month period`);
+
+  await page.click('[data-palpum-period="monthly"]');
+  assert.equal(
+    await page.$eval('#palpumMonthGrid', element => element.children.length),
+    12,
+    `${width}px monthly period grid`
+  );
+
+  await page.click('[data-palpum-period="next-year"]');
+  assert.equal(await selectedQuickPeriod(page), 'next-year', `${width}px next-year period`);
+}
+
+async function inspectPalpumConstruction(page, width) {
+  await calculateFixture(page, { birth: '19860219', time: '1430' });
+  const exact = await page.evaluate(() => ({
+    type: currentPalpum?.type,
+    ruler: currentPalpum?.ruler,
+    accuracy: currentPalpum?.accuracy,
+    boundaryUncertain: currentPalpum?.boundaryUncertain
+  }));
+  assert.deepEqual(exact, {
+    type: '인묘품',
+    ruler: '갑목',
+    accuracy: 'exact',
+    boundaryUncertain: false
+  }, `${width}px exact Palpum construction`);
+
+  await calculateFixture(page, { birth: '17990219', time: '1430' });
+  const historical = await page.evaluate(() => ({
+    destination: document.querySelector('.tab.active')?.dataset.tab,
+    type: currentPalpum?.type,
+    ruler: currentPalpum?.ruler,
+    accuracy: currentPalpum?.accuracy
+  }));
+  assert.deepEqual(historical, {
+    destination: 'fortune',
+    type: '인묘품',
+    ruler: '갑목',
+    accuracy: 'historical-approximation'
+  }, `${width}px historical Palpum construction`);
+
+  await page.emulateTimezone('UTC');
+  await page.reload({ waitUntil: 'networkidle0' });
+  await calculateFixture(page, { birth: '20260204', time: '0430' });
+  assert.deepEqual(await page.evaluate(() => ({
+    type: currentPalpum?.type,
+    ruler: currentPalpum?.ruler,
+    accuracy: currentPalpum?.accuracy
+  })), {
+    type: '자축품',
+    ruler: '계수',
+    accuracy: 'exact'
+  }, `${width}px Palpum construction is independent of the viewer timezone`);
+  await page.emulateTimezone('Asia/Seoul');
+  await page.reload({ waitUntil: 'networkidle0' });
+}
+
+async function inspectPalpumResultRendering(page, width) {
+  await calculateFixture(page, { birth: '19860219', time: '1430' });
+  const result = await page.evaluate(() => ({
+    attribution: document.querySelector('.palpum-attribution')?.textContent.trim(),
+    type: document.querySelector('.palpum-type')?.textContent.trim(),
+    title: document.getElementById('palpumResultTitle')?.textContent.trim(),
+    state: document.querySelector('.palpum-state')?.textContent.trim(),
+    role: document.querySelector('.palpum-role')?.textContent.trim(),
+    triad: [...document.querySelectorAll('.palpum-triad h3')].map(element => element.textContent.trim()),
+    areas: [...document.querySelectorAll('[data-palpum-area] h3')].map(element => element.textContent.trim()),
+    evidence: [...document.querySelectorAll('[data-palpum-evidence-kind]')].map(element => (
+      element.dataset.palpumEvidenceKind
+    )),
+    evidenceSummary: document.querySelector('.palpum-evidence summary')?.textContent.trim(),
+    sourceSummary: document.querySelector('.palpum-sources summary')?.textContent.trim(),
+    sourceText: document.querySelector('.palpum-sources')?.textContent.replace(/\s+/g, ' ').trim(),
+    sourceLinks: [...document.querySelectorAll('.palpum-sources a')].map(link => link.href),
+    hasOverallScore: Boolean(document.querySelector('.ov-score')),
+    hasAreaScore: Boolean(document.querySelector('.f-score-num'))
+  }));
+
+  assert.equal(result.attribution, '팔품 운세 · 취명선 창작 해석', `${width}px attribution`);
+  assert.equal(result.type, '인묘품 · 당령 갑목', `${width}px Palpum type`);
+  assert.ok(result.title, `${width}px result title`);
+  assert.ok(['발현', '전환', '조율', '축적'].includes(result.state), `${width}px result state`);
+  assert.ok(result.role, `${width}px Palpum role`);
+  assert.deepEqual(result.triad, ['기회', '부담', '준비'], `${width}px opportunity triad`);
+  assert.deepEqual(result.areas, ['관계', '직업', '재물', '건강'], `${width}px result areas`);
+  assert.deepEqual(new Set(result.evidence), new Set(['팔품', '시기', '시대']), `${width}px evidence layers`);
+  assert.ok(result.evidence.length >= 3, `${width}px evidence count`);
+  assert.equal(result.evidenceSummary, '왜 이렇게 보나요?', `${width}px evidence summary`);
+  assert.equal(result.sourceSummary, '해석 기준과 출처', `${width}px source summary`);
+  assert.match(result.sourceText, /취명선 창작 해석/, `${width}px creative attribution disclosure`);
+  assert.match(
+    result.sourceText,
+    /특정 학파나 강의자의 공식 판정이 아닙니다/,
+    `${width}px non-official disclosure`
+  );
+  assert.deepEqual(result.sourceLinks, [
+    'https://www.youtube.com/watch?v=GrhmwgAcriU',
+    'https://www.youtube.com/watch?v=iwStEECtqIE',
+    'https://www.youtube.com/watch?v=4Apx9ioMvc0',
+    'https://www.youtube.com/watch?v=cMpJSb52i9Q',
+    'https://www.youtube.com/watch?v=pspvs3uNi8g',
+    'https://www.youtube.com/watch?v=2i8XPVCfXDw'
+  ], `${width}px public primary sources`);
+  assert.equal(result.hasOverallScore, false, `${width}px giant score is not primary output`);
+  assert.equal(result.hasAreaScore, false, `${width}px area scores are internal signals`);
+}
+
+async function inspectHistoricalPalpumDisclosure(page, width) {
+  await calculateFixture(page, { birth: '17990219', time: '1430' });
+  assert.equal(
+    await page.$eval('#fortuneContent', element => element.textContent.includes('역사 범위 근사')),
+    true,
+    `${width}px historical approximation disclosure`
+  );
+}
+
+async function inspectUnknownTimePalpumBoundary(page, width) {
+  await calculateFixture(page, { birth: '20260204', time: '' });
+  const uncertain = await page.evaluate(() => ({
+    destination: document.querySelector('.tab.active')?.dataset.tab,
+    boundaryUncertain: currentPalpum?.boundaryUncertain,
+    candidates: currentPalpum?.candidates ? [...currentPalpum.candidates] : [],
+    disclosure: document.getElementById('fortuneContent')?.textContent.includes('팔품 경계 가능성')
+  }));
+  assert.deepEqual(uncertain, {
+    destination: 'fortune',
+    boundaryUncertain: true,
+    candidates: ['자축품', '인묘품'],
+    disclosure: true
+  }, `${width}px unknown-time boundary candidates`);
+
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.click('#advancedCalculationSettings > summary');
+  await page.click('#segDayBoundary [data-val="jasi"]');
+  assert.equal(
+    await page.$eval('#segDayBoundary .active', element => element.dataset.val),
+    'jasi',
+    `${width}px jasi day boundary selection`
+  );
+  await calculateFixture(page, { birth: '20260219', time: '' });
+  const dayBoundaryRequired = await page.evaluate(() => ({
+    activePanel: document.querySelector('.view.active')?.id,
+    hasSaju: window.hasCurrentSaju(),
+    error: document.getElementById('inErr').textContent.trim()
+  }));
+  assert.equal(dayBoundaryRequired.activePanel, 'view-input', `${width}px uncertain day pillar stays at input`);
+  assert.equal(dayBoundaryRequired.hasSaju, false, `${width}px uncertain day pillar is not stored`);
+  assert.match(dayBoundaryRequired.error, /태어난 시간을 알아야/, `${width}px uncertain day pillar asks for time`);
+
+  await calculateFixture(page, { birth: '20260204', time: '' });
+  assert.deepEqual(await page.evaluate(() => ({
+    activePanel: document.querySelector('.view.active')?.id,
+    hasSaju: window.hasCurrentSaju()
+  })), {
+    activePanel: 'view-input',
+    hasSaju: false
+  }, `${width}px jasi ambiguity stays fail-closed on a Palpum boundary`);
+  await page.click('#segDayBoundary [data-val="midnight"]');
+}
+
+async function inspectPalpumIntegration(page, width) {
+  await inspectPalpumConstruction(page, width);
+  await inspectPalpumResultRendering(page, width);
+  await inspectHistoricalPalpumDisclosure(page, width);
+  await inspectUnknownTimePalpumBoundary(page, width);
+}
+
+async function inspectPalpumPeriodBoundaries(page, width) {
+  await calculateFixture(page, { birth: '19860219', time: '1430' });
+  const thisYear = await page.evaluate(() => ({
+    mode: fortuneQuickPeriod,
+    year: fortuneCursorYear,
+    month: fortuneCursorMonth,
+    title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
+  }));
+  assert.deepEqual(thisYear, {
+    mode: 'this-year',
+    year: 2026,
+    month: 7,
+    title: '2026년'
+  }, `${width}px current app date`);
+
+  await page.click('[data-palpum-period="next-month"]');
+  const nextMonth = await page.evaluate(() => ({
+    mode: fortuneQuickPeriod,
+    year: fortuneCursorYear,
+    month: fortuneCursorMonth,
+    title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
+  }));
+  assert.deepEqual(nextMonth, {
+    mode: 'next-month',
+    year: 2026,
+    month: 8,
+    title: '2026년 8월'
+  }, `${width}px next month from current app date`);
+
+  await page.click('[data-palpum-period="next-year"]');
+  assert.deepEqual(await page.evaluate(() => ({
+    mode: fortuneQuickPeriod,
+    year: fortuneCursorYear,
+    title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
+  })), {
+    mode: 'next-year',
+    year: 2027,
+    title: '2027년'
+  }, `${width}px next year from current app date`);
+
+  const rollover = await page.evaluate(() => {
+    if (typeof nextFortuneMonth !== 'function') return { api: typeof nextFortuneMonth };
+    const next = nextFortuneMonth(new Date(2026, 11, 15));
+    return { api: 'function', year: next.getFullYear(), month: next.getMonth() + 1 };
+  });
+  assert.deepEqual(rollover, {
+    api: 'function',
+    year: 2027,
+    month: 1
+  }, `${width}px December next-month rollover`);
+
+  await page.evaluate(() => {
+    fortuneCursorYear = 1026;
+    fortuneCursorMonth = 1;
+    setFortuneQuickPeriod('monthly');
+  });
+  await page.click('#fortunePeriodPrev');
+  assert.equal(
+    await page.evaluate(() => fortuneCursorYear),
+    1026,
+    `${width}px lower year clamp`
+  );
+
+  await page.evaluate(() => {
+    fortuneCursorYear = 2099;
+    renderFortune();
+  });
+  await page.click('#fortunePeriodNext');
+  assert.equal(
+    await page.evaluate(() => fortuneCursorYear),
+    2099,
+    `${width}px upper year clamp`
+  );
+
+  const chartBefore = await page.evaluate(() => JSON.stringify({
+    birth: [currentSaju.inputYear, currentSaju.inputMonth, currentSaju.inputDay],
+    pillars: [
+      currentSaju.yStem, currentSaju.yBranch,
+      currentSaju.mStem, currentSaju.mBranch,
+      currentSaju.dStem, currentSaju.dBranch,
+      currentSaju.hStem, currentSaju.hBranch
+    ]
+  }));
+  await page.click('[data-palpum-month="12"]');
+  const selectedMonth = await page.evaluate(() => ({
+    month: fortuneCursorMonth,
+    selected: document.querySelector('[data-palpum-month][aria-pressed="true"]')?.dataset.palpumMonth,
+    chart: JSON.stringify({
+      birth: [currentSaju.inputYear, currentSaju.inputMonth, currentSaju.inputDay],
+      pillars: [
+        currentSaju.yStem, currentSaju.yBranch,
+        currentSaju.mStem, currentSaju.mBranch,
+        currentSaju.dStem, currentSaju.dBranch,
+        currentSaju.hStem, currentSaju.hBranch
+      ]
+    })
+  }));
+  assert.deepEqual(selectedMonth, {
+    month: 12,
+    selected: '12',
+    chart: chartBefore
+  }, `${width}px month selection preserves current chart`);
+}
+
 async function inspectExactReleaseAssertions(page, width) {
   await activateDestination(page, 'legend');
   await sleep(80);
@@ -1383,12 +1700,12 @@ async function inspectExactReleaseAssertions(page, width) {
   await activateDestination(page, 'fortune');
   await sleep(80);
   const initialPeriod = await page.evaluate(() => ({
-    mode: document.querySelector('[data-fortune-mode].active')?.dataset.fortuneMode,
+    mode: document.querySelector('[data-palpum-period][aria-pressed="true"]')?.dataset.palpumPeriod,
     year: fortuneCursorYear,
     month: fortuneCursorMonth
   }));
-  assert.equal(initialPeriod.mode, 'month', `${width}px fortune defaults to month`);
-  await page.click('#fortunePeriodNext');
+  assert.equal(initialPeriod.mode, 'this-year', `${width}px fortune defaults to this year`);
+  await page.click('[data-palpum-period="next-month"]');
   await sleep(80);
   const nextPeriod = await page.evaluate(() => ({
     year: fortuneCursorYear,
@@ -1407,15 +1724,15 @@ async function inspectExactReleaseAssertions(page, width) {
     `${width}px next-month title`
   );
 
-  await page.click('[data-fortune-jump="next-year"]');
+  await page.click('[data-palpum-period="next-year"]');
   await sleep(80);
   const nextYear = await page.evaluate(() => ({
-    mode: fortunePeriodMode,
+    mode: fortuneQuickPeriod,
     year: fortuneCursorYear,
     expected: new Date().getFullYear() + 1,
     title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
   }));
-  assert.equal(nextYear.mode, 'year', `${width}px next-year mode`);
+  assert.equal(nextYear.mode, 'next-year', `${width}px next-year mode`);
   assert.equal(nextYear.year, nextYear.expected, `${width}px next-year fortune`);
   assert.equal(nextYear.title, `${nextYear.expected}년`, `${width}px next-year title`);
 
@@ -2213,6 +2530,8 @@ async function inspectLegendNavigation(page, width) {
 }
 
 async function inspectLegendHome(page, width) {
+  await page.evaluate(() => window.activateLegendDestination('legend', { history: false }));
+  await sleep(80);
   const initial = await page.evaluate(() => {
     const era = window.LegendEra.getLegendEra(new Date().getFullYear());
     const landing = document.getElementById('legendLanding');
@@ -2307,6 +2626,8 @@ async function inspectLegendHome(page, width) {
   });
 
   await page.reload({ waitUntil: 'networkidle0' });
+  await page.evaluate(() => window.activateLegendDestination('legend', { history: false }));
+  await sleep(80);
   await page.click('#legendPersonButton');
   await sleep(80);
   assert.deepEqual(
@@ -2624,6 +2945,7 @@ async function inspectAppleDesign(page, width) {
     const componentInspection = await collectAppleComponentInspection(page);
 
     await fillAndCalculate(page);
+    await activateDestination(page, 'result');
     await page.evaluate(() => {
       document.querySelector('#daeunScroll .luck-item')?.click();
       document.querySelector('#seunScroll .luck-item')?.click();
@@ -3358,6 +3680,36 @@ async function inspectWidth(browser, width) {
   console.log(`[ui] ${width}px: loaded`);
   await page.evaluate(() => document.body.classList.add('dark'));
 
+  if (TEST_GROUP === 'palpum-quick-periods' || (!TEST_GROUP && width === 390)) {
+    await inspectPalpumQuickPeriods(page, width);
+    if (TEST_GROUP === 'palpum-quick-periods') {
+      await closeCleanPage(page, width, pageIssues);
+      return;
+    }
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
+  }
+
+  if (TEST_GROUP === 'palpum-result-rendering' || (!TEST_GROUP && width === 390)) {
+    await inspectPalpumIntegration(page, width);
+    if (TEST_GROUP === 'palpum-result-rendering') {
+      await closeCleanPage(page, width, pageIssues);
+      return;
+    }
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
+  }
+
+  if (TEST_GROUP === 'palpum-period-boundaries' || (!TEST_GROUP && width === 390)) {
+    await inspectPalpumPeriodBoundaries(page, width);
+    if (TEST_GROUP === 'palpum-period-boundaries') {
+      await closeCleanPage(page, width, pageIssues);
+      return;
+    }
+    await page.reload({ waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.body.classList.add('dark'));
+  }
+
   if (TEST_GROUP === 'lunar-input' || (!TEST_GROUP && width === 390)) {
     await inspectLunarMonthInput(page, width);
     if (TEST_GROUP === 'lunar-input') {
@@ -4087,6 +4439,7 @@ async function inspectWidth(browser, width) {
     }
   }
 
+  await activateDestination(page, 'result');
   const metrics = await page.evaluate(() => {
     const rects = selector => [...document.querySelectorAll(selector)].map(element => {
       const rect = element.getBoundingClientRect();

@@ -529,6 +529,22 @@ test('browser famous-person search auto-fills a complete local profile and calcu
       psSearch('반기문');
     });
     await page.waitForSelector('.ps-item[data-kind="local"][data-ymd="19440613"]');
+    await page.evaluate(() => {
+      window.__namuKeyboardClicks = 0;
+      const link = document.querySelector('.ps-item-shell .ps-namuwiki');
+      link.addEventListener('click', event => {
+        event.preventDefault();
+        window.__namuKeyboardClicks++;
+      });
+    });
+    await page.focus('.ps-item-shell .ps-namuwiki');
+    await page.keyboard.press('Enter');
+    const linkKeyboard = await page.evaluate(() => ({
+      clicks: window.__namuKeyboardClicks,
+      confirmationOpen: Boolean(document.querySelector('.ps-confirm-box'))
+    }));
+    assert.deepEqual(linkKeyboard, { clicks: 1, confirmationOpen: false });
+
     const itemA11y = await page.$eval(
       '.ps-item[data-kind="local"][data-ymd="19440613"]',
       item => ({ role: item.getAttribute('role'), tabIndex: item.tabIndex })

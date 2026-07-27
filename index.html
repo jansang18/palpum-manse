@@ -372,29 +372,46 @@
   }
 
   /* 인물 검색 모달 결과 */
+  .sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
   .ps-results {
     max-height: 50vh;
     overflow-y: auto;
     margin-top: 10px;
     -webkit-overflow-scrolling: touch;
   }
-  .ps-item {
-    display: flex; gap: 12px; align-items: flex-start;
-    padding: 12px;
+  .ps-item-shell {
     background: var(--bg-soft);
     border-radius: 12px;
     margin-bottom: 8px;
-    cursor: pointer;
     border: 1.5px solid transparent;
+  }
+  .ps-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 12px;
+    background: transparent;
+    border-radius: 12px;
+    margin-bottom: 0;
+    cursor: pointer;
+    border: 0;
     transition: border-color 0.15s;
   }
-  .ps-item:active { border-color: var(--line); }
+  .ps-item:active { opacity: 0.82; }
   .ps-item:focus-visible {
     outline: 3px solid color-mix(in srgb, var(--apple-accent, #007aff) 45%, transparent);
     outline-offset: 2px;
   }
   @media (hover: hover) and (pointer: fine) {
-    .ps-item:hover { border-color: var(--line); }
+    .ps-item-shell:hover { border-color: var(--line); }
   }
   .ps-item .ps-thumb {
     width: 48px; height: 48px;
@@ -443,6 +460,9 @@
     border: 1px solid rgba(8,127,91,0.35);
     cursor: pointer; user-select: none;
     text-decoration: none;
+  }
+  .ps-item-shell > .ps-namuwiki {
+    margin: 0 12px 12px 72px;
   }
   body.dark .ps-namuwiki { color: #63e6be; background: rgba(99,230,190,0.12); border-color: rgba(99,230,190,0.38); }
   .ps-namuwiki:active { opacity: 0.65; }
@@ -2204,10 +2224,12 @@
     <div style="font-size:12px; font-weight:500; color:var(--text-sub); line-height:1.6; margin-bottom:10px;">
       국내 유명인은 <b>앱 내장 DB에서 즉시</b>, 그 밖의 인물은 <b>위키백과·위키데이터에서 생년월일과 성별</b>을 찾아 자동 입력합니다. 각 결과의 <b>나무위키 🔍</b>로 상세를 함께 확인할 수 있어요.
     </div>
+    <label class="field-label" for="psQuery">인물 이름</label>
     <div style="position:relative;">
       <input class="input" id="psQuery" placeholder="예: 아이유, 방탄소년단 뷔, 세종대왕" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding-right:44px;" />
       <button type="button" id="psClearBtn" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--text-light);font-size:18px;cursor:pointer;display:none;width:28px;height:28px;border-radius:50%;" aria-label="지우기">✕</button>
     </div>
+    <div id="psStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
     <div id="psResults" class="ps-results"></div>
     <div class="modal-actions">
       <button type="button" id="psClose">닫기</button>
@@ -15480,7 +15502,13 @@ function closePersonSearch() {
   window.closeAppModal($('#personSearchModal'));
   $('#psQuery').value = '';
   $('#psResults').innerHTML = '';
+  setPersonSearchStatus('');
   $('#psClearBtn').style.display = 'none';
+}
+
+function setPersonSearchStatus(message) {
+  const status = $('#psStatus');
+  if (status) status.textContent = message || '';
 }
 
 const ALLOWED_ENRICHMENT_HOSTS = new Set(['ko.wikipedia.org', 'www.wikidata.org']);
@@ -15602,15 +15630,17 @@ function psItemHtml(o) {
   const data = o.kind === 'local'
     ? `data-kind="local" data-name="${escapeHtml(o.title)}" data-ymd="${o.ymd}" data-g="${o.g || ''}"`
     : `data-kind="wiki" data-title="${escapeHtml(o.title)}" data-qid="${escapeHtml(safeQid)}"`;
-  return `<div class="ps-item" role="button" tabindex="0" ${data}>
-    <div class="ps-thumb" ${o.thumb ? `style="background-image:url('${escapeHtml(o.thumb)}')"` : ''}>
-      ${o.thumb ? '' : escapeHtml(initial)}
+  return `<div class="ps-item-shell">
+    <div class="ps-item" role="button" tabindex="0" ${data}>
+      <div class="ps-thumb" ${o.thumb ? `style="background-image:url('${escapeHtml(o.thumb)}')"` : ''}>
+        ${o.thumb ? '' : escapeHtml(initial)}
+      </div>
+      <div class="ps-info">
+        <div class="ps-title">${escapeHtml(o.title)}<span class="ps-src">${o.kind === 'local' ? '내장' : '위키'}</span></div>
+        <div class="ps-desc">${escapeHtml(o.desc || '설명 없음')}</div>
+      </div>
     </div>
-    <div class="ps-info">
-      <div class="ps-title">${escapeHtml(o.title)}<span class="ps-src">${o.kind === 'local' ? '내장' : '위키'}</span></div>
-      <div class="ps-desc">${escapeHtml(o.desc || '설명 없음')}</div>
-      <a class="ps-namuwiki" href="${escapeHtml(buildNamuWikiUrl(o.title))}" target="_blank" rel="noopener noreferrer">나무위키 🔍</a>
-    </div>
+    <a class="ps-namuwiki" href="${escapeHtml(buildNamuWikiUrl(o.title))}" target="_blank" rel="noopener noreferrer">나무위키 🔍</a>
   </div>`;
 }
 
@@ -15652,6 +15682,7 @@ function psBindItems(scope) {
 async function psSearch(query) {
   if (!query || query.length < 2) {
     $('#psResults').innerHTML = '';
+    setPersonSearchStatus('');
     return;
   }
   psLastQuery = query;
@@ -15666,6 +15697,7 @@ async function psSearch(query) {
   });
   $('#psResults').innerHTML = html +
     '<div class="ps-loading" id="psWikiLoading"><span class="spinner"></span>위키백과 검색 중...</div>';
+  setPersonSearchStatus(`${locals.length}명의 내장 결과를 찾았습니다. 위키백과를 검색 중입니다.`);
   psBindItems($('#psResults'));
 
   // 2) 위키백과 온라인 검색 (롱테일·해외 인물 보강)
@@ -15693,11 +15725,13 @@ async function psSearch(query) {
     if (loadEl2) loadEl2.remove();
     if (!locals.length && !wikiHtml) {
       $('#psResults').innerHTML = '<div class="ps-empty">검색 결과가 없습니다<br><span style="font-size:11px;">다른 이름이나 본명으로 시도해보세요</span></div>';
+      setPersonSearchStatus('검색 결과가 없습니다.');
       return;
     }
     // 로컬 항목은 그대로 두고 위키 결과만 추가(append) → 이미 렌더/바인딩된 로컬 항목이 교체되지 않음
     if (wikiHtml) $('#psResults').insertAdjacentHTML('beforeend', wikiHtml);
     psBindItems($('#psResults'));
+    setPersonSearchStatus(`${$('#psResults').querySelectorAll('.ps-item').length}명의 검색 결과를 찾았습니다.`);
   } catch (e) {
     if (query !== psLastQuery) return;
     console.error(e);
@@ -15705,8 +15739,10 @@ async function psSearch(query) {
       // 내장 결과는 유지하고, 온라인 실패만 작게 안내
       const loadEl = $('#psWikiLoading');
       if (loadEl) loadEl.outerHTML = '<div class="ps-online-note">※ 위키백과(온라인) 검색은 실패했지만, 위 내장 결과는 사용할 수 있어요.</div>';
+      setPersonSearchStatus(`${locals.length}명의 내장 결과를 찾았습니다. 온라인 검색은 실패했습니다.`);
     } else {
       $('#psResults').innerHTML = `<div class="ps-error">검색 실패<br><span style="font-size:11px;color:var(--text-sub);margin-top:8px;display:inline-block;line-height:1.7;">내장 목록에 없는 인물은 <b>인터넷 연결</b>이 필요합니다.<br>파일을 직접 열어 사용 중이라면,<br>https 주소(웹/앱)로 접속해주세요.</span></div>`;
+      setPersonSearchStatus('인물 검색에 실패했습니다.');
     }
   }
 }
@@ -15729,6 +15765,7 @@ function psShowConfirm(title, year, month, day, gender, source) {
   const gText = gender === 'M' ? '남자' : gender === 'F' ? '여자' : '알 수 없음';
   const dateStr = String(year).padStart(4, '0') + '.' + String(month).padStart(2, '0') + '.' + String(day).padStart(2, '0');
   const srcText = source === 'local' ? '앱 내장 정보(Wikidata) 기준입니다.' : '위키백과 기준입니다.';
+  setPersonSearchStatus(`${title}의 자동 입력 정보를 확인해주세요.`);
   $('#psResults').innerHTML = `<div class="ps-confirm-box">
       <div class="pcb-name">${escapeHtml(title)}</div>
       <div class="pcb-row"><span class="k">생년월일</span><span class="v">${dateStr}</span></div>

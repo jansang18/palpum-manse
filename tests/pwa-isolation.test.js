@@ -566,6 +566,10 @@ test('uses Wikimedia for structured people data and NamuWiki for detail lookup',
   assert.match(html, /위키백과·위키데이터[^<]*생년월일/);
   assert.match(html, /class="ps-item"[^>]*role="button"[^>]*tabindex="0"/);
   assert.match(html, /addEventListener\('keydown'/);
+  assert.match(html, /<label[^>]*for="psQuery"[^>]*>[^<]*인물 이름[^<]*<\/label>/);
+  assert.match(html, /id="psStatus"[^>]*role="status"[^>]*aria-live="polite"/);
+  assert.match(html, /function\s+setPersonSearchStatus\(/);
+  assert.match(html, /class="ps-item-shell"[\s\S]*?class="ps-item"[\s\S]*?<\/div>\s*<a class="ps-namuwiki"/);
   assert.doesNotMatch(html, /function\s+buildNaverUrl\(|class="ps-naver"|네이버 🔍/);
   assert.match(deploymentGuide, /브라우저[^.\n]*통합 회귀 8개/);
 });

@@ -2383,6 +2383,25 @@ body.dark #view-calendar .cal-day .d {
   color: var(--ink) !important;
 }
 
+#view-calendar .cal-day .gj,
+body.dark #view-calendar .cal-day .gj {
+  color: var(--ink) !important;
+  font-size: calc(13px + 1pt) !important;
+}
+
+#view-calendar .cal-day .gj > span,
+body.dark #view-calendar .cal-day .gj > span {
+  color: var(--ink) !important;
+  -webkit-text-fill-color: var(--ink) !important;
+}
+
+@media (min-width: 48rem) {
+  #view-calendar .cal-day .gj,
+  body.dark #view-calendar .cal-day .gj {
+    font-size: calc(15px + 1pt) !important;
+  }
+}
+
 #view-calendar .cal-day.today,
 #view-calendar .cal-day.selected,
 body.dark #view-calendar .cal-day.today,
@@ -2901,5 +2920,18 @@ body.dark .bottom-bar .bb.primary,
 
   body #shareCardModal .share-card-sheet {
     background: var(--paper-bright) !important;
+  }
+}
+
+/* Keep the final annual-fortune row above the fixed result actions. */
+#view-result {
+  padding-bottom: calc(3rem + env(safe-area-inset-bottom)) !important;
+}
+
+@media (max-width: 47.99rem) {
+  #view-result {
+    padding-bottom:
+      calc(clamp(3.5rem, 15vw, 7rem) + env(safe-area-inset-bottom))
+      !important;
   }
 }

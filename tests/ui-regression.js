@@ -171,6 +171,10 @@ function findChromeExecutable() {
 let URL = pathToFileURL(path.join(UI_ROOT, 'index.html')).href;
 const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-width'
   ? [390, 1220]
+  : TEST_GROUP === 'result-action-clearance'
+    ? [390, 744, 768, 1220]
+  : TEST_GROUP === 'calendar-ink-controls'
+    ? [390, 768]
   : TEST_GROUP === 'fold-layout'
     ? [720, 884]
   : TEST_GROUP === 'calendar-shell-width'
@@ -540,6 +544,75 @@ async function inspectResultWidthAndBrand(page, width) {
     assert.ok(pillar.transformY <= -2.8 && pillar.transformY >= -3.2, `${width}px natal Hanja optical offset must be about -3px, got ${pillar.transformY}px`);
     assert.ok(pillar.glyphCenterY <= 4, `${width}px natal glyph line-box center delta ${pillar.glyphCenterY}px`);
   }
+}
+
+async function inspectResultActionClearance(page, width) {
+  await activateDestination(page, 'result');
+  await sleep(80);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await sleep(80);
+
+  const geometry = await page.evaluate(() => {
+    const visibleFixedRect = element => {
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      if (style.display === 'none' || style.visibility === 'hidden' || rect.height <= 0) return null;
+      return { top: rect.top, bottom: rect.bottom, height: rect.height };
+    };
+    const content = document.querySelector(
+      '#view-result .result-right .luck-section:last-child'
+    ).getBoundingClientRect();
+    const overlays = [
+      visibleFixedRect(document.getElementById('bottomBar')),
+      visibleFixedRect(document.getElementById('legendMobileNav'))
+    ].filter(Boolean);
+    const overlayTop = Math.min(...overlays.map(rect => rect.top));
+    const maxScroll = document.documentElement.scrollHeight - innerHeight;
+
+    return {
+      clearance: overlayTop - content.bottom,
+      overlayTop,
+      contentBottom: content.bottom,
+      scrollY,
+      maxScroll
+    };
+  });
+
+  assert.ok(
+    Math.abs(geometry.scrollY - geometry.maxScroll) <= 1,
+    `${width}px result did not reach the page end`
+  );
+  assert.ok(
+    geometry.clearance >= 12,
+    `${width}px annual fortune is covered by the fixed actions: ${geometry.clearance.toFixed(1)}px clearance`
+  );
+}
+
+async function inspectCalendarInkControls(page, width) {
+  await activateDestination(page, 'calendar');
+  await sleep(80);
+
+  const state = await page.evaluate(() => {
+    const ganji = [...document.querySelectorAll(
+      '#view-calendar .cal-day:not(.other) .gj'
+    )];
+    return {
+      themeButtonExists: Boolean(document.getElementById('themeToggleBtn')),
+      fontSizes: [...new Set(ganji.map(node => parseFloat(getComputedStyle(node).fontSize)))],
+      colors: [...new Set(
+        ganji.flatMap(node => [...node.children].map(child => getComputedStyle(child).color))
+      )]
+    };
+  });
+
+  assert.equal(state.themeButtonExists, false, `${width}px theme button must be removed`);
+  assert.deepEqual(state.colors, ['rgb(32, 35, 31)'], `${width}px calendar Ganji must use solid ink`);
+  assert.equal(state.fontSizes.length, 1, `${width}px calendar Ganji font size must be consistent`);
+  assert.ok(
+    state.fontSizes[0] >= (width < 768 ? 14.3 : 16.3),
+    `${width}px calendar Ganji was not enlarged by about 1pt: ${state.fontSizes[0]}px`
+  );
 }
 
 function parseCssColor(value) {
@@ -3319,6 +3392,12 @@ async function inspectWidth(browser, width) {
     return;
   }
 
+  if (TEST_GROUP === 'calendar-ink-controls') {
+    await inspectCalendarInkControls(page, width);
+    await closeCleanPage(page, width, pageIssues);
+    return;
+  }
+
   await inspectCalendarCurrentYear(page, width);
   if (TEST_GROUP === 'calendar-current-year') {
     await closeCleanPage(page, width, pageIssues);
@@ -3950,6 +4029,12 @@ async function inspectWidth(browser, width) {
 
   if (runsResultWidthBrand()) {
     await inspectResultWidthAndBrand(page, width);
+    await closeCleanPage(page, width, pageIssues);
+    return;
+  }
+
+  if (TEST_GROUP === 'result-action-clearance') {
+    await inspectResultActionClearance(page, width);
     await closeCleanPage(page, width, pageIssues);
     return;
   }

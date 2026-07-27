@@ -398,12 +398,12 @@ async function inspectFrontendQuality(page, width) {
   await page.evaluate(() => document.querySelector('.tab[data-tab="fortune"]').click());
   const switched = await page.evaluate(() => ({
     selected: document.querySelector('.tab[data-tab="fortune"]').getAttribute('aria-selected'),
-    previous: document.querySelector('.tab[data-tab="input"]').getAttribute('aria-selected'),
+    previous: document.querySelector('.tab[data-tab="legend"]').getAttribute('aria-selected'),
     panelHidden: document.getElementById('view-fortune').hasAttribute('hidden')
   }));
   assert.deepEqual(switched, { selected: 'true', previous: 'false', panelHidden: false }, `${width}px tab state must update`);
 
-  await page.evaluate(() => document.querySelector('.tab[data-tab="input"]').click());
+  await page.evaluate(() => window.activateLegendDestination('input'));
   await page.evaluate(() => document.querySelector('#segGender button[data-val="F"]').click());
   const selectedGender = await page.evaluate(() => [...document.querySelectorAll('#segGender button')].map(button => button.getAttribute('aria-checked')));
   assert.deepEqual(selectedGender, ['false', 'true'], `${width}px segmented radio state must update`);
@@ -887,7 +887,7 @@ async function inspectFinalSecurityRuntime(page, width) {
       .filter(element => element.getClientRects().length)
       .map(element => getComputedStyle(element).borderTopColor);
 
-    document.querySelector('.tab[data-tab="result"]').click();
+    window.activateLegendDestination('result');
     renderResult();
     await wait(40);
     document.querySelector('#daeunScroll .luck-item')?.click();
@@ -970,7 +970,7 @@ async function inspectCalendarCurrentYear(page, width) {
     document.querySelector('.tab[data-tab="calendar"]').click();
     const initial = readTitle();
     for (let index = 0; index < 6; index++) document.getElementById('calNext').click();
-    document.querySelector('.tab[data-tab="input"]').click();
+    window.activateLegendDestination('input');
     document.querySelector('.tab[data-tab="calendar"]').click();
     const reopened = readTitle();
     return {
@@ -990,7 +990,7 @@ async function inspectCalendarCurrentYear(page, width) {
   assert.equal(state.initial.ariaCurrent, 'date', `${width}px current calendar year must expose aria-current`);
   assert.equal(state.initial.selectedClass, true, `${width}px current calendar year must be visibly selected`);
   assert.equal(state.initial.badge, '올해', `${width}px current calendar year badge`);
-  assert.equal(state.initial.color, 'rgb(10, 132, 255)', `${width}px current calendar year must use system blue`);
+  assert.equal(state.initial.color, 'rgb(158, 62, 50)', `${width}px current calendar year must use seal red`);
   assert.notEqual(state.initial.background, 'rgba(0, 0, 0, 0)', `${width}px current calendar year selection needs a visible fill`);
   assert.deepEqual(
     { year: state.reopened.year, month: state.reopened.month },
@@ -1228,6 +1228,19 @@ async function inspectExactReleaseAssertions(page, width) {
     timeLayers: document.querySelectorAll('[data-time-layer]').length,
     hourBranches: document.querySelectorAll('[data-hour-branch]').length,
     selectedTabs: document.querySelectorAll('.tab[aria-selected="true"]').length,
+    topLabels: [...document.querySelectorAll('.tabs .tab')].map(tab => tab.textContent.trim()),
+    activeTopLabel: document.querySelector('.tabs .tab.active')?.textContent.trim(),
+    activeSajuLabel: document.querySelector('[data-legend-saju-nav].active')?.textContent.trim(),
+    shell: (() => {
+      const app = document.querySelector('.app').getBoundingClientRect();
+      const top = document.querySelector('.top-bar').getBoundingClientRect();
+      const tabs = document.querySelector('.tabs').getBoundingClientRect();
+      return {
+        containsTop: top.left >= app.left - 1 && top.right <= app.right + 1,
+        containsTabs: tabs.left >= app.left - 1 && tabs.right <= app.right + 1,
+        topBackground: getComputedStyle(document.querySelector('.top-bar')).backgroundColor
+      };
+    })(),
     documentWidth: document.documentElement.scrollWidth,
     viewportWidth: document.documentElement.clientWidth
   }));
@@ -1236,9 +1249,86 @@ async function inspectExactReleaseAssertions(page, width) {
   assert.equal(release.timeLayers, 8, `${width}px release time-layer count`);
   assert.equal(release.hourBranches, 12, `${width}px release hour-branch count`);
   assert.equal(release.selectedTabs, 1, `${width}px release selected-tab count`);
+  assert.deepEqual(
+    release.topLabels,
+    ['전설사주', '운의 흐름', '인연궁합', '만세력', '보관함'],
+    `${width}px grouped navigation`
+  );
+  assert.equal(release.activeTopLabel, '전설사주', `${width}px grouped top destination`);
+  assert.equal(release.activeSajuLabel, '전설', `${width}px grouped saju destination`);
+  assert.equal(release.shell.containsTop, true, `${width}px title banner must be inside book shell`);
+  assert.equal(release.shell.containsTabs, true, `${width}px tabs must be inside book shell`);
+  assert.match(release.shell.topBackground, /^rgba?\(250, 247, 238/, `${width}px paper title banner`);
   assert.ok(
     release.documentWidth <= release.viewportWidth + 1,
     `${width}px release document overflows by ${release.documentWidth - release.viewportWidth}px`
+  );
+
+  await activateDestination(page, 'input');
+  await page.evaluate(() => {
+    const birth = document.getElementById('inBirth');
+    birth.value = '19860219';
+    birth.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const inputInk = await page.$eval('#inBirth', element => ({
+    color: getComputedStyle(element).color,
+    fill: getComputedStyle(element).webkitTextFillColor,
+    top: document.querySelector('.tabs .tab.active')?.textContent.trim(),
+    sub: document.querySelector('[data-legend-saju-nav].active')?.textContent.trim()
+  }));
+  assert.equal(inputInk.color, 'rgb(32, 35, 31)', `${width}px birth value ink color`);
+  assert.equal(inputInk.fill, 'rgb(32, 35, 31)', `${width}px iPhone birth value fill`);
+  assert.equal(inputInk.top, '전설사주', `${width}px input remains in grouped destination`);
+  assert.equal(inputInk.sub, '사주 입력', `${width}px input subdestination`);
+
+  await activateDestination(page, 'fortune');
+  await sleep(80);
+  const initialPeriod = await page.evaluate(() => ({
+    mode: document.querySelector('[data-fortune-mode].active')?.dataset.fortuneMode,
+    year: fortuneCursorYear,
+    month: fortuneCursorMonth
+  }));
+  assert.equal(initialPeriod.mode, 'month', `${width}px fortune defaults to month`);
+  await page.click('#fortunePeriodNext');
+  await sleep(80);
+  const nextPeriod = await page.evaluate(() => ({
+    year: fortuneCursorYear,
+    month: fortuneCursorMonth,
+    title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
+  }));
+  const expectedNext = new Date(initialPeriod.year, initialPeriod.month, 1);
+  assert.deepEqual(
+    [nextPeriod.year, nextPeriod.month],
+    [expectedNext.getFullYear(), expectedNext.getMonth() + 1],
+    `${width}px next-month fortune`
+  );
+  assert.equal(
+    nextPeriod.title,
+    `${nextPeriod.year}년 ${nextPeriod.month}월`,
+    `${width}px next-month title`
+  );
+
+  await page.click('[data-fortune-jump="next-year"]');
+  await sleep(80);
+  const nextYear = await page.evaluate(() => ({
+    mode: fortunePeriodMode,
+    year: fortuneCursorYear,
+    expected: new Date().getFullYear() + 1,
+    title: document.querySelector('.fortune-period-title strong')?.textContent.trim()
+  }));
+  assert.equal(nextYear.mode, 'year', `${width}px next-year mode`);
+  assert.equal(nextYear.year, nextYear.expected, `${width}px next-year fortune`);
+  assert.equal(nextYear.title, `${nextYear.expected}년`, `${width}px next-year title`);
+
+  await activateDestination(page, 'result');
+  const groupedResult = await page.evaluate(() => ({
+    top: document.querySelector('.tabs .tab.active')?.textContent.trim(),
+    sub: document.querySelector('[data-legend-saju-nav].active')?.textContent.trim()
+  }));
+  assert.deepEqual(
+    groupedResult,
+    { top: '전설사주', sub: '원국' },
+    `${width}px result grouped under legend saju`
   );
 }
 
@@ -1640,7 +1730,7 @@ async function inspectLegendFlow(page, width) {
 
   await page.evaluate(() => {
     document.querySelector('[data-legend-evidence-dialog]')?.close();
-    document.querySelector('.tab[data-tab="input"]').click();
+    window.activateLegendDestination('input');
     document.getElementById('inTime').value = '';
     document.getElementById('calcBtn').click();
   });
@@ -2086,10 +2176,11 @@ async function inspectLegendHome(page, width) {
   assert.deepEqual(
     await page.evaluate(() => ({
       selectedTab: document.querySelector('.tab.active')?.dataset.tab,
+      selectedSaju: document.querySelector('[data-legend-saju-nav].active')?.dataset.tab,
       activePanel: document.querySelector('.view.active')?.id,
       focused: document.activeElement?.id
     })),
-    { selectedTab: 'input', activePanel: 'view-input', focused: 'inBirth' }
+    { selectedTab: 'legend', selectedSaju: 'input', activePanel: 'view-input', focused: 'inBirth' }
   );
 
   const inputDesign = await page.evaluate(() => {
@@ -2109,7 +2200,7 @@ async function inspectLegendHome(page, width) {
     hasTitle: true,
     hasSeal: true,
     legacyLogoWidth: 1,
-    view: 'rgb(242, 236, 221)',
+    view: 'rgba(0, 0, 0, 0)',
     card: 'rgb(250, 247, 238)',
     primary: 'rgb(158, 62, 50)',
     selected: 'rgb(158, 62, 50)',
@@ -2122,12 +2213,14 @@ async function inspectLegendHome(page, width) {
   assert.deepEqual(
     await page.evaluate(() => ({
       selectedTab: document.querySelector('.tab.active')?.dataset.tab,
+      selectedSaju: document.querySelector('[data-legend-saju-nav].active')?.dataset.tab,
       activePanel: document.querySelector('.view.active')?.id,
       modalActive: document.getElementById('personSearchModal').classList.contains('active'),
       focused: document.activeElement?.id
     })),
     {
-      selectedTab: 'input',
+      selectedTab: 'legend',
+      selectedSaju: 'input',
       activePanel: 'view-input',
       modalActive: true,
       focused: 'psQuery'
@@ -2379,9 +2472,7 @@ async function collectLuckFlowReachability(page) {
 }
 
 async function inspectAppleDesign(page, width) {
-  const expectedAccents = { light: '#007aff', dark: '#0a84ff' };
-  const expectedAccentColors = { light: 'rgb(0, 122, 255)', dark: 'rgb(10, 132, 255)' };
-  const expectedAccentTints = { light: { r: 0, g: 122, b: 255 }, dark: { r: 10, g: 132, b: 255 } };
+  const expectedAccents = { light: '#9e3e32', dark: '#9e3e32' };
   const expectedPastels = {
     light: {
       wood: ['rgb(221, 246, 232)', 'rgb(35, 122, 75)'],
@@ -2769,10 +2860,14 @@ async function inspectAppleSecondaryScreens(page, width) {
 
       const activeView = document.querySelector('.view.active');
       const surfaceProbe = document.createElement('div');
-      surfaceProbe.style.backgroundColor = 'var(--apple-surface)';
+      surfaceProbe.style.backgroundColor = 'rgb(250 247 238 / 0.9)';
+      const solidSurfaceProbe = document.createElement('div');
+      solidSurfaceProbe.style.backgroundColor = 'var(--paper-bright)';
       document.body.appendChild(surfaceProbe);
+      document.body.appendChild(solidSurfaceProbe);
       const result = {
         surface: getComputedStyle(surfaceProbe).backgroundColor,
+        solidSurface: getComputedStyle(solidSurfaceProbe).backgroundColor,
         accent: getComputedStyle(document.documentElement).getPropertyValue('--apple-accent').trim(),
         matchControl,
         matchDecorations,
@@ -2793,16 +2888,21 @@ async function inspectAppleSecondaryScreens(page, width) {
       };
       await window.storage.delete(`legend-saju:record:${savedId}`);
       surfaceProbe.remove();
+      solidSurfaceProbe.remove();
       return result;
     }, { theme, width });
 
     for (const [name, surface] of Object.entries({
-      matchSlot: state.matchControl,
       savedCard: state.savedCard,
       fortuneCard: state.fortuneCard
     })) {
       assert.equal(surface.background, state.surface, `${width}px ${theme} ${name} must use the Apple grouped surface`);
     }
+    const matchPaper = parseCssColor(state.matchControl.background);
+    assert.ok(
+      matchPaper.r >= 235 && matchPaper.g >= 225 && matchPaper.b >= 215,
+      `${width}px ${theme} match slot must stay on a light paper surface: ${state.matchControl.background}`
+    );
     assert.match(state.savedContent, new RegExp(`실제저장-${theme}`), `${width}px ${theme} actual saved record was not rendered`);
     assert.ok(state.fortuneCount >= 1, `${width}px ${theme} actual fortune cards were not rendered`);
     for (const color of state.matchDecorations) {
@@ -2810,8 +2910,8 @@ async function inspectAppleSecondaryScreens(page, width) {
     }
     assert.equal(
       state.calendarSelected.borderTop.toLowerCase(),
-      theme === 'dark' ? 'rgb(10, 132, 255)' : 'rgb(0, 122, 255)',
-      `${width}px ${theme} selected calendar day must use system blue`
+      'rgb(158, 62, 50)',
+      `${width}px ${theme} selected calendar day must use seal red`
     );
     for (const value of [state.calendarSelected.outlineColor, state.calendarSelected.boxShadow]) {
       assert.ok(!legacyGold.test(value), `${width}px ${theme} selected calendar retains legacy gold: ${value}`);
@@ -2835,12 +2935,12 @@ async function inspectAppleSecondaryScreens(page, width) {
       assert.ok(control.width >= 43.5 && control.height >= 43.5, `${width}px ${theme} ${name} is below 44x44px: ${control.width}x${control.height}`);
     }
     for (const modal of state.modalStates) {
-      assert.equal(modal.panel.background, state.surface, `${width}px ${theme} ${modal.id} panel surface`);
+      assert.equal(modal.panel.background, state.solidSurface, `${width}px ${theme} ${modal.id} panel surface`);
       assert.ok(modal.focusedInside, `${width}px ${theme} ${modal.id} must receive focus`);
-      assert.deepEqual(
-        { width: modal.grabber.width, height: modal.grabber.height },
-        { width: 36, height: 5 },
-        `${width}px ${theme} ${modal.id} grabber`
+      assert.ok(
+        Math.abs(modal.grabber.width - 36) <= 0.1 &&
+        modal.grabber.height >= 3 && modal.grabber.height <= 3.3,
+        `${width}px ${theme} ${modal.id} grabber ${modal.grabber.width}x${modal.grabber.height}`
       );
       for (const control of modal.controls) {
         assert.ok(control.width >= 43.5 && control.height >= 43.5, `${width}px ${theme} ${modal.id} control is below 44x44px`);
@@ -2853,7 +2953,7 @@ async function inspectAppleSecondaryScreens(page, width) {
       }
     }
     assert.ok(state.shareState.hasPanel, `${width}px ${theme} share dialog must expose an Apple sheet`);
-    assert.equal(state.shareState.panel.background, state.surface, `${width}px ${theme} share sheet surface`);
+    assert.equal(state.shareState.panel.background, state.solidSurface, `${width}px ${theme} share sheet surface`);
     assert.ok(state.shareState.focusedInside, `${width}px ${theme} share dialog must receive focus`);
     assert.deepEqual(state.shareState.image.corner, [242, 242, 247, 255], `${width}px ${theme} share PNG must use the Apple light canvas`);
     assert.ok(
@@ -3047,7 +3147,7 @@ async function inspectAppleMotion(page, width) {
       }
     }
 
-    document.querySelector('.tab[data-tab="input"]').click();
+    window.activateLegendDestination('input');
     const pressTarget = document.getElementById('calcBtn');
     const beforePress = getComputedStyle(pressTarget);
     pressTarget.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
@@ -3434,7 +3534,7 @@ async function inspectWidth(browser, width) {
         document.body.classList.add('dark');
         await wait(350);
         const dark = measure();
-        document.querySelector('.tab[data-tab="input"]').click();
+    window.activateLegendDestination('input');
         return { light, dark };
       });
 
@@ -3916,8 +4016,12 @@ async function inspectWidth(browser, width) {
     selectedOutline: getComputedStyle(document.querySelector('#daeunScroll .luck-item.selected')).outlineColor,
     bottomBarBackground: getComputedStyle(document.getElementById('bottomBar')).backgroundColor
   }));
-  assert.equal(resultPalette.selectedOutline, 'rgb(10, 132, 255)', `${width}px selected luck outline`);
-  assert.equal(resultPalette.bottomBarBackground, 'rgba(7, 8, 13, 0.96)', `${width}px bottom bar background`);
+  assert.equal(resultPalette.selectedOutline, 'rgb(158, 62, 50)', `${width}px selected luck outline`);
+  assert.match(
+    resultPalette.bottomBarBackground,
+    /^rgba?\(250, 247, 238/,
+    `${width}px bottom bar paper background`
+  );
 
   await page.evaluate(() => document.querySelector('.tab[data-tab="fortune"]').click());
   await sleep(200);
@@ -3931,9 +4035,9 @@ async function inspectWidth(browser, width) {
   await sleep(200);
   assert.equal(
     await page.$eval('.match-intro em', element => getComputedStyle(element).color),
-    'rgb(10, 132, 255)'
+    'rgb(158, 62, 50)'
   );
-  await page.evaluate(() => document.querySelector('.tab[data-tab="result"]').click());
+  await page.evaluate(() => window.activateLegendDestination('result'));
   await sleep(150);
 
   await page.evaluate(() => window.shareCard(currentSaju));
@@ -3945,7 +4049,7 @@ async function inspectWidth(browser, width) {
   }));
   assert.ok(sharePreview.src.startsWith('data:image/png'), `${width}px share preview missing`);
   assert.equal(sharePreview.buttonBackground, 'none', `${width}px share button must not use a metallic gradient`);
-  assert.equal(sharePreview.buttonColor, 'rgb(10, 132, 255)', `${width}px share button must use system blue`);
+  assert.equal(sharePreview.buttonColor, 'rgb(158, 62, 50)', `${width}px share button must use seal red`);
   if (width === 390 && runsGroup('share-back')) {
     const overlayContract = await page.evaluate(() => ({
       closeShare: typeof window.closeShareCardModal,

@@ -6,10 +6,10 @@
 <title>취명선 전설의 만세력</title>
 <meta name="description" content="취명선 전설의 만세력 · 삼원구운과 사주 명리의 여덟 겹 시간 해석">
 <meta name="theme-color" content="#F2ECDD" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#20231F" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F2ECDD" media="(prefers-color-scheme: dark)">
 <!-- iOS PWA (홈화면 추가시 앱처럼 작동) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="전설의 만세력">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.webmanifest">
@@ -2014,16 +2014,20 @@
   </header>
 
   <nav class="tabs" role="tablist" aria-label="주요 화면">
-    <button type="button" class="tab" id="tab-input" role="tab" aria-selected="false" aria-controls="view-input" data-tab="input">내 사주</button>
-    <button type="button" class="tab" id="tab-result" role="tab" aria-selected="false" aria-controls="view-result" data-tab="result">원국</button>
-    <button type="button" class="tab active" id="tab-legend" role="tab" aria-selected="true" aria-controls="view-legend" data-tab="legend">전설</button>
-    <button type="button" class="tab" id="tab-fortune" role="tab" aria-selected="false" aria-controls="view-fortune" data-tab="fortune">풀이</button>
-    <button type="button" class="tab" id="tab-match" role="tab" aria-selected="false" aria-controls="view-match" data-tab="match">궁합</button>
+    <button type="button" class="tab active" id="tab-legend" role="tab" aria-selected="true" aria-controls="view-legend" data-tab="legend">전설사주</button>
+    <button type="button" class="tab" id="tab-fortune" role="tab" aria-selected="false" aria-controls="view-fortune" data-tab="fortune">운의 흐름</button>
+    <button type="button" class="tab" id="tab-match" role="tab" aria-selected="false" aria-controls="view-match" data-tab="match">인연궁합</button>
     <button type="button" class="tab" id="tab-calendar" role="tab" aria-selected="false" aria-controls="view-calendar" data-tab="calendar">만세력</button>
-    <button type="button" class="tab" id="tab-saved" role="tab" aria-selected="false" aria-controls="view-saved" data-tab="saved">저장</button>
+    <button type="button" class="tab" id="tab-saved" role="tab" aria-selected="false" aria-controls="view-saved" data-tab="saved">보관함</button>
   </nav>
 
-  <section class="view" id="view-input" role="tabpanel" aria-labelledby="tab-input" hidden>
+  <nav class="legend-saju-nav" id="legendSajuNav" aria-label="전설사주 메뉴">
+    <button type="button" data-legend-saju-nav data-tab="input" aria-controls="view-input">사주 입력</button>
+    <button type="button" data-legend-saju-nav data-tab="result" aria-controls="view-result">원국</button>
+    <button type="button" data-legend-saju-nav data-tab="legend" aria-controls="view-legend" class="active" aria-current="page">전설</button>
+  </nav>
+
+  <section class="view" id="view-input" role="tabpanel" aria-labelledby="tab-legend" hidden>
     <div class="input-intro">
       <img class="intro-logo-img" src="main-logo.png" alt="취명선 전설의 만세력">
       <img class="legend-input-seal" src="assets/legend-seal.webp" alt="" aria-hidden="true">
@@ -2104,7 +2108,7 @@
     </div>
   </section>
 
-  <section class="view" id="view-result" role="tabpanel" aria-labelledby="tab-result" hidden></section>
+  <section class="view" id="view-result" role="tabpanel" aria-labelledby="tab-legend" hidden></section>
 
   <section class="view active" id="view-legend" role="tabpanel" aria-labelledby="tab-legend">
     <div id="legendContent" aria-live="polite"></div>
@@ -2134,17 +2138,17 @@
 </div>
 
 <nav class="legend-mobile-nav" id="legendMobileNav" aria-label="모바일 주요 화면">
-  <button type="button" data-legend-primary-nav data-tab="input" aria-controls="view-input">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5v8.25A1.25 1.25 0 0 1 18.75 20H5.25A1.25 1.25 0 0 1 4 18.75Z"/><path d="M9 20v-6h6v6"/></svg>
-    <span>내 사주</span>
-  </button>
-  <button type="button" data-legend-primary-nav data-tab="result" aria-controls="view-result">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9.5 4v16M14.5 4v16M5 9.3h14M5 14.7h14"/></svg>
-    <span>원국</span>
-  </button>
   <button type="button" data-legend-primary-nav data-tab="legend" aria-controls="view-legend">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18.5 9.5 8l3.2 5 2.2-3.5L20 18.5Z"/><path d="M7 18.5h10M16.5 5.5v2M15.5 6.5h2"/></svg>
-    <span>전설</span>
+    <span>전설사주</span>
+  </button>
+  <button type="button" data-legend-primary-nav data-tab="fortune" aria-controls="view-fortune">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5c3.2-1.1 5.3-3.5 6.2-7.2 1.8 2.6 4.9 4.3 9.8 5.2"/><path d="M5 20h14M7 5.5h10M12 3v5"/></svg>
+    <span>운의 흐름</span>
+  </button>
+  <button type="button" data-legend-primary-nav data-tab="match" aria-controls="view-match">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.2-7-9.3A3.7 3.7 0 0 1 12 8a3.7 3.7 0 0 1 7 2.7C19 15.8 12 20 12 20Z"/></svg>
+    <span>궁합</span>
   </button>
   <button type="button" data-legend-primary-nav data-tab="calendar" aria-controls="view-calendar">
     <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16M8 13h2M14 13h2M8 17h2M14 17h2"/></svg>
@@ -2152,21 +2156,21 @@
   </button>
   <button type="button" data-legend-primary-nav data-tab="saved" aria-controls="view-saved">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16l-6-3.5L6 20Z"/></svg>
-    <span>저장</span>
+    <span>보관함</span>
   </button>
 </nav>
 
 <div class="legend-more-menu" id="legendMoreMenu" role="menu"
   aria-labelledby="legendMoreButton" hidden>
-  <button type="button" role="menuitem" data-legend-secondary-nav data-tab="fortune"
-    aria-controls="view-fortune">
-    <span class="legend-more-symbol" aria-hidden="true">解</span>
-    <span><strong>풀이</strong><small>운의 흐름과 명리 해석</small></span>
+  <button type="button" role="menuitem" data-legend-secondary-nav data-tab="input"
+    aria-controls="view-input">
+    <span class="legend-more-symbol" aria-hidden="true">命</span>
+    <span><strong>새 사주</strong><small>태어난 순간을 새로 입력</small></span>
   </button>
-  <button type="button" role="menuitem" data-legend-more-nav data-tab="match"
-    aria-controls="view-match">
-    <span class="legend-more-symbol" aria-hidden="true">合</span>
-    <span><strong>궁합</strong><small>두 명반의 흐름 비교</small></span>
+  <button type="button" role="menuitem" data-legend-more-nav data-tab="result"
+    aria-controls="view-result">
+    <span class="legend-more-symbol" aria-hidden="true">局</span>
+    <span><strong>원국 보기</strong><small>내 명식과 대운 흐름</small></span>
   </button>
   <button type="button" role="menuitem" id="aboutBtn" data-legend-more-nav data-tab="about"
     aria-controls="aboutModal" aria-label="앱 정보">
@@ -14561,8 +14565,13 @@ if (themeBtn) {
 }
 
 /* ============================================
-   사주풀이 (올해운)
+   운의 흐름 (월운·연운)
    ============================================ */
+
+const fortuneToday = new Date();
+let fortunePeriodMode = 'month';
+let fortuneCursorYear = fortuneToday.getFullYear();
+let fortuneCursorMonth = fortuneToday.getMonth() + 1;
 
 // 오행 상생/상극 관계
 // 상생: 목→화→토→금→수→목
@@ -14690,9 +14699,9 @@ function barColorByScore(score) {
   return 'linear-gradient(90deg, #9ca3af, #6b7280)';
 }
 
-// 올해 운 계산
-function calcYearFortune(saju) {
-  const thisYear = new Date().getFullYear();
+// 선택한 해의 운 계산
+function calcYearFortune(saju, targetYear = new Date().getFullYear()) {
+  const thisYear = Math.max(1026, Math.min(2099, Number(targetYear) || new Date().getFullYear()));
   const seun = yearGanji(thisYear);
   const ilgan = saju.dStem;
 
@@ -14782,6 +14791,64 @@ function calcYearFortune(saju) {
   };
 }
 
+function calcMonthFortune(saju, targetYear, targetMonth) {
+  const year = Math.max(1026, Math.min(2099, Number(targetYear) || fortuneToday.getFullYear()));
+  const month = Math.max(1, Math.min(12, Number(targetMonth) || 1));
+  const annual = calcYearFortune(saju, year);
+  const monthPillar = getWoonMonth(year, month);
+  const ilgan = saju.dStem;
+  const stemSipsin = getSipsin(ilgan, monthPillar.stem);
+  const branchSipsin = getSipsin(ilgan, JIJANGAN[monthPillar.branch][0]);
+  const inter = interactionBonus(saju, monthPillar);
+  const yongsinInfo = annual.yongsinInfo;
+
+  function monthlyScore(area, weightArr) {
+    let shortScore = 52;
+    shortScore += (weightArr[stemSipsin] + weightArr[branchSipsin]) * 1.45;
+    if (STEM_EL[monthPillar.stem] === yongsinInfo.yongsin) shortScore += 7;
+    if (BRANCH_EL[monthPillar.branch] === yongsinInfo.yongsin) shortScore += 4;
+    shortScore += inter.harmony * 1.3;
+    shortScore -= inter.conflict * 1.6;
+    if (area === 'health') {
+      shortScore += (ohaengBalance(saju.ohaeng) - 50) * 0.14;
+      shortScore -= inter.conflict * 1.5;
+    }
+    if (area === 'move' && [2, 5, 8, 11].includes(monthPillar.branch)) shortScore += 5;
+    shortScore = Math.max(8, Math.min(95, shortScore));
+    return Math.round(annual.scores[area] * 0.42 + shortScore * 0.58);
+  }
+
+  let shortLove = 52;
+  shortLove += sipsinLoveWeight(stemSipsin, saju.gender) * 1.45;
+  shortLove += sipsinLoveWeight(branchSipsin, saju.gender) * 1.45;
+  shortLove += inter.harmony * 1.8;
+  shortLove -= inter.conflict * 1.5;
+  shortLove = Math.max(8, Math.min(95, shortLove));
+
+  return {
+    mode: 'month',
+    year,
+    month,
+    seun: monthPillar,
+    seunStemSipsin: stemSipsin,
+    seunBranchSipsin: branchSipsin,
+    curDaeun: annual.curDaeun,
+    daeunStemSipsin: annual.daeunStemSipsin,
+    daeunBranchSipsin: annual.daeunBranchSipsin,
+    yongsinInfo,
+    inter,
+    annual,
+    scores: {
+      overall: monthlyScore('overall', SIPSIN_WEIGHT.overall),
+      love: Math.round(annual.scores.love * 0.42 + shortLove * 0.58),
+      job: monthlyScore('job', SIPSIN_WEIGHT.job),
+      money: monthlyScore('money', SIPSIN_WEIGHT.money),
+      health: monthlyScore('health', SIPSIN_WEIGHT.health),
+      move: monthlyScore('move', SIPSIN_WEIGHT.move)
+    }
+  };
+}
+
 // 운세 텍스트 생성
 function genFortuneText(area, fortune, saju) {
   const s = fortune.scores[area];
@@ -14831,6 +14898,43 @@ function genFortuneText(area, fortune, saju) {
   return isHigh ? t.high : isLow ? t.low : t.mid;
 }
 
+function genMonthlyFortuneText(area, fortune) {
+  const score = fortune.scores[area];
+  const level = score >= 70 ? 'high' : score < 45 ? 'low' : 'mid';
+  const stemGod = SIPSIN_KOR[fortune.seunStemSipsin];
+  const branchGod = SIPSIN_KOR[fortune.seunBranchSipsin];
+  const ganji = STEM_KOR[fortune.seun.stem] + BRANCH_KOR[fortune.seun.branch];
+  const lead = `${fortune.year}년 ${fortune.month}월 ${ganji} 월운은 <strong>${stemGod}·${branchGod}</strong>의 작용이 중심입니다. `;
+  const templates = {
+    love: {
+      high: '약속과 대화가 자연스럽게 이어지기 쉬운 달입니다. 먼저 연락하고 만남을 구체적인 날짜로 잡으면 관계가 진전됩니다.',
+      mid: '관계의 속도보다 말의 온도를 맞추는 편이 좋습니다. 오래된 인연을 돌보고, 새 인연은 공통 관심사부터 천천히 확인하세요.',
+      low: '서운함을 즉시 결론으로 만들기 쉬운 달입니다. 중요한 대화는 피곤한 밤보다 여유 있는 낮에 하고, 답을 재촉하지 않는 편이 좋습니다.'
+    },
+    job: {
+      high: '제안, 발표, 협업처럼 결과가 보이는 업무에 힘을 싣기 좋습니다. 월초에 우선순위를 정하고 중순 전후로 핵심 결정을 배치하세요.',
+      mid: '새 일을 크게 벌이기보다 진행 중인 업무의 품질과 문서를 정리할 때입니다. 작은 마감들을 먼저 닫으면 다음 기회가 선명해집니다.',
+      low: '요청과 책임 범위가 엇갈리기 쉬우니 구두 합의보다 기록을 남기세요. 이직이나 큰 방향 전환은 조건을 한 번 더 비교하는 편이 안전합니다.'
+    },
+    money: {
+      high: '수입 기회와 협상력이 살아나는 달입니다. 다만 들어오는 돈과 쓸 수 있는 돈을 구분하고, 이익의 일부는 바로 보관하는 흐름이 좋습니다.',
+      mid: '큰 손익보다 생활비와 반복 지출 관리가 중요한 달입니다. 자동결제와 구독을 점검하면 체감 여유가 생깁니다.',
+      low: '충동구매, 보증, 급한 투자 제안을 특히 경계하세요. 큰 결제는 하루 이상 검토하고 현금성 여유를 우선 확보하는 편이 좋습니다.'
+    },
+    health: {
+      high: '생활 리듬을 새로 만들기 좋은 달입니다. 수면, 식사, 가벼운 운동 중 한 가지를 정해 꾸준히 반복하면 컨디션 관리에 도움이 됩니다.',
+      mid: '일정이 몰리는 날과 쉬는 날의 차이를 줄이는 것이 중요합니다. 피로 신호가 이어지면 무리하지 말고 적절한 휴식과 전문적인 확인을 병행하세요.',
+      low: '과로와 수면 부족이 판단력을 흐릴 수 있습니다. 위험한 활동은 서두르지 말고, 불편한 증상이 지속되면 운세 해석보다 의료 전문가의 판단을 우선하세요.'
+    },
+    move: {
+      high: '자리 이동, 여행, 공간 재배치처럼 환경을 바꾸는 일이 활력을 줍니다. 계약이 있다면 일정과 비용을 문서로 확정한 뒤 움직이세요.',
+      mid: '큰 이동보다 책상, 방, 동선처럼 일상의 공간을 손보는 편이 효과적입니다. 이동 계획은 다음 달까지 비교해도 늦지 않습니다.',
+      low: '일정 변경과 계약 누락이 생기기 쉬우니 이사·여행·이직 준비표를 따로 만드세요. 서두른 이동보다 조건 확인이 우선입니다.'
+    }
+  };
+  return lead + templates[area][level];
+}
+
 function genFortuneTips(area, fortune, saju) {
   const s = fortune.scores[area];
   const tips = {
@@ -14865,6 +14969,48 @@ function genOverallText(fortune, saju) {
   return main;
 }
 
+function genMonthlyOverallText(fortune) {
+  const score = fortune.scores.overall;
+  const ganji = STEM_KOR[fortune.seun.stem] + BRANCH_KOR[fortune.seun.branch];
+  const stemGod = SIPSIN_KOR[fortune.seunStemSipsin];
+  const branchGod = SIPSIN_KOR[fortune.seunBranchSipsin];
+  if (score >= 70) {
+    return `${fortune.year}년 ${fortune.month}월(${ganji})은 <strong>${stemGod}·${branchGod}</strong>의 쓰임이 비교적 선명합니다. 한 달에 끝낼 수 있는 목표 하나를 정하고 월초에 먼저 움직이면 흐름을 살리기 좋습니다.`;
+  }
+  if (score < 45) {
+    return `${fortune.year}년 ${fortune.month}월(${ganji})은 속도보다 점검이 필요한 달입니다. 중요한 계약과 지출은 재확인하고, 일정 사이에 회복 시간을 남겨 두면 흔들림을 줄일 수 있습니다.`;
+  }
+  return `${fortune.year}년 ${fortune.month}월(${ganji})은 큰 승부보다 조율에 강점이 있는 달입니다. <strong>${stemGod}·${branchGod}</strong>의 성향을 참고해 관계, 일정, 지출의 균형을 한 주 단위로 점검하세요.`;
+}
+
+function moveFortunePeriod(direction) {
+  if (fortunePeriodMode === 'month') {
+    const moved = new Date(fortuneCursorYear, fortuneCursorMonth - 1 + direction, 1);
+    const nextYear = Math.max(1026, Math.min(2099, moved.getFullYear()));
+    fortuneCursorYear = nextYear;
+    fortuneCursorMonth = nextYear === moved.getFullYear()
+      ? moved.getMonth() + 1
+      : direction > 0 ? 12 : 1;
+  } else {
+    fortuneCursorYear = Math.max(1026, Math.min(2099, fortuneCursorYear + direction));
+  }
+  renderFortune();
+}
+
+function jumpFortunePeriod(target) {
+  if (target === 'next-year') {
+    fortunePeriodMode = 'year';
+    fortuneCursorYear = Math.min(2099, fortuneToday.getFullYear() + 1);
+  } else {
+    const monthOffset = target === 'next-month' ? 1 : 0;
+    const moved = new Date(fortuneToday.getFullYear(), fortuneToday.getMonth() + monthOffset, 1);
+    fortunePeriodMode = 'month';
+    fortuneCursorYear = moved.getFullYear();
+    fortuneCursorMonth = moved.getMonth() + 1;
+  }
+  renderFortune();
+}
+
 function renderFortune() {
   try {
     _renderFortuneInner();
@@ -14873,7 +15019,7 @@ function renderFortune() {
     const box = document.getElementById('fortuneContent');
     if (box) {
       box.innerHTML = `<div class="fortune-empty">
-        <div class="ico">⚠️</div>
+        <div class="ico">解</div>
         <p>풀이 생성 중 오류가 발생했습니다<br><span style="font-size:12px;color:var(--text-light)">${escapeHtml(e.message || String(e))}</span></p>
       </div>`;
     }
@@ -14883,31 +15029,40 @@ function renderFortune() {
 function _renderFortuneInner() {
   if (!currentSaju) {
     $('#fortuneContent').innerHTML = `<div class="fortune-empty">
-      <div class="ico">🔮</div>
-      <p>먼저 <strong>입력</strong> 탭에서 사주를 펼쳐주세요<br>또는 <strong>저장</strong>된 명반을 불러오세요</p>
+      <div class="ico">命</div>
+      <p><strong>전설사주 → 사주 입력</strong>에서 먼저 사주를 펼쳐주세요<br>또는 <strong>보관함</strong>의 명반을 불러오세요</p>
     </div>`;
     return;
   }
 
   const s = currentSaju;
-  const fortune = calcYearFortune(s);
+  const isMonth = fortunePeriodMode === 'month';
+  const fortune = isMonth
+    ? calcMonthFortune(s, fortuneCursorYear, fortuneCursorMonth)
+    : calcYearFortune(s, fortuneCursorYear);
   const overallGrade = gradeFromScore(fortune.scores.overall);
   const ga = STEM_KOR[fortune.seun.stem] + BRANCH_KOR[fortune.seun.branch];
   const seunClsS = EL_CLASS[STEM_EL[fortune.seun.stem]].replace('el-', 'gj-s-');
   const seunClsB = EL_CLASS[BRANCH_EL[fortune.seun.branch]].replace('el-', 'gj-b-');
+  const periodTitle = isMonth
+    ? `${fortune.year}년 ${fortune.month}월`
+    : `${fortune.year}년`;
+  const periodSubtitle = isMonth ? '월운' : '연운';
 
   const areas = [
-    { key: 'love', ico: '💕', title: '연애운' },
-    { key: 'job', ico: '💼', title: '직장운' },
-    { key: 'money', ico: '💰', title: '금전운' },
-    { key: 'health', ico: '🌿', title: '건강운' },
-    { key: 'move', ico: '🚚', title: '이사운' }
+    { key: 'love', ico: '緣', title: '인연운' },
+    { key: 'job', ico: '業', title: '직업운' },
+    { key: 'money', ico: '財', title: '재물운' },
+    { key: 'health', ico: '身', title: '건강운' },
+    { key: 'move', ico: '行', title: '변화운' }
   ];
 
   const cardsHtml = areas.map(a => {
     const sc = fortune.scores[a.key];
     const grade = gradeFromScore(sc);
-    const text = genFortuneText(a.key, fortune, s);
+    const text = isMonth
+      ? genMonthlyFortuneText(a.key, fortune)
+      : genFortuneText(a.key, fortune, s);
     const tips = genFortuneTips(a.key, fortune, s);
     return `<div class="f-card">
       <div class="f-card-head">
@@ -14924,34 +15079,66 @@ function _renderFortuneInner() {
   }).join('');
 
   $('#fortuneContent').innerHTML = `
+    <section class="fortune-period-panel" aria-label="운세 기간 선택">
+      <div class="fortune-period-switch" role="tablist" aria-label="월운 또는 연운">
+        <button type="button" role="tab" data-fortune-mode="month" aria-selected="${isMonth}" class="${isMonth ? 'active' : ''}">월운</button>
+        <button type="button" role="tab" data-fortune-mode="year" aria-selected="${!isMonth}" class="${!isMonth ? 'active' : ''}">연운</button>
+      </div>
+      <div class="fortune-period-navigator">
+        <button type="button" id="fortunePeriodPrev" aria-label="${isMonth ? '이전 달' : '이전 해'}">‹</button>
+        <div class="fortune-period-title">
+          <span>${periodSubtitle}</span>
+          <strong>${periodTitle}</strong>
+        </div>
+        <button type="button" id="fortunePeriodNext" aria-label="${isMonth ? '다음 달' : '다음 해'}">›</button>
+      </div>
+      <div class="fortune-period-shortcuts" aria-label="빠른 기간 이동">
+        <button type="button" data-fortune-jump="now">이번 달</button>
+        <button type="button" data-fortune-jump="next-month">다음 달</button>
+        <button type="button" data-fortune-jump="next-year">내년</button>
+      </div>
+    </section>
+
     <div class="fortune-head">
-      <div class="nm">${escapeHtml(s.name)}님의 올해운</div>
-      <div class="year-tag">${fortune.year}년 · ${STEM[fortune.seun.stem]}${BRANCH[fortune.seun.branch]}年</div>
+      <div class="nm">${escapeHtml(s.name)}님의 ${periodSubtitle}</div>
+      <div class="year-tag">${periodTitle} · ${STEM[fortune.seun.stem]}${BRANCH[fortune.seun.branch]}</div>
       <div class="ganji-big">
         <span class="${seunClsS}">${STEM[fortune.seun.stem]}</span><span class="${seunClsB}">${BRANCH[fortune.seun.branch]}</span>
         <span style="font-family:'Noto Sans KR'; font-size:14px; font-weight:700; color:var(--text-sub); margin-left:4px;">(${ga})</span>
       </div>
       <div class="ganji-sub">
-        세운천간 ${SIPSIN_KOR[fortune.seunStemSipsin]} · 지지 ${SIPSIN_KOR[fortune.seunBranchSipsin]} ·
+        ${isMonth ? '월운' : '세운'} 천간 ${SIPSIN_KOR[fortune.seunStemSipsin]} · 지지 ${SIPSIN_KOR[fortune.seunBranchSipsin]} ·
         현재 대운 ${STEM[fortune.curDaeun.stem]}${BRANCH[fortune.curDaeun.branch]}(${SIPSIN_KOR[fortune.daeunStemSipsin]})
       </div>
     </div>
 
     <div class="overall-card">
-      <div class="ov-label">종합 올해운</div>
+      <div class="ov-label">종합 ${periodSubtitle}</div>
       <div class="ov-score">${fortune.scores.overall}<span class="pt">점</span></div>
       <div class="ov-grade">${overallGrade.g}</div>
-      <div class="ov-text">${genOverallText(fortune, s)}</div>
+      <div class="ov-text">${isMonth ? genMonthlyOverallText(fortune) : genOverallText(fortune, s)}</div>
     </div>
 
     <div class="fortune-cards">
       ${cardsHtml}
     </div>
 
-    <div style="margin-top:16px; padding:14px; background:var(--bg-soft); border-radius:12px; font-size:11.5px; font-weight:500; color:var(--text-sub); line-height:1.7; text-align:center;">
-      ⚠︎ 본 풀이는 세운·대운·간이 용신 후보·십신·합충을 종합한 참고용 해석입니다. 실제 삶의 흐름은 당신의 선택과 노력에 따라 달라집니다.
+    <div class="fortune-disclaimer">
+      본 풀이는 ${isMonth ? '월운·세운' : '세운'}·대운·간이 용신 후보·십신·합충을 종합한 참고용 창작 해석입니다. 실제 삶의 흐름은 선택과 환경에 따라 달라집니다.
     </div>
   `;
+
+  $$('[data-fortune-mode]').forEach(button => {
+    onTap(button, () => {
+      fortunePeriodMode = button.dataset.fortuneMode;
+      renderFortune();
+    });
+  });
+  onTap($('#fortunePeriodPrev'), () => moveFortunePeriod(-1));
+  onTap($('#fortunePeriodNext'), () => moveFortunePeriod(1));
+  $$('[data-fortune-jump]').forEach(button => {
+    onTap(button, () => jumpFortunePeriod(button.dataset.fortuneJump));
+  });
 }
 
 

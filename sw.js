@@ -1,7 +1,7 @@
 // 취명선 전설의 만세력 서비스워커
 // 전략: HTML/CSS/JS = 네트워크 우선(항상 최신 디자인), 이미지/아이콘 = 캐시 우선(빠름).
 // 오프라인일 때만 캐시로 폴백한다. 배포 시 VERSION만 올리면 옛 캐시는 자동 삭제됨.
-const VERSION = 'v6-20260727-readings';
+const VERSION = 'v7-20260727-legend-book-flow';
 const CACHE_PREFIX = 'legend-manse-';
 const CACHE = CACHE_PREFIX + VERSION;
 

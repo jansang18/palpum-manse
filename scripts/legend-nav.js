@@ -3,6 +3,7 @@
 
   var TOP_TAB_SELECTOR = '.tab[data-tab]';
   var PRIMARY_SELECTOR = '[data-legend-primary-nav]';
+  var SAJU_SELECTOR = '[data-legend-saju-nav]';
   var MORE_ITEM_SELECTOR = '[data-legend-more-nav]';
   var SECONDARY_ITEM_SELECTOR = '[data-legend-secondary-nav]';
   var MENU_ITEM_SELECTOR = SECONDARY_ITEM_SELECTOR + ', ' + MORE_ITEM_SELECTOR;
@@ -29,8 +30,16 @@
   }
 
   function currentDestination() {
-    var active = document.querySelector(TOP_TAB_SELECTOR + '.active');
-    return active ? active.dataset.tab : 'input';
+    var activeView = document.querySelector('.view.active');
+    return activeView && activeView.id.indexOf('view-') === 0
+      ? activeView.id.slice(5)
+      : 'legend';
+  }
+
+  function groupDestination(tabName) {
+    return tabName === 'input' || tabName === 'result' || tabName === 'legend'
+      ? 'legend'
+      : tabName;
   }
 
   function renderDestination(tabName) {
@@ -60,8 +69,9 @@
 
   function syncDestination(tabName) {
     var selectedTab = null;
+    var groupName = groupDestination(tabName);
     all(TOP_TAB_SELECTOR).forEach(function (tab) {
-      var selected = tab.dataset.tab === tabName;
+      var selected = tab.dataset.tab === groupName;
       tab.classList.toggle('active', selected);
       tab.setAttribute('aria-selected', String(selected));
       tab.tabIndex = selected ? 0 : -1;
@@ -74,15 +84,26 @@
       view.classList.toggle('active', selected);
       view.hidden = !selected;
     });
-    all(PRIMARY_SELECTOR).forEach(function (button) {
+    var hasSaju = typeof window.hasCurrentSaju === 'function'
+      && window.hasCurrentSaju();
+    var sajuNav = document.getElementById('legendSajuNav');
+    if (sajuNav) sajuNav.hidden = groupName !== 'legend';
+    all(SAJU_SELECTOR).forEach(function (button) {
       var selected = button.dataset.tab === tabName;
+      button.classList.toggle('active', selected);
+      button.disabled = button.dataset.tab === 'result' && !hasSaju;
+      if (selected) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+    });
+    all(PRIMARY_SELECTOR).forEach(function (button) {
+      var selected = button.dataset.tab === groupName;
       button.classList.toggle('active', selected);
       if (selected) button.setAttribute('aria-current', 'page');
       else button.removeAttribute('aria-current');
     });
     var moreButton = document.getElementById('legendMoreButton');
     if (moreButton) {
-      var secondary = tabName === 'fortune' || tabName === 'match';
+      var secondary = false;
       moreButton.classList.toggle('active', secondary);
       if (secondary) moreButton.setAttribute('aria-current', 'page');
       else moreButton.removeAttribute('aria-current');
@@ -90,8 +111,6 @@
 
     var bottomBar = document.getElementById('bottomBar');
     if (bottomBar) {
-      var hasSaju = typeof window.hasCurrentSaju === 'function'
-        && window.hasCurrentSaju();
       bottomBar.style.display = tabName === 'result' && hasSaju ? 'flex' : 'none';
     }
     renderDestination(tabName);
@@ -103,23 +122,24 @@
 
   function focusDestination(tabName) {
     var mobile = window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches;
+    var groupName = groupDestination(tabName);
     var target = mobile
-      ? document.querySelector(PRIMARY_SELECTOR + '[data-tab="' + tabName + '"]')
-      : document.querySelector(TOP_TAB_SELECTOR + '[data-tab="' + tabName + '"]');
-    if (!target && mobile && (tabName === 'fortune' || tabName === 'match')) {
-      target = document.getElementById('legendMoreButton');
-    }
+      ? document.querySelector(PRIMARY_SELECTOR + '[data-tab="' + groupName + '"]')
+      : document.querySelector(TOP_TAB_SELECTOR + '[data-tab="' + groupName + '"]');
     if (!target) {
-      target = document.querySelector(TOP_TAB_SELECTOR + '[data-tab="' + tabName + '"]');
+      target = document.querySelector(SAJU_SELECTOR + '[data-tab="' + tabName + '"]');
     }
     if (target) target.focus();
   }
 
   window.activateLegendDestination = function activateLegendDestination(tabName, options) {
     var settings = options || {};
-    var target = document.querySelector(
-      TOP_TAB_SELECTOR + '[data-tab="' + String(tabName) + '"]'
-    );
+    if (tabName === 'result'
+      && typeof window.hasCurrentSaju === 'function'
+      && !window.hasCurrentSaju()) {
+      tabName = 'input';
+    }
+    var target = document.getElementById('view-' + String(tabName));
     if (!target) return false;
 
     var current = currentDestination();
@@ -129,6 +149,9 @@
     }
     if (current !== tabName) window.closeLegendMoreMenu({ restoreFocus: false });
     if (!syncDestination(tabName)) return false;
+    if (current !== tabName && settings.scroll !== false) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
     if (settings.focus) focusDestination(tabName);
     return true;
   };
@@ -186,6 +209,12 @@
       pressFeedback(button);
       button.addEventListener('click', function () {
         window.activateLegendDestination(button.dataset.tab);
+      });
+    });
+    all(SAJU_SELECTOR).forEach(function (button) {
+      pressFeedback(button);
+      button.addEventListener('click', function () {
+        if (!button.disabled) window.activateLegendDestination(button.dataset.tab);
       });
     });
   }

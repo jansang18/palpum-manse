@@ -12273,6 +12273,7 @@ Sigrid Niehaus|19641229|F|
 
 <script src="scripts/vendor/manseryeok.browser.js"></script>
 <script src="scripts/manseryeok-adapter.js"></script>
+<script src="scripts/legend-storage.js"></script>
 <script>
 /* 전역 에러 핸들러 — 콘솔에만 기록 (화면 오버레이는 iOS에서 인터랙션을 막을 수 있어 제거) */
 window.addEventListener('error', function(e) {
@@ -12318,21 +12319,10 @@ window.addEventListener('unhandledrejection', function(e) {
 })();
 
 const LEGEND_STORAGE_PREFIX = 'legend-saju:';
+const LEGEND_RECORD_PREFIX = 'legend-saju:record:';
 const LEGEND_FALLBACK_KEY = 'legend-saju:records';
 const LEGEND_THEME_KEY = 'legend-saju:theme';
-
-function readLegendFallbackRecords() {
-  try {
-    const value = JSON.parse(localStorage.getItem(LEGEND_FALLBACK_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch (error) {
-    return [];
-  }
-}
-
-function writeLegendFallbackRecords(records) {
-  localStorage.setItem(LEGEND_FALLBACK_KEY, JSON.stringify(records));
-}
+const recordStore = window.LegendStorage.createRecordStore(window.storage, localStorage);
 
 /* 계산 엔진 */
 const STEM = ['甲','乙','丙','丁','戊','己','庚','辛','壬','癸'];
@@ -13654,11 +13644,11 @@ onTap($('#saveConfirm'), async () => {
   const name = $('#saveName').value.trim() || '이름 없음';
   const memo = $('#saveMemo').value.trim();
   const record = { ...currentSaju, name, memo, savedAt: Date.now(), id: 'saju_' + Date.now() };
-  try { await window.storage.set(LEGEND_STORAGE_PREFIX + record.id, JSON.stringify(record)); }
-  catch (e) {
-    const list = readLegendFallbackRecords();
-    list.push(record);
-    writeLegendFallbackRecords(list);
+  try {
+    await recordStore.saveRecord(record);
+  } catch (error) {
+    window.showAppToast(error.message || '명반을 저장하지 못했습니다');
+    return;
   }
   window.closeAppModal($('#saveModal'));
   window.showAppToast('명반이 저장되었습니다');
@@ -13745,12 +13735,8 @@ function makeSavedCard(record) {
 async function renderSaved() {
   let list = [];
   try {
-    const res = await window.storage.list(LEGEND_STORAGE_PREFIX);
-    if (res && res.keys) for (const k of res.keys) {
-      const r = await window.storage.get(k);
-      if (r) list.push(JSON.parse(r.value));
-    }
-  } catch (e) { list = readLegendFallbackRecords(); }
+    list = await recordStore.listRecords();
+  } catch (error) {}
 
   list = list.filter(record => record && typeof record === 'object');
   const content = $('#savedContent');
@@ -13793,11 +13779,7 @@ async function renderSaved() {
       if (e.target.classList.contains('sdelete')) return;
       const id = c.dataset.id;
       let rec;
-      try { const r = await window.storage.get(LEGEND_STORAGE_PREFIX + id); if (r) rec = JSON.parse(r.value); }
-      catch (err) {
-        const arr = readLegendFallbackRecords();
-        rec = arr.find(x => x.id === id);
-      }
+      try { rec = await recordStore.getRecord(id); } catch (error) {}
       if (rec) {
         currentSaju = rec;
         selectedDaeun = null; selectedSeun = null; selectedWoon = null; selectedLegendDay = null;
@@ -13812,10 +13794,11 @@ async function renderSaved() {
         e.stopPropagation();
         if (!confirm('삭제하시겠습니까?')) return;
         const id = b.dataset.del;
-        try { await window.storage.delete(LEGEND_STORAGE_PREFIX + id); }
-        catch (err) {
-          const arr = readLegendFallbackRecords();
-          writeLegendFallbackRecords(arr.filter(x => x.id !== id));
+        try {
+          await recordStore.deleteRecord(id);
+        } catch (error) {
+          window.showAppToast(error.message || '명반을 삭제하지 못했습니다');
+          return;
         }
         renderSaved();
       });
@@ -13830,12 +13813,11 @@ async function renderSaved() {
 }
 
 async function updateSavedRecord(id, patch) {
-  try { const r = await window.storage.get(LEGEND_STORAGE_PREFIX + id); if (r) { const rec = JSON.parse(r.value); Object.assign(rec, patch); await window.storage.set(LEGEND_STORAGE_PREFIX + id, JSON.stringify(rec)); return; } } catch (e) {}
-  const arr = readLegendFallbackRecords(); const i = arr.findIndex(x => x.id === id); if (i >= 0) { Object.assign(arr[i], patch); writeLegendFallbackRecords(arr); }
+  return recordStore.updateRecord(id, patch);
 }
 async function toggleFav(id) {
-  let cur = false;
-  try { const r = await window.storage.get(LEGEND_STORAGE_PREFIX + id); if (r) cur = !!JSON.parse(r.value).fav; } catch (e) { const arr = readLegendFallbackRecords(); const rec = arr.find(x => x.id === id); cur = rec && !!rec.fav; }
+  const record = await recordStore.getRecord(id);
+  const cur = record && !!record.fav;
   await updateSavedRecord(id, { fav: !cur });
 }
 function filterSaved(q) {
@@ -13882,15 +13864,7 @@ async function findSimilarSaju() {
   if (!currentSaju) { alert('먼저 사주를 펼쳐주세요.'); return; }
   // 저장 목록 불러오기
   let list = [];
-  try {
-    const res = await window.storage.list(LEGEND_STORAGE_PREFIX);
-    if (res && res.keys) for (const k of res.keys) {
-      const r = await window.storage.get(k);
-      if (r) list.push(JSON.parse(r.value));
-    }
-  } catch (err) {
-    list = readLegendFallbackRecords();
-  }
+  try { list = await recordStore.listRecords(); } catch (error) {}
 
   if (list.length === 0) {
     $('#similarModal .similar-body').innerHTML = `<div style="text-align:center;padding:40px 20px;color:var(--text-sub);font-size:14px;font-weight:600;line-height:1.7;">저장된 명반이 없습니다.<br>저장 탭에서 사주를 모아두면<br>여기서 비교할 수 있어요.</div>`;
@@ -14023,14 +13997,7 @@ async function importSavedRecords(records) {
     else skipped++;
   }
 
-  try {
-    for (const record of accepted) {
-      await window.storage.set(`${LEGEND_STORAGE_PREFIX}${record.id}`, JSON.stringify(record));
-    }
-  } catch (error) {
-    const existing = readLegendFallbackRecords();
-    writeLegendFallbackRecords(existing.concat(accepted));
-  }
+  await recordStore.importRecords(accepted);
   return { added: accepted.length, skipped };
 }
 
@@ -14103,7 +14070,10 @@ function bindSavedToolbar(list) {
       fileIn.value = '';
       renderSaved();
     } catch (err) {
-      alert('파일을 읽을 수 없습니다. 취명선 전설의 만세력에서 내보낸 JSON 파일인지 확인해주세요.');
+      const message = err && /가져오기를 저장하지 못했습니다/.test(err.message)
+        ? err.message
+        : '파일을 읽을 수 없습니다. 취명선 전설의 만세력에서 내보낸 JSON 파일인지 확인해주세요.';
+      alert(message);
       fileIn.value = '';
     }
   });
@@ -14870,13 +14840,7 @@ function renderSlotFilled(person, key) {
 async function openMatchPicker() {
   // 모달로 저장된 명반 리스트 + 현재 사주 + 새로 입력 옵션
   let list = [];
-  try {
-    const res = await window.storage.list(LEGEND_STORAGE_PREFIX);
-    if (res && res.keys) for (const k of res.keys) {
-      const r = await window.storage.get(k);
-      if (r) list.push(JSON.parse(r.value));
-    }
-  } catch (e) { list = readLegendFallbackRecords(); }
+  try { list = await recordStore.listRecords(); } catch (error) {}
   list.sort((a,b) => (b.savedAt || 0) - (a.savedAt || 0));
 
   let itemsHtml = '';
@@ -14925,11 +14889,7 @@ async function openMatchPicker() {
     el.addEventListener('click', async () => {
       const id = el.dataset.id;
       let rec;
-      try { const r = await window.storage.get(LEGEND_STORAGE_PREFIX + id); if (r) rec = JSON.parse(r.value); }
-      catch (err) {
-        const arr = readLegendFallbackRecords();
-        rec = arr.find(x => x.id === id);
-      }
+      try { rec = await recordStore.getRecord(id); } catch (error) {}
       if (rec) { setMatchSlot(matchPickerTarget, rec); closeMatchPicker(); }
     });
   });

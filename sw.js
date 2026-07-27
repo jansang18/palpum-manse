@@ -1,9 +1,8 @@
 // 취명선 전설의 만세력 서비스워커
 // 전략: HTML/CSS/JS = 네트워크 우선(항상 최신 디자인), 이미지/아이콘 = 캐시 우선(빠름).
 // 오프라인일 때만 캐시로 폴백한다. 배포 시 VERSION만 올리면 옛 캐시는 자동 삭제됨.
-const VERSION = 'v1-20260727';
+const VERSION = 'v2-20260727';
 const CACHE_PREFIX = 'legend-manse-';
-const LEGACY_CACHE_PREFIX = 'sineum-manse-';
 const CACHE = CACHE_PREFIX + VERSION;
 
 // 오프라인 첫 진입에도 동작하도록 핵심 자원을 미리 캐시(이후 온라인이면 네트워크본으로 갱신)
@@ -22,6 +21,7 @@ const PRECACHE = [
   './assets/legend-seal.webp',
   './scripts/vendor/manseryeok.browser.js',
   './scripts/manseryeok-adapter.js',
+  './scripts/legend-storage.js',
   './scripts/legend-era.js',
   './scripts/legend-resonance.js',
   './scripts/legend-copy.js',
@@ -48,10 +48,7 @@ self.addEventListener('activate', (e) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((k) => (
-            (k.startsWith(CACHE_PREFIX) || k.startsWith(LEGACY_CACHE_PREFIX)) &&
-            k !== CACHE
-          ))
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE)
           .map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())

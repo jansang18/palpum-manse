@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const vm = require('node:vm');
 
 const html = fs.readFileSync('index.html', 'utf8');
 const share = fs.readFileSync('share.js', 'utf8');
@@ -21,6 +22,7 @@ const runtimeAssets = [
   'assets/legend-seal.webp',
   'scripts/vendor/manseryeok.browser.js',
   'scripts/manseryeok-adapter.js',
+  'scripts/legend-storage.js',
   'scripts/legend-era.js',
   'scripts/legend-resonance.js',
   'scripts/legend-copy.js',
@@ -59,8 +61,57 @@ test('precaches every legend runtime asset for an offline first visit', () => {
 
 test('activation preserves caches owned by other deployments', () => {
   assert.match(serviceWorker, /startsWith\(CACHE_PREFIX\)/);
-  assert.doesNotMatch(serviceWorker, /startsWith\(['"]chwimyeongseon-manse-/);
+  assert.doesNotMatch(serviceWorker, /sineum-manse-/);
+  assert.doesNotMatch(serviceWorker, /chwimyeongseon-manse-/);
   assert.doesNotMatch(serviceWorker, /keys\.filter\(\s*\(?[a-z]\)?\s*=>\s*[a-z]\s*!==\s*CACHE\s*\)/);
+});
+
+test('activation deletes only stale legend caches', async () => {
+  const handlers = new Map();
+  const deleted = [];
+  let activeCache = '';
+  const caches = {
+    open(name) {
+      activeCache = name;
+      return Promise.resolve({ addAll: () => Promise.resolve(), put: () => Promise.resolve() });
+    },
+    keys() {
+      return Promise.resolve([
+        'legend-manse-previous',
+        'sineum-manse-previous',
+        'chwimyeongseon-manse-previous',
+        activeCache
+      ]);
+    },
+    delete(name) {
+      deleted.push(name);
+      return Promise.resolve(true);
+    },
+    match: () => Promise.resolve()
+  };
+  const self = {
+    location: { origin: 'https://example.test' },
+    clients: { claim: () => Promise.resolve() },
+    addEventListener: (type, handler) => handlers.set(type, handler),
+    skipWaiting: () => Promise.resolve()
+  };
+  vm.runInNewContext(serviceWorker, {
+    self,
+    caches,
+    URL,
+    fetch: () => Promise.reject(new Error('network unavailable')),
+    Promise
+  });
+  const dispatch = async type => {
+    let lifetime;
+    handlers.get(type)({ waitUntil: promise => { lifetime = promise; } });
+    await lifetime;
+  };
+
+  await dispatch('install');
+  await dispatch('activate');
+
+  assert.deepEqual(deleted, ['legend-manse-previous']);
 });
 
 test('protects every legend runtime asset in the release inventory', () => {
@@ -76,11 +127,64 @@ test('protects every legend runtime asset in the release inventory', () => {
 
 test('isolates live records in the legend storage namespace', () => {
   assert.match(html, /const\s+LEGEND_STORAGE_PREFIX\s*=\s*['"]legend-saju:['"]/);
+  assert.match(html, /const\s+LEGEND_RECORD_PREFIX\s*=\s*['"]legend-saju:record:['"]/);
   assert.match(html, /const\s+LEGEND_FALLBACK_KEY\s*=\s*['"]legend-saju:records['"]/);
   assert.match(html, /const\s+LEGEND_THEME_KEY\s*=\s*['"]legend-saju:theme['"]/);
   assert.doesNotMatch(html, /window\.storage\.(?:get|set|delete|list)\(\s*['"`]saju:/);
   assert.doesNotMatch(html, /localStorage\.(?:getItem|setItem|removeItem)\(\s*['"]saju_list['"]/);
   assert.doesNotMatch(html, /saju_theme/);
+});
+
+test('record listing ignores theme and fallback configuration keys', async () => {
+  const { createRecordStore, RECORD_PREFIX, FALLBACK_KEY, THEME_KEY } =
+    require('../scripts/legend-storage.js');
+  const values = new Map([
+    [`${RECORD_PREFIX}primary`, JSON.stringify({ id: 'primary', name: '기본' })],
+    [THEME_KEY, 'dark'],
+    [FALLBACK_KEY, JSON.stringify([{ id: 'fallback', name: '보조' }])]
+  ]);
+  const storage = {
+    list: async prefix => ({ keys: [...values.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => values.has(key) ? { value: values.get(key) } : null,
+    set: async (key, value) => { values.set(key, value); },
+    delete: async key => { values.delete(key); }
+  };
+  const fallbackStorage = {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value)
+  };
+
+  const records = await createRecordStore(storage, fallbackStorage).listRecords();
+
+  assert.deepEqual(records.map(record => record.id).sort(), ['fallback', 'primary']);
+});
+
+test('partial import failure rolls back written records and rejects', async () => {
+  const { createRecordStore, RECORD_PREFIX } = require('../scripts/legend-storage.js');
+  const values = new Map();
+  let writes = 0;
+  const storage = {
+    list: async prefix => ({ keys: [...values.keys()].filter(key => key.startsWith(prefix)) }),
+    get: async key => values.has(key) ? { value: values.get(key) } : null,
+    set: async (key, value) => {
+      writes++;
+      if (writes === 2) throw new Error('quota exceeded');
+      values.set(key, value);
+    },
+    delete: async key => { values.delete(key); }
+  };
+  const fallbackStorage = {
+    getItem: () => null,
+    setItem: () => { throw new Error('fallback must not claim a partial import'); }
+  };
+  const recordStore = createRecordStore(storage, fallbackStorage);
+
+  await assert.rejects(
+    recordStore.importRecords([{ id: 'first' }, { id: 'second' }]),
+    /가져오기를 저장하지 못했습니다/
+  );
+
+  assert.deepEqual([...values.keys()].filter(key => key.startsWith(RECORD_PREFIX)), []);
 });
 
 test('exports exact product schema and rule metadata', () => {
@@ -97,7 +201,7 @@ test('normalizes validated legacy backups into the legend namespace', () => {
   assert.match(html, /data\.product\s*===\s*['"]legend-manse['"]/);
   assert.match(html, /data\.schemaVersion\s*===\s*2/);
   assert.match(html, /data\.version\s*===\s*1/);
-  assert.match(html, /window\.storage\.set\(`\$\{LEGEND_STORAGE_PREFIX\}\$\{record\.id\}`/);
+  assert.match(html, /recordStore\.importRecords\(accepted\)/);
 });
 
 test('shares era, resonance relation, and all four pillars without guarantees', () => {

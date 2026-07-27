@@ -485,7 +485,11 @@ function createServiceWorkerHarness(source, addAllFailure = null) {
       });
     },
     keys() {
-      return Promise.resolve(['sineum-manse-previous', openedCache].filter(Boolean));
+      return Promise.resolve([
+        'sineum-manse-previous',
+        'legend-manse-previous',
+        openedCache
+      ].filter(Boolean));
     },
     delete(name) {
       deletedCaches.push(name);
@@ -552,7 +556,7 @@ async function inspectServiceWorkerInstall(source) {
     'skipWaiting must follow successful addAll'
   );
   await successfulInstall.dispatch('activate');
-  assert.deepEqual(successfulInstall.deletedCaches, ['sineum-manse-previous']);
+  assert.deepEqual(successfulInstall.deletedCaches, ['legend-manse-previous']);
   assert.equal(successfulInstall.events.at(-1).type, 'claim');
 }
 
@@ -657,7 +661,7 @@ async function inspectFinalSecurityRuntime(page, width) {
   const state = await page.evaluate(async () => {
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const listSavedKeys = async () => {
-      const result = await window.storage.list('saju:');
+      const result = await window.storage.list('legend-saju:record:');
       return result && Array.isArray(result.keys) ? result.keys : [];
     };
 
@@ -795,7 +799,7 @@ async function inspectFinalSecurityRuntime(page, width) {
   assert.equal(state.importState.executableNodes, 0, `${width}px imported markup became executable DOM`);
   assert.equal(state.importState.keys.length, 1, `${width}px invalid imported schemas must be rejected`);
   assert.ok(uuid.test(state.importState.stored.id), `${width}px imported id is not a UUID: ${state.importState.stored.id}`);
-  assert.equal(state.importState.keys[0], `saju:${state.importState.stored.id}`);
+  assert.equal(state.importState.keys[0], `legend-saju:record:${state.importState.stored.id}`);
   assert.deepEqual(state.importState.cardIds, [state.importState.stored.id]);
   assert.match(state.importState.cardText[0], /<img src=x onerror=/, 'malicious display text must remain inert text');
   assert.equal(Object.hasOwn(state.importState.stored, 'unexpected'), false, 'unknown import fields must be dropped');
@@ -884,7 +888,7 @@ async function inspectImportedFieldDownstreamSafety(page, width) {
   const state = await page.evaluate(async () => {
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const listKeys = async () => {
-      const result = await window.storage.list('saju:');
+      const result = await window.storage.list('legend-saju:record:');
       return result && Array.isArray(result.keys) ? result.keys : [];
     };
     const attackerNodes = root => [
@@ -2156,7 +2160,7 @@ async function inspectAppleSecondaryScreens(page, width) {
 
       document.querySelector('.tab[data-tab="saved"]').click();
       const savedId = `task5-${theme}`;
-      await window.storage.set(`saju:${savedId}`, JSON.stringify({
+      await window.storage.set(`legend-saju:record:${savedId}`, JSON.stringify({
         ...currentSaju,
         id: savedId,
         name: `실제저장-${theme}`,
@@ -2284,7 +2288,7 @@ async function inspectAppleSecondaryScreens(page, width) {
         viewportHeight: window.innerHeight,
         width
       };
-      await window.storage.delete(`saju:${savedId}`);
+      await window.storage.delete(`legend-saju:record:${savedId}`);
       surfaceProbe.remove();
       return result;
     }, { theme, width });
@@ -3006,12 +3010,12 @@ async function inspectWidth(browser, width) {
       let alerts = 0;
       window.alert = () => { alerts++; };
       try {
-        const before = new Set((await window.storage.list('saju:')).keys || []);
+        const before = new Set((await window.storage.list('legend-saju:record:')).keys || []);
         document.getElementById('saveBtn').click();
         document.getElementById('saveConfirm').click();
         await new Promise(resolve => setTimeout(resolve, 100));
         const toast = document.getElementById('appToast');
-        const after = await window.storage.list('saju:');
+        const after = await window.storage.list('legend-saju:record:');
         await Promise.all((after.keys || [])
           .filter(key => !before.has(key))
           .map(key => window.storage.delete(key)));

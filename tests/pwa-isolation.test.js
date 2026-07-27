@@ -353,6 +353,83 @@ test('storage read failures are not rendered as empty UI state', () => {
   assert.match(html, /function\s+reportLegendStorageError\(error\)/);
 });
 
+test('primary list failure propagates instead of accepting an empty fallback as authoritative', async () => {
+  const { createRecordStore } = require('../scripts/legend-storage.js');
+  const recordStore = createRecordStore({
+    list: async () => { throw new Error('primary list unavailable'); },
+    get: async () => null,
+    set: async () => {},
+    delete: async () => {}
+  }, {
+    getItem: () => null,
+    setItem: () => {}
+  });
+
+  await assert.rejects(recordStore.listRecords(), error => {
+    assert.equal(error.code, 'LEGEND_STORAGE_UNAVAILABLE');
+    assert.match(error.message, /저장소 상태/);
+    return true;
+  });
+});
+
+test('primary entry read failure aborts the list instead of hiding one record', async () => {
+  const { createRecordStore, RECORD_PREFIX } = require('../scripts/legend-storage.js');
+  const recordStore = createRecordStore({
+    list: async () => ({ keys: [`${RECORD_PREFIX}kept`] }),
+    get: async () => { throw new Error('primary record unavailable'); },
+    set: async () => {},
+    delete: async () => {}
+  }, {
+    getItem: () => JSON.stringify([{ id: 'fallback-only' }]),
+    setItem: () => {}
+  });
+
+  await assert.rejects(recordStore.listRecords(), error => {
+    assert.equal(error.code, 'LEGEND_STORAGE_UNAVAILABLE');
+    return true;
+  });
+});
+
+test('primary get failure propagates even when the fallback has no matching record', async () => {
+  const { createRecordStore } = require('../scripts/legend-storage.js');
+  const recordStore = createRecordStore({
+    list: async () => ({ keys: [] }),
+    get: async () => { throw new Error('primary get unavailable'); },
+    set: async () => {},
+    delete: async () => {}
+  }, {
+    getItem: () => '[]',
+    setItem: () => {}
+  });
+
+  await assert.rejects(recordStore.getRecord('kept'), error => {
+    assert.equal(error.code, 'LEGEND_STORAGE_UNAVAILABLE');
+    return true;
+  });
+});
+
+test('a successful primary read still lets a newer fallback record win', async () => {
+  const { createRecordStore, RECORD_PREFIX, FALLBACK_KEY } =
+    require('../scripts/legend-storage.js');
+  const primary = new Map([
+    [`${RECORD_PREFIX}same`, JSON.stringify({ id: 'same', memo: 'primary-old' })]
+  ]);
+  const recordStore = createRecordStore({
+    list: async () => ({ keys: [...primary.keys()] }),
+    get: async key => primary.has(key) ? { value: primary.get(key) } : null,
+    set: async () => {},
+    delete: async () => {}
+  }, {
+    getItem: key => key === FALLBACK_KEY
+      ? JSON.stringify([{ id: 'same', memo: 'fallback-new' }])
+      : null,
+    setItem: () => {}
+  });
+
+  assert.equal((await recordStore.getRecord('same')).memo, 'fallback-new');
+  assert.equal((await recordStore.listRecords())[0].memo, 'fallback-new');
+});
+
 test('write-then-throw import rolls back every attempted id', async () => {
   const { createRecordStore, RECORD_PREFIX } = require('../scripts/legend-storage.js');
   const primary = new Map();

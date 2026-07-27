@@ -2050,6 +2050,22 @@
         <input class="input" type="tel" inputmode="numeric" pattern="[0-9]*" id="inTime" placeholder="1430" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
       </div>
     </div>
+
+    <details class="advanced-settings" id="advancedCalculationSettings">
+      <summary>고급 계산 설정</summary>
+      <div class="advanced-settings-body">
+        <div class="field">
+          <label class="field-label" id="segDayBoundaryLabel">일 경계 관법</label>
+          <div class="segmented day-boundary-segmented" id="segDayBoundary" role="radiogroup"
+            aria-labelledby="segDayBoundaryLabel">
+            <button type="button" role="radio" aria-checked="true" data-val="midnight" class="active">자정 기준</button>
+            <button type="button" role="radio" aria-checked="false" data-val="jasi">자시 기준</button>
+            <button type="button" role="radio" aria-checked="false" data-val="splitJasi">야자시 분리</button>
+          </div>
+          <p class="advanced-settings-note">23:00–23:59의 일주·시주를 정하는 학파별 기준입니다. 기본값은 자정 기준입니다.</p>
+        </div>
+      </div>
+    </details>
     </div>
 
     <button type="button" class="primary-btn" id="calcBtn">사주 펼치기</button>
@@ -12224,18 +12240,25 @@ Sigrid Niehaus|19641229|F|
       </div>
       <div class="field field-row">
         <div class="field-half">
-          <label class="field-label">성별</label>
-          <div class="segmented" id="mnfGender">
+          <label class="field-label" id="mnfGenderLabel">성별</label>
+          <div class="segmented" id="mnfGender" role="radiogroup" aria-labelledby="mnfGenderLabel">
             <button type="button" data-val="M" class="active">남자</button>
             <button type="button" data-val="F">여자</button>
           </div>
         </div>
         <div class="field-half">
-          <label class="field-label">양/음력</label>
-          <div class="segmented" id="mnfCal">
+          <label class="field-label" id="mnfCalLabel">양/음력</label>
+          <div class="segmented" id="mnfCal" role="radiogroup" aria-labelledby="mnfCalLabel">
             <button type="button" data-val="solar" class="active">양력</button>
             <button type="button" data-val="lunar">음력</button>
           </div>
+        </div>
+      </div>
+      <div class="field" id="mnfLunarMonthTypeField" hidden>
+        <label class="field-label" id="mnfLeapMonthLabel">음력 월 구분</label>
+        <div class="segmented" id="mnfLeapMonth" role="radiogroup" aria-labelledby="mnfLeapMonthLabel">
+          <button type="button" role="radio" aria-checked="true" data-val="normal" class="active" disabled>평달</button>
+          <button type="button" role="radio" aria-checked="false" data-val="leap" disabled>윤달</button>
         </div>
       </div>
       <div class="field field-row">
@@ -12264,11 +12287,12 @@ Sigrid Niehaus|19641229|F|
     </div>
     <div style="font-size:13px; color:var(--text-sub); line-height:1.8; margin-top:12px; font-weight:500;">
       · 지원 기간 : 1026 ~ 2099년<br>
-      · 시주 계산 : 야자시 구분<br>
+      · 시간 기준 : Asia/Seoul 역사 표준시·서머타임<br>
+      · 일 경계 : 자정·자시·야자시 분리 중 선택<br>
       · 월주 기준 : 절기<br>
       · 대운 : 남양녀음 순행 / 남음녀양 역행<br>
       · 풀이 : 올해운·연애·직장·금전·건강·이사<br>
-      · 궁합 : 일간·지지 합충, 오행보완, 용신비교
+      · 궁합 : 일간·지지 합충, 오행보완, 간이 용신 후보 비교
     </div>
     <div style="font-size:11px; color:var(--text-light); line-height:1.7; margin-top:12px; font-weight:500; padding-top:10px; border-top:1px solid var(--line);">
       본 앱의 풀이는 전통 명리학 이론에 기반한 해석으로, 참고용입니다. 실제 삶의 선택과 결과는 본인의 의지와 노력에 달려있습니다.
@@ -12330,6 +12354,12 @@ const LEGEND_STORAGE_PREFIX = 'legend-saju:';
 const LEGEND_RECORD_PREFIX = 'legend-saju:record:';
 const LEGEND_FALLBACK_KEY = 'legend-saju:records';
 const LEGEND_THEME_KEY = 'legend-saju:theme';
+const LEGEND_DAY_BOUNDARY_KEY = 'legend-saju:day-boundary';
+const DAY_BOUNDARY_LABELS = Object.freeze({
+  midnight: '자정 기준',
+  jasi: '자시 기준',
+  splitJasi: '야자시 분리'
+});
 const recordStore = window.LegendStorage.createRecordStore(window.storage, localStorage);
 
 function reportLegendStorageError(error) {
@@ -12526,6 +12556,7 @@ function solarToLunar(y, m, d) {
 
 function calcSaju(opts) {
   let { year, month, day, hour, minute, calendar, gender, unknown, isLeapMonth } = opts;
+  const dayBoundary = DAY_BOUNDARY_LABELS[opts.dayBoundary] ? opts.dayBoundary : 'midnight';
   const inputYear = year;
   const inputMonth = month;
   const inputDay = day;
@@ -12548,7 +12579,7 @@ function calcSaju(opts) {
     }
     const precise = globalThis.LegendGanji.calculate({
       ...opts,
-      dayBoundary: opts.dayBoundary || 'midnight'
+      dayBoundary
     });
     year = precise.year;
     month = precise.month;
@@ -12576,7 +12607,12 @@ function calcSaju(opts) {
     di = dayGanji(toJD(year, month, day));
     if (!unknown) {
       hBranch = hourToBranch(hour);
-      hStem = getHourStem(di.stem, hBranch);
+      const nextDay = dayGanji(toJD(year, month, day) + 1);
+      if (hour === 23 && dayBoundary === 'jasi') di = nextDay;
+      const hourDayStem = hour === 23 && dayBoundary === 'splitJasi'
+        ? nextDay.stem
+        : di.stem;
+      hStem = getHourStem(hourDayStem, hBranch);
     }
   }
 
@@ -12615,7 +12651,9 @@ function calcSaju(opts) {
     dStem: di.stem, dBranch: di.branch,
     hStem, hBranch,
     sipsin, sipsinJi, ohaeng, interactions, shinsal, daeun, gongmang,
-    unknown, gender, jd, calculationMode
+    unknown, gender, jd, calculationMode, dayBoundary,
+    timeStandard: year >= 1800 ? 'asia-seoul-civil' : 'legacy-approximate',
+    trueSolarCorrection: false
   };
 }
 
@@ -12791,6 +12829,35 @@ function syncLunarMonthType() {
   });
 }
 
+function syncMatchLunarMonthType() {
+  const field = $('#mnfLunarMonthTypeField');
+  if (!field) return;
+  const isLunar = $('#mnfCal .active')?.dataset.val === 'lunar';
+  field.hidden = !isLunar;
+  field.querySelectorAll('button').forEach(button => {
+    button.disabled = !isLunar;
+    if (!isLunar) button.classList.toggle('active', button.dataset.val === 'normal');
+  });
+}
+
+function getSelectedDayBoundary() {
+  const value = $('#segDayBoundary .active')?.dataset.val;
+  return DAY_BOUNDARY_LABELS[value] ? value : 'midnight';
+}
+
+function restoreDayBoundaryPreference() {
+  let saved = 'midnight';
+  try {
+    const value = localStorage.getItem(LEGEND_DAY_BOUNDARY_KEY);
+    if (DAY_BOUNDARY_LABELS[value]) saved = value;
+  } catch (error) {
+    // The calculation still has a deterministic default when preferences are blocked.
+  }
+  $$('#segDayBoundary button').forEach(button => {
+    button.classList.toggle('active', button.dataset.val === saved);
+  });
+}
+
 // 세그먼트 버튼 (양력/음력, 남자/여자 등)
 function bindSegmented(root) {
   (root || document).querySelectorAll('.segmented').forEach(seg => {
@@ -12810,6 +12877,14 @@ function bindSegmented(root) {
         b.classList.add('active');
         sync();
         if (seg.id === 'segCal') syncLunarMonthType();
+        if (seg.id === 'mnfCal') syncMatchLunarMonthType();
+        if (seg.id === 'segDayBoundary') {
+          try {
+            localStorage.setItem(LEGEND_DAY_BOUNDARY_KEY, b.dataset.val);
+          } catch (error) {
+            window.showAppToast('관법 설정을 저장하지 못했지만 이번 계산에는 적용합니다.');
+          }
+        }
       });
       b.addEventListener('keydown', event => {
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
@@ -12828,8 +12903,10 @@ function bindSegmented(root) {
     }
   });
 }
+restoreDayBoundaryPreference();
 bindSegmented();
 syncLunarMonthType();
+syncMatchLunarMonthType();
 
 // 숫자만 허용하는 input 처리 (iOS에서 type=tel만으로는 비숫자 입력이 막히지 않음)
 document.addEventListener('input', e => {
@@ -12904,7 +12981,8 @@ onTap($('#calcBtn'), () => {
       calendar,
       isLeapMonth,
       gender,
-      unknown
+      unknown,
+      dayBoundary: getSelectedDayBoundary()
     });
     saju.name = name || '이름 없음';
     currentSaju = saju;
@@ -12913,6 +12991,9 @@ onTap($('#calcBtn'), () => {
     window.activateLegendDestination('result');
     window.scrollTo({top: 0, behavior: 'smooth'});
   } catch (e) {
+    if (e && e.code === 'LEGEND_SOLAR_TERM_TIME_REQUIRED') {
+      return showInErr(e.message, '#inTime');
+    }
     if (e instanceof RangeError) return showInErr(e.message, '#inBirth');
     console.error(e);
     alert('계산 오류: ' + e.message);
@@ -12941,6 +13022,12 @@ function renderResult() {
         양력 ${s.year}.${pad(s.month)}.${pad(s.day)}${s.lunar ? ` / 음력 ${s.lunar.y}.${pad(s.lunar.m)}.${pad(s.lunar.d)}` : ''}
         <span data-calculation-mode="${s.calculationMode}">${s.calculationMode === 'kasi-precise' ? '정밀 계산' : '역사 범위 근사 계산'}</span><br>
         ${s.unknown ? '시 모름' : `${BRANCH_KOR[s.hBranch]}시 (${pad(s.hour)}시 ${pad(s.minute)}분)`}
+      </div>
+      <div class="result-source-legend" aria-label="계산 및 해석 출처">
+        <span class="source-badge source-traditional">명리 계산 · KASI</span>
+        <span>${DAY_BOUNDARY_LABELS[s.dayBoundary] || DAY_BOUNDARY_LABELS.midnight} · Asia/Seoul civil time</span>
+        <span class="source-badge source-creative">취명선 창작 규칙</span>
+        <span>공명도와 전설 서사는 참고용 창작 해석입니다.</span>
       </div>
     </div>
 
@@ -13707,7 +13794,7 @@ onTap($('#shareBtn'), () => {
   if (!currentSaju) return;
   if (window.shareCard) { window.shareCard(currentSaju); return; }
   const s = currentSaju;
-  const txt = `${s.name}의 사주\n${s.year}.${pad(s.month)}.${pad(s.day)} ${s.unknown?'시 모름':(pad(s.hour)+':'+pad(s.minute))}\n${STEM[s.yStem]}${BRANCH[s.yBranch]} ${STEM[s.mStem]}${BRANCH[s.mBranch]} ${STEM[s.dStem]}${BRANCH[s.dBranch]} ${s.hStem>=0?STEM[s.hStem]+BRANCH[s.hBranch]:'시간모름'}\n\n취명선 전설의 만세력`;
+  const txt = `${s.name}의 사주\n${s.year}.${pad(s.month)}.${pad(s.day)} ${s.unknown?'시 모름':(pad(s.hour)+':'+pad(s.minute))}\n일 경계: ${DAY_BOUNDARY_LABELS[s.dayBoundary] || DAY_BOUNDARY_LABELS.midnight}\n${STEM[s.yStem]}${BRANCH[s.yBranch]} ${STEM[s.mStem]}${BRANCH[s.mBranch]} ${STEM[s.dStem]}${BRANCH[s.dBranch]} ${s.hStem>=0?STEM[s.hStem]+BRANCH[s.hBranch]:'시간모름'}\n\n취명선 전설의 만세력`;
   if (navigator.share) navigator.share({ text: txt });
   else { navigator.clipboard.writeText(txt); alert('클립보드에 복사되었습니다'); }
 });
@@ -14032,6 +14119,8 @@ function normalizeImportedRecord(input) {
   const gender = input.gender === 'M' || input.gender === 'F' ? input.gender : null;
   const hour = unknown === true ? integer(input.hour ?? 0, 0, 23) : integer(input.hour, 0, 23);
   const minute = unknown === true ? integer(input.minute ?? 0, 0, 59) : integer(input.minute, 0, 59);
+  const dayBoundary = input.dayBoundary === undefined ? 'midnight' : input.dayBoundary;
+  if (!DAY_BOUNDARY_LABELS[dayBoundary]) return null;
   if ([year, month, day, unknown, gender, hour, minute].includes(null)) return null;
 
   if (calendar === 'solar') {
@@ -14068,7 +14157,8 @@ function normalizeImportedRecord(input) {
       calendar,
       isLeapMonth,
       gender,
-      unknown
+      unknown,
+      dayBoundary
     });
   } catch (error) {
     if (error instanceof RangeError || error instanceof TypeError) return null;
@@ -14536,7 +14626,10 @@ function getYongsin(saju) {
     candidates.sort((a,b) => saju.ohaeng[a] - saju.ohaeng[b]);
     yongsin = candidates[0];
   }
-  return { strong, yongsin, support, drain };
+  const rationale = strong
+    ? `일간을 돕는 기운이 더 많아 소모·조절 계열 중 부족한 ${EL_KOR[yongsin]}를 후보로 삼았습니다.`
+    : `일간을 돕는 기운이 더 적어 비겁·인성 계열 중 부족한 ${EL_KOR[yongsin]}를 후보로 삼았습니다.`;
+  return { strong, yongsin, support, drain, rationale };
 }
 
 function gradeFromScore(score) {
@@ -14719,7 +14812,7 @@ function genOverallText(fortune, saju) {
 
   let main;
   if (s >= 80) {
-    main = `${fortune.year}년(${ga}년)은 당신의 명식과 조화로운 해입니다. 용신 <strong>${yong}</strong>의 기운이 세운에 실려 들어와, 오랫동안 준비해온 일이 결실을 맺기 좋은 시기입니다.`;
+    main = `${fortune.year}년(${ga}년)은 당신의 명식과 조화로운 해입니다. 간이 용신 후보 <strong>${yong}</strong>의 기운이 세운에 실려 들어와, 오랫동안 준비해온 일이 결실을 맺기 좋은 시기입니다.`;
   } else if (s >= 65) {
     main = `${fortune.year}년(${ga}년)은 전반적으로 무난한 흐름 속에 기회가 숨어 있는 해입니다. ${strong ? '신강한 명식이라 억제하는 기운' : '신약한 명식이라 돕는 기운'}을 세운에서 어느 정도 공급받을 수 있습니다.`;
   } else if (s >= 50) {
@@ -14814,7 +14907,7 @@ function _renderFortuneInner() {
     </div>
 
     <div style="margin-top:16px; padding:14px; background:var(--bg-soft); border-radius:12px; font-size:11.5px; font-weight:500; color:var(--text-sub); line-height:1.7; text-align:center;">
-      ⚠︎ 본 풀이는 세운·대운·용신·십신·합충을 종합한 참고용 해석입니다. 실제 삶의 흐름은 당신의 선택과 노력에 따라 달라집니다.
+      ⚠︎ 본 풀이는 세운·대운·간이 용신 후보·십신·합충을 종합한 참고용 해석입니다. 실제 삶의 흐름은 당신의 선택과 노력에 따라 달라집니다.
     </div>
   `;
 }
@@ -15029,6 +15122,8 @@ function openMatchNewForm() {
   // 성별/달력 기본값
   $$('#mnfGender button').forEach(b => b.classList.toggle('active', b.dataset.val === 'M'));
   $$('#mnfCal button').forEach(b => b.classList.toggle('active', b.dataset.val === 'solar'));
+  $$('#mnfLeapMonth button').forEach(b => b.classList.toggle('active', b.dataset.val === 'normal'));
+  syncMatchLunarMonthType();
 }
 function closeMatchNewForm() {
   window.closeAppModal($('#matchNewModal'));
@@ -15129,16 +15224,16 @@ function calcCompatibility(a, b) {
   if (chungCount > 0) interNotes.push(`충 ${chungCount}개`);
   interScore = Math.max(10, Math.min(95, Math.round(interScore)));
 
-  // 5) 용신 비교 - 용신 오행이 상대의 명식에 풍부한가
+  // 5) 간이 용신 후보 비교 - 후보 오행이 상대의 명식에 풍부한가
   const yA = getYongsin(a);
   const yB = getYongsin(b);
   let yongScore = 50;
   const yongNotes = [];
   const bRatioForA = b.ohaeng[yA.yongsin] / totalB;
   const aRatioForB = a.ohaeng[yB.yongsin] / totalA;
-  if (bRatioForA > 0.2) { yongScore += 15; yongNotes.push(`상대가 내 용신(${EL_KOR[yA.yongsin]}) 풍부`); }
+  if (bRatioForA > 0.2) { yongScore += 15; yongNotes.push(`상대가 내 간이 용신 후보(${EL_KOR[yA.yongsin]})를 보완`); }
   else if (bRatioForA > 0.1) { yongScore += 7; }
-  if (aRatioForB > 0.2) { yongScore += 15; yongNotes.push(`내가 상대 용신(${EL_KOR[yB.yongsin]}) 풍부`); }
+  if (aRatioForB > 0.2) { yongScore += 15; yongNotes.push(`내가 상대 간이 용신 후보(${EL_KOR[yB.yongsin]})를 보완`); }
   else if (aRatioForB > 0.1) { yongScore += 7; }
   yongScore = Math.max(15, Math.min(90, yongScore));
 
@@ -15158,7 +15253,7 @@ function calcCompatibility(a, b) {
       ilji: { score: Math.round(iljiScore), notes: iljiNotes, title: '일지 관계', sub: '배우자 자리 · 친밀함의 궁합' },
       ohaeng: { score: Math.round(ohaengScore), notes: ohaengNotes, title: '오행 보완', sub: '서로의 결핍을 채우는가' },
       inter: { score: interScore, notes: interNotes, title: '원국 합충', sub: '전체 기운의 얽힘' },
-      yong: { score: Math.round(yongScore), notes: yongNotes, title: '용신 조화', sub: '서로에게 필요한 기운을 주는가' }
+      yong: { score: Math.round(yongScore), notes: yongNotes, title: '간이 용신 후보 조화', sub: '단순 오행 후보를 서로 보완하는가' }
     }
   };
 }
@@ -15231,8 +15326,8 @@ function genSubText(key, sub, a, b) {
   }
   if (key === 'yong') {
     if (s >= 70) return '서로가 서로에게 필요한 기운을 풍부히 가지고 있어, 함께 있을 때 운이 밝아지는 관계입니다.';
-    if (s >= 50) return '용신의 일부가 맞닿아 있어, 상대가 곁에 있는 것이 도움이 되는 사이입니다.';
-    return '용신이 서로에게 크게 채워지지 않아, 운의 관점에서는 중립입니다.';
+    if (s >= 50) return '간이 용신 후보의 일부가 맞닿아 있어, 서로의 부족한 오행을 보완할 여지가 있습니다.';
+    return '간이 용신 후보가 서로에게 크게 채워지지 않아, 이 단순 지표에서는 중립입니다.';
   }
   return '';
 }
@@ -15281,7 +15376,7 @@ function renderMatchResult() {
       <button type="button" class="match-reset" id="matchResetBtn2">다시 선택하기</button>
 
       <div style="margin-top:16px; padding:14px; background:var(--bg-soft); border-radius:12px; font-size:11.5px; font-weight:500; color:var(--text-sub); line-height:1.7; text-align:center;">
-        ⚠︎ 궁합은 일간·일지·오행보완·합충·용신을 종합한 참고용입니다. 명리는 관계의 경향이지 결과가 아닙니다.
+        ⚠︎ 궁합은 일간·일지·오행보완·합충·간이 용신 후보를 종합한 참고용입니다. 명리는 관계의 경향이지 결과가 아닙니다.
       </div>
   `;
 
@@ -15300,6 +15395,9 @@ function submitMatchNewForm() {
   const name = $('#mnfName').value.trim() || '상대방';
   const gender = $('#mnfGender .active').dataset.val;
   const calendar = $('#mnfCal .active').dataset.val;
+  const isLeapMonth = calendar === 'lunar'
+    ? $('#mnfLeapMonth .active')?.dataset.val === 'leap'
+    : false;
   const birthRaw = $('#mnfBirth').value.trim();
   const timeRaw = $('#mnfTime').value.trim();
 
@@ -15331,7 +15429,18 @@ function submitMatchNewForm() {
   if (m < 1 || m > 12 || d < 1 || d > 31) { alert('생년월일 형식을 확인해주세요'); return; }
   if (y < 1026 || y > 2099) { alert('1026 ~ 2099년 범위로 입력해주세요'); return; }
   try {
-    const saju = calcSaju({ year: y, month: m, day: d, hour: h, minute: mi, calendar, gender, unknown });
+    const saju = calcSaju({
+      year: y,
+      month: m,
+      day: d,
+      hour: h,
+      minute: mi,
+      calendar,
+      isLeapMonth,
+      gender,
+      unknown,
+      dayBoundary: getSelectedDayBoundary()
+    });
     saju.name = name;
     setMatchSlot(matchPickerTarget, saju);
     closeMatchNewForm();

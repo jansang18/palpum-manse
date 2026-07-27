@@ -12,11 +12,18 @@
     'hour'
   ]);
   const EVIDENCE_LABELS = Object.freeze({
-    useful: '용신 후보와 시대',
+    useful: '간이 용신 후보와 시대',
     day: '일간과 시대',
     balance: '오행 균형 보완',
     daeun: '대운과 시대',
     short: '단기 운과 시대'
+  });
+  const EVIDENCE_KINDS = Object.freeze({
+    useful: '간이 해석 · 취명선 창작 규칙',
+    day: '명리 계산 · 취명선 창작 규칙',
+    balance: '명리 계산 · 취명선 창작 규칙',
+    daeun: '명리 계산 · 취명선 창작 규칙',
+    short: '명리 계산 · 취명선 창작 규칙'
   });
 
   function element(tagName, className, text) {
@@ -86,7 +93,7 @@
 
   function resonanceFor(saju, era, selection) {
     const yongsin = getYongsin(saju);
-    return root.LegendResonance.calculateResonance({
+    const resonance = root.LegendResonance.calculateResonance({
       eraElement: era.element,
       dayElement: EL_KOR[STEM_EL[saju.dStem]],
       usefulElement: EL_KOR[yongsin.yongsin],
@@ -94,6 +101,15 @@
       daeunElement: selection.daeun ? EL_KOR[STEM_EL[selection.daeun.stem]] : null,
       shortElement: EL_KOR[STEM_EL[selection.dayPillar.stem]]
     });
+    return {
+      ...resonance,
+      provenance: {
+        usefulElement: EL_KOR[yongsin.yongsin],
+        supportCount: yongsin.support,
+        drainCount: yongsin.drain,
+        usefulRationale: yongsin.rationale
+      }
+    };
   }
 
   function layerCard(layer) {
@@ -146,18 +162,34 @@
     const inner = element('div', 'legend-dialog-inner');
     const title = appendText(inner, 'h2', '', '공명도 계산 근거');
     title.id = 'legendEvidenceTitle';
+    title.tabIndex = -1;
     appendText(
       inner,
       'p',
       'legend-dialog-intro',
-      '다섯 항목의 점수와 판단 이유를 모두 공개합니다. 공명도는 선택을 돕는 참고 지표입니다.'
+      '전통 계산값과 창작 점수 규칙을 구분해 공개합니다. 공명도는 선택을 돕는 참고 지표입니다.'
     );
+
+    const sources = element('div', 'legend-evidence-sources');
+    appendText(sources, 'strong', 'legend-source-badge source-traditional', '명리 계산 · KASI');
+    appendText(sources, 'p', '', '연주·월주·일주·시주, 절입과 대운의 기초값입니다.');
+    appendText(sources, 'strong', 'legend-source-badge source-heuristic', '간이 용신 후보');
+    appendText(
+      sources,
+      'p',
+      '',
+      `${resonance.provenance.usefulRationale} 지지 ${resonance.provenance.supportCount}, 소모 ${resonance.provenance.drainCount}로 비교했습니다.`
+    );
+    appendText(sources, 'strong', 'legend-source-badge source-creative', '취명선 창작 규칙');
+    appendText(sources, 'p', '', '삼원구운 공명도, 가중치와 전설 서사는 취명선이 만든 참고용 해석입니다.');
+    inner.appendChild(sources);
 
     Object.entries(resonance.parts).forEach(([key, part]) => {
       const row = element('section', 'legend-evidence-part');
       row.dataset.legendEvidencePart = key;
       appendText(row, 'strong', '', EVIDENCE_LABELS[key] || key);
       appendText(row, 'span', '', `${part.score} / ${part.max}`);
+      appendText(row, 'small', 'legend-evidence-kind', EVIDENCE_KINDS[key] || '취명선 창작 규칙');
       appendText(row, 'p', '', part.reason);
       inner.appendChild(row);
     });
@@ -175,6 +207,12 @@
     appendText(hero, 'div', 'legend-eyebrow', '취명선 전설 해석 · 시대의 하늘');
     appendText(hero, 'h2', '', narrative.heroTitle);
     appendText(hero, 'p', 'legend-hero-summary', narrative.heroSummary);
+    appendText(
+      hero,
+      'p',
+      'legend-hero-source',
+      '공명도와 서사는 취명선 창작 규칙이며, 명식·절입 기초값과 구분됩니다.'
+    );
 
     const row = element('div', 'legend-score-row');
     const score = element('div', 'legend-score');
@@ -191,6 +229,13 @@
     evidence.addEventListener('click', () => {
       if (typeof dialog.showModal === 'function') dialog.showModal();
       else dialog.setAttribute('open', '');
+      const title = dialog.querySelector('#legendEvidenceTitle');
+      const focusDialogStart = () => {
+        if (title) title.focus({ preventScroll: true });
+        dialog.scrollTop = 0;
+      };
+      focusDialogStart();
+      requestAnimationFrame(focusDialogStart);
     });
     hero.appendChild(row);
     return hero;

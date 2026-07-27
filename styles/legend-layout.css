@@ -3,6 +3,87 @@ html {
     "Noto Sans KR", sans-serif;
 }
 
+.advanced-settings {
+  margin-top: 0.25rem;
+  border-top: 1px solid var(--legend-line);
+}
+
+.advanced-settings summary {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.55rem 0;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  font-weight: 720;
+  line-height: 1.4;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.advanced-settings summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--seal) 72%, white);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+.advanced-settings-body {
+  padding: 0.35rem 0 0.15rem;
+}
+
+.advanced-settings-note {
+  margin: 0.55rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.day-boundary-segmented button {
+  min-height: 2.75rem !important;
+  padding-inline: 0.35rem !important;
+  white-space: normal !important;
+  line-height: 1.25;
+}
+
+.result-source-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 0.5rem;
+  max-width: 36rem;
+  margin: 0.75rem auto 0;
+  color: var(--ink-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.source-badge,
+.legend-source-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 0.22rem 0.55rem;
+  border: 1px solid var(--legend-line-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--paper-bright);
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.source-heuristic {
+  color: color-mix(in srgb, var(--seal) 78%, var(--ink));
+  border-color: color-mix(in srgb, var(--seal) 34%, transparent);
+}
+
+.source-creative {
+  color: var(--seal);
+  border-color: color-mix(in srgb, var(--seal) 34%, transparent);
+}
+
 #view-legend {
   position: relative;
   isolation: isolate;
@@ -112,6 +193,17 @@ html {
   font-weight: 560;
   line-height: 1.72;
   word-break: keep-all;
+}
+
+.legend-hero-source {
+  position: relative;
+  z-index: 1;
+  max-width: 34rem;
+  margin: 0.65rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1.55;
 }
 
 .legend-score-row {
@@ -444,6 +536,25 @@ html {
   line-height: 1.6;
 }
 
+.legend-evidence-sources {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.55rem 0.7rem;
+  align-items: start;
+  margin-bottom: 0.6rem;
+  padding: 0.85rem;
+  border: 1px solid var(--legend-line);
+  border-radius: 1rem;
+  background: rgb(250 247 238 / 0.72);
+}
+
+.legend-evidence-sources p {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
 .legend-evidence-part {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -468,6 +579,14 @@ html {
   color: var(--ink-muted);
   font-size: 0.76rem;
   line-height: 1.55;
+}
+
+.legend-evidence-kind {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .legend-dialog-close {
@@ -505,6 +624,18 @@ body.dark .day-item.selected[data-legend-day] {
 }
 
 @media (max-width: 40rem) {
+  .day-boundary-segmented {
+    align-items: stretch;
+  }
+
+  .day-boundary-segmented button {
+    font-size: 0.72rem !important;
+  }
+
+  .legend-evidence-sources {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   #view-legend {
     border-radius: 1.25rem 1.25rem 0 0;
     padding-inline: max(0.625rem, env(safe-area-inset-left));
@@ -803,6 +934,13 @@ body.dark .day-item.selected[data-legend-day] {
 }
 
 @media (prefers-reduced-transparency: reduce) {
+  .legend-evidence-dialog,
+  .legend-evidence-sources {
+    background: var(--paper-bright);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .legend-mobile-nav,
   .legend-more-menu {
     border-color: var(--legend-line-strong);

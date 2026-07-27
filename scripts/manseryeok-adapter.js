@@ -5,6 +5,12 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (browserEngine) {
   const stems = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계'];
   const branches = ['자', '축', '인', '묘', '진', '사', '오', '미', '신', '유', '술', '해'];
+  const KOREA_CIVIL_TIME = Object.freeze({
+    // 135° with EoT off applies only the package's historical civil offset table.
+    longitude: 135,
+    applyEquationOfTime: false,
+    applyHistoricalDst: true
+  });
 
   function indexPillar(pillar) {
     const stem = stems.indexOf(pillar.heavenlyStem);
@@ -96,6 +102,44 @@
     };
   }
 
+  function engineBirthInput(input, dates, hour, minute) {
+    return {
+      year: dates.solar.y,
+      month: dates.solar.m,
+      day: dates.solar.d,
+      hour,
+      minute,
+      isLunar: false,
+      isLeapMonth: false,
+      trueSolarTime: KOREA_CIVIL_TIME,
+      dayBoundary: input.dayBoundary || 'midnight',
+      gender: input.gender === 'M' ? 'male' : 'female'
+    };
+  }
+
+  function pillarHead(result) {
+    return [
+      result.year.heavenlyStem,
+      result.year.earthlyBranch,
+      result.month.heavenlyStem,
+      result.month.earthlyBranch
+    ].join(':');
+  }
+
+  function assertKnownTimeIsNotRequired(engine, input, dates) {
+    if (!input.unknown) return;
+    const start = engine.calculateFourPillars(engineBirthInput(input, dates, 0, 0));
+    const end = engine.calculateFourPillars(engineBirthInput(input, dates, 23, 59));
+    if (pillarHead(start) === pillarHead(end)) return;
+
+    const error = new Error(
+      '이 날짜에는 절입 시각이 있어 태어난 시간을 알아야 연주·월주와 대운을 확정할 수 있습니다.'
+    );
+    error.name = 'LegendSolarTermTimeRequiredError';
+    error.code = 'LEGEND_SOLAR_TERM_TIME_REQUIRED';
+    throw error;
+  }
+
   function createAdapter(engine) {
     if (!engine || typeof engine.calculateFourPillars !== 'function' ||
         typeof engine.lunarToSolar !== 'function' ||
@@ -109,17 +153,13 @@
         throw new TypeError('음력은 평달 또는 윤달을 선택해야 합니다 (isLeapMonth).');
       }
       const dates = convertedDates(engine, input);
-      const result = engine.calculateFourPillars({
-        year: input.year,
-        month: input.month,
-        day: input.day,
-        hour: input.unknown ? 12 : input.hour,
-        minute: input.unknown ? 0 : input.minute,
-        isLunar: input.calendar === 'lunar',
-        isLeapMonth: input.calendar === 'lunar' ? input.isLeapMonth : false,
-        dayBoundary: input.dayBoundary || 'midnight',
-        gender: input.gender === 'M' ? 'male' : 'female'
-      });
+      assertKnownTimeIsNotRequired(engine, input, dates);
+      const result = engine.calculateFourPillars(engineBirthInput(
+        input,
+        dates,
+        input.unknown ? 12 : input.hour,
+        input.unknown ? 0 : input.minute
+      ));
       const y = indexPillar(result.year);
       const m = indexPillar(result.month);
       const d = indexPillar(result.day);
@@ -143,6 +183,9 @@
         hBranch: h.branch,
         daeun: mapDaeun(result, result.month),
         calculationMode: 'kasi-precise',
+        dayBoundary: input.dayBoundary || 'midnight',
+        timeStandard: 'asia-seoul-civil',
+        trueSolarCorrection: false,
         engineResult: result
       };
     }

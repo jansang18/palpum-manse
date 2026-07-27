@@ -67,21 +67,23 @@
 
     async function listRecords() {
       const merged = new Map();
+      let result;
       try {
-        const result = await storage.list(RECORD_PREFIX);
-        const keys = result && Array.isArray(result.keys) ? result.keys : [];
-        for (const key of keys) {
-          if (!key.startsWith(RECORD_PREFIX)) continue;
-          try {
-            const result = await storage.get(key);
-            const record = result && parseRecord(result.value);
-            if (record) merged.set(record.id, record);
-          } catch (error) {
-            // A single damaged entry must not hide the rest of the saved charts.
-          }
-        }
+        result = await storage.list(RECORD_PREFIX);
       } catch (error) {
-        // The fallback set remains visible when the primary backend is unavailable.
+        throw storageUnavailable(error);
+      }
+      const keys = result && Array.isArray(result.keys) ? result.keys : [];
+      for (const key of keys) {
+        if (!key.startsWith(RECORD_PREFIX)) continue;
+        let stored;
+        try {
+          stored = await storage.get(key);
+        } catch (error) {
+          throw storageUnavailable(error);
+        }
+        const record = stored && parseRecord(stored.value);
+        if (record) merged.set(record.id, record);
       }
       for (const record of readFallbackRecords()) merged.set(record.id, record);
       return [...merged.values()];
@@ -89,15 +91,14 @@
 
     async function getRecord(id) {
       const fallbackRecord = readFallbackRecords().find(record => record.id === id);
-      if (fallbackRecord) return fallbackRecord;
+      let result;
       try {
-        const result = await storage.get(RECORD_PREFIX + id);
-        const record = result && parseRecord(result.value);
-        if (record) return record;
+        result = await storage.get(RECORD_PREFIX + id);
       } catch (error) {
-        return null;
+        throw storageUnavailable(error);
       }
-      return null;
+      const primaryRecord = result && parseRecord(result.value);
+      return fallbackRecord || primaryRecord || null;
     }
 
     async function saveRecord(record) {

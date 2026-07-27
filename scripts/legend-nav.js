@@ -353,7 +353,13 @@
       else dialog.setAttribute('open', '');
     }
     var focusables = focusableIn(dialog);
-    (focusables[0] || dialog).focus();
+    var title = dialog.querySelector('#legendEvidenceTitle');
+    var focusDialogStart = function () {
+      (title || focusables[0] || dialog).focus({ preventScroll: true });
+      dialog.scrollTop = 0;
+    };
+    focusDialogStart();
+    requestAnimationFrame(focusDialogStart);
     return true;
   };
 
@@ -384,6 +390,11 @@
     }
     var first = focusables[0];
     var last = focusables[focusables.length - 1];
+    if (document.activeElement === dialog.querySelector('#legendEvidenceTitle')) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+      return;
+    }
     if (!dialog.contains(document.activeElement)
       || (event.shiftKey && document.activeElement === first)
       || (!event.shiftKey && document.activeElement === last)) {

@@ -101,9 +101,16 @@
     var dline = '양력 ' + s.year + '.' + p2(s.month) + '.' + p2(s.day) +
       (s.unknown ? ' · 시 모름' : ' · ' + p2(s.hour) + ':' + p2(s.minute));
     c.fillText(dline, W / 2, 382);
+    var boundaryLabel = {
+      midnight: '자정 기준',
+      jasi: '자시 기준',
+      splitJasi: '야자시 분리'
+    }[s.dayBoundary] || '자정 기준';
+    c.font = '500 22px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif';
+    c.fillText('일 경계 · ' + boundaryLabel, W / 2, 416);
 
     c.fillStyle = THEME.inset;
-    rr(c, 54, 430, W - 108, 720, 30); c.fill();
+    rr(c, 54, 446, W - 108, 704, 30); c.fill();
 
     // 사주 4기둥
     var labels = ['시주', '일주', '월주', '년주'];
@@ -116,7 +123,7 @@
       sip(s.sipsin && s.sipsin.year)
     ];
     var pad = 80, areaW = W - pad * 2, colW = areaW / 4, blk = Math.min(colW - 22, 168);
-    var topY = 500;
+    var topY = 512;
     for (var k = 0; k < 4; k++) {
       var cx = pad + colW * k + colW / 2;
       // 십신
@@ -191,6 +198,11 @@
         })
       : { relation: '판단 보류' };
     var relation = resonance.relation || '판단 보류';
+    var boundary = {
+      midnight: '자정 기준',
+      jasi: '자시 기준',
+      splitJasi: '야자시 분리'
+    }[s.dayBoundary] || '자정 기준';
     var pillars = [
       '년주 ' + sharePillar(s, 'yStem', 'yBranch'),
       '월주 ' + sharePillar(s, 'mStem', 'mBranch'),
@@ -203,6 +215,7 @@
       (s.name || '이름 없음') + '의 명식',
       currentYear + '년 시대 · ' + era.yuan + ' ' + era.yun + '운 · ' + era.trigram + '(' + era.hanja + ') · ' + era.element,
       '시대 공명 관계 · ' + relation,
+      '일 경계 관법 · ' + boundary,
       pillars,
       'jansang18.github.io/legend-manse'
     ].join('\n');

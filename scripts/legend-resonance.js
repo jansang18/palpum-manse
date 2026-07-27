@@ -136,7 +136,7 @@
     const relation = relationToEra(dayElement, eraElement) || '판단 보류';
 
     const parts = {
-      useful: makeRelationPart('용신 후보', usefulElement, eraElement, 35),
+      useful: makeRelationPart('간이 용신 후보', usefulElement, eraElement, 35),
       day: makeRelationPart('일간', dayElement, eraElement, 25),
       balance: makeBalancePart(source.elements, eraElement),
       daeun: makeRelationPart('대운', daeunElement, eraElement, 15),

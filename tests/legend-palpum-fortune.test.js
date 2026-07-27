@@ -4,6 +4,19 @@ const {
   composePalpumFortune
 } = require('../scripts/legend-palpum-fortune.js');
 
+const RESULT_KEYS = [
+  'version',
+  'state',
+  'headline',
+  'opportunity',
+  'burden',
+  'preparation',
+  'areas',
+  'evidence',
+  'tags'
+];
+const AREA_KEYS = ['relationship', 'career', 'money', 'health'];
+
 function fixtureInput(overrides = {}) {
   return {
     palpum: {
@@ -34,6 +47,8 @@ function fixtureInput(overrides = {}) {
 test('returns role-led sections and at least three distinct evidence layers', () => {
   const result = composePalpumFortune(fixtureInput());
 
+  assert.deepEqual(Object.keys(result), RESULT_KEYS);
+  assert.deepEqual(Object.keys(result.areas), AREA_KEYS);
   assert.equal(result.version, 'palpum-v1');
   assert.match(result.headline, /역할|기준|성과/);
   assert.ok(['발현', '전환', '조율', '축적'].includes(result.state));
@@ -88,6 +103,29 @@ test('does not call strong timing 발현 when the ruler is absent from the natal
   assert.equal(result.state, '축적');
 });
 
+test('same-element opposite-polarity presence cannot satisfy the exact-ruler gate', () => {
+  const result = composePalpumFortune(fixtureInput({
+    saju: {
+      yStem: 7,
+      yBranch: 9,
+      mStem: 4,
+      mBranch: 10,
+      dStem: 0,
+      dBranch: 2,
+      hStem: 2,
+      hBranch: 6,
+      ohaeng: [2, 2, 2, 2, 0]
+    },
+    target: { year: 2026, month: null, stem: 6, branch: 8 },
+    era: { yun: 8, element: '토', symbol: '산' }
+  }));
+  const palpumEvidence = result.evidence.find(item => item.kind === '팔품');
+
+  assert.notEqual(result.state, '발현');
+  assert.match(palpumEvidence.detail, /당령 흔적은 0곳/);
+  assert.match(palpumEvidence.detail, /같은 오행.*2/);
+});
+
 test('changing only the era changes context evidence but not a strong timing state', () => {
   const strongTiming = {
     target: { year: 2026, month: null, stem: 6, branch: 8 }
@@ -122,6 +160,8 @@ test('uses shared language and asks for birth time at an uncertain Palpum bounda
   }));
   const palpumEvidence = result.evidence.find(item => item.kind === '팔품');
 
+  assert.deepEqual(Object.keys(result), RESULT_KEYS);
+  assert.deepEqual(Object.keys(result.areas), AREA_KEYS);
   assert.equal(result.state, '축적');
   assert.match(result.headline, /팔품 경계.*공통 역할/);
   assert.doesNotMatch(result.headline, /자축품의|인묘품의/);
@@ -169,12 +209,7 @@ test('provides distinct creative observations for every Palpum', () => {
 
   assert.equal(new Set(results.map(result => result.opportunity)).size, 8);
   for (const result of results) {
-    assert.deepEqual(Object.keys(result.areas), [
-      'relationship',
-      'career',
-      'money',
-      'health'
-    ]);
+    assert.deepEqual(Object.keys(result.areas), AREA_KEYS);
     assert.ok(Object.values(result.areas).every(value => (
       typeof value === 'string' && value.length > 0
     )));

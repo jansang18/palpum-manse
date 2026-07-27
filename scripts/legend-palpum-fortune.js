@@ -177,9 +177,12 @@
     const branchCount = ['yBranch', 'mBranch', 'dBranch', 'hBranch']
       .filter(key => BRANCH_MAIN_STEMS[chart[key]] === info.stem)
       .length;
-    const directCount = stemCount + branchCount;
+    return stemCount + branchCount;
+  }
 
-    if (directCount > 0) return directCount;
+  function countSameElementPresence(saju, ruler) {
+    const info = rulerInfo(ruler);
+    const chart = saju && typeof saju === 'object' ? saju : {};
     const elementIndex = ELEMENTS.indexOf(info.element);
     const ohaengCount = Array.isArray(chart.ohaeng) ? chart.ohaeng[elementIndex] : 0;
     return Number.isFinite(ohaengCount) && ohaengCount > 0 ? ohaengCount : 0;
@@ -291,6 +294,7 @@
     if (!copy) throw new RangeError('unknown Palpum type');
     const signal = Object.freeze({
       rulerVisible: countRulerPresence(input.saju, input.palpum.ruler),
+      sameElementVisible: countSameElementPresence(input.saju, input.palpum.ruler),
       timingSupport: relationScore(input.palpum.ruler, input.target),
       daeunSupport: relationScore(input.palpum.ruler, input.daeun),
       eraPressure: eraRelationScore(input.palpum.ruler, input.era)
@@ -311,7 +315,7 @@
           label: `${input.palpum.type} · 당령 ${input.palpum.ruler}${
             input.palpum.accuracy === 'historical-approximation' ? ' · 역사 범위 근사' : ''
           }`,
-          detail: `${copy.scene}. ${copy.role}로 읽으며, 원국의 당령 흔적은 ${signal.rulerVisible}곳입니다.`
+          detail: `${copy.scene}. ${copy.role}로 읽으며, 원국의 정확한 당령 흔적은 ${signal.rulerVisible}곳이고 같은 오행 분포는 ${signal.sameElementVisible}입니다.`
         }),
         Object.freeze({
           kind: '시기',

@@ -15,9 +15,11 @@
   ]);
 
   function definitionAt(instantMs, boundaries) {
-    const active = boundaries
-      .filter(boundary => boundary.instantMs <= instantMs)
-      .at(-1);
+    const activeIndex = boundaries.findLastIndex(boundary => boundary.instantMs <= instantMs);
+    if (activeIndex < 0 || activeIndex === boundaries.length - 1) {
+      throw new RangeError('birth instant is outside supplied boundaries');
+    }
+    const active = boundaries[activeIndex];
     const definition = PALPUM_DEFINITIONS.find(item => item.startTerm === active?.name);
     if (!definition) throw new RangeError('birth instant is outside supplied boundaries');
     return definition;
@@ -29,8 +31,16 @@
     }
     const definition = definitionAt(input.instantMs, input.boundaries);
     const candidateInstants = [input.instantMs];
-    if (input.possibleRange) {
+    if (input.unknownTime === true && input.possibleRange) {
       candidateInstants.push(input.possibleRange.startMs, input.possibleRange.endMs);
+      input.boundaries.forEach(boundary => {
+        if (
+          boundary.instantMs >= input.possibleRange.startMs &&
+          boundary.instantMs <= input.possibleRange.endMs
+        ) {
+          candidateInstants.push(boundary.instantMs);
+        }
+      });
     }
     const candidates = Object.freeze(
       candidateInstants

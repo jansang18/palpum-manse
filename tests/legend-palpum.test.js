@@ -62,3 +62,31 @@ test('preserves historical approximation accuracy', () => {
     accuracy: 'historical-approximation'
   }).accuracy, 'historical-approximation');
 });
+
+test('includes every segment intersecting a broad unknown-time range', () => {
+  const result = classifyPalpum({
+    instantMs: 2000,
+    boundaries,
+    unknownTime: true,
+    possibleRange: { startMs: 500, endMs: 3500 }
+  });
+  assert.deepEqual(result.candidates, ['자축품', '인묘품', '묘진품', '사오품']);
+});
+
+test('rejects an instant at the final supplied boundary', () => {
+  assert.throws(
+    () => classifyPalpum({ instantMs: 8000, boundaries }),
+    { name: 'RangeError', message: 'birth instant is outside supplied boundaries' }
+  );
+});
+
+test('ignores possible range when birth time is known', () => {
+  const result = classifyPalpum({
+    instantMs: 2500,
+    boundaries,
+    unknownTime: false,
+    possibleRange: { startMs: 500, endMs: 3500 }
+  });
+  assert.deepEqual(result.candidates, ['묘진품']);
+  assert.equal(result.boundaryUncertain, false);
+});

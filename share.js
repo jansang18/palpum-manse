@@ -88,7 +88,7 @@
     c.fillText('사주 명식', W / 2, 104);
     c.fillStyle = THEME.text;
     c.font = '800 58px -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif';
-    c.fillText('취명선 만세력', W / 2, 184);
+    c.fillText('취명선 전설의 만세력', W / 2, 184);
 
     // 이름 + 정보
     var age = (new Date().getFullYear()) - s.year;
@@ -137,7 +137,7 @@
 
     // 푸터
     c.fillStyle = THEME.tertiary; c.font = '500 23px sans-serif';
-    c.fillText('취명선 만세력 · jansang18.github.io/sineum-manse', W / 2, H - 72);
+    c.fillText('취명선 전설의 만세력 · jansang18.github.io/legend-manse', W / 2, H - 72);
 
     return cv;
   }
@@ -258,8 +258,8 @@
     m.onclick = function (e) { if (e.target === m) closeShareCardModal(); };
     document.getElementById('shareCardDo').onclick = function () {
       cv.toBlob(async function (blob) {
-        var file = new File([blob], (s.name || '사주') + '_취명선_만세력.png', { type: 'image/png' });
-        var txt = (s.name || '') + ' 사주 · 취명선 만세력\njansang18.github.io/sineum-manse';
+        var file = new File([blob], (s.name || '사주') + '_취명선_전설의_만세력.png', { type: 'image/png' });
+        var txt = (s.name || '') + ' 사주 · 취명선 전설의 만세력\njansang18.github.io/legend-manse';
         try {
           if (navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({ files: [file], text: txt });

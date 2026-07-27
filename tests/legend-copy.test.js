@@ -53,6 +53,27 @@ test('removes control characters and HTML delimiters and caps names at 40 charac
   assert.equal(/[<>"'&/=`\u0000-\u001f\u007f-\u009f]/.test(renderedName), false);
 });
 
+test('uses 당신 for blank or punctuation-only names and preserves real Korean and Latin names', () => {
+  const context = {
+    era: { yun: 9, element: '화', symbol: '빛' },
+    resonance: { relation: '동조', score: 80 }
+  };
+
+  for (const name of ['', '   ', '???', '... !', '···', '()[]{}']) {
+    assert.equal(
+      buildNarrative({ ...context, name }).heroTitle,
+      '빛의 시대에 선 당신'
+    );
+  }
+
+  for (const name of ['홍길동', 'Jane Doe', 'A-민']) {
+    assert.equal(
+      buildNarrative({ ...context, name }).heroTitle,
+      `빛의 시대에 선 ${name}`
+    );
+  }
+});
+
 test('preserves a deferred relation without claiming alignment', () => {
   for (const resonance of [
     { relation: '판단 보류', score: 0 },

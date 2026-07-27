@@ -72,6 +72,12 @@
 
 @media (prefers-reduced-transparency: reduce) {
   .legend-paper-panel,
+  .legend-score,
+  .legend-layer,
+  .legend-section,
+  .legend-story,
+  .legend-hour-item,
+  .legend-evidence-button,
   .legend-evidence-dialog {
     background: var(--paper-bright);
     backdrop-filter: none;

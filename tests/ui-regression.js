@@ -18,8 +18,27 @@ function inspectLegendSourceContracts() {
   const tokens = fs.readFileSync(path.join(UI_ROOT, 'styles', 'legend-tokens.css'), 'utf8');
   const layout = fs.readFileSync(path.join(UI_ROOT, 'styles', 'legend-layout.css'), 'utf8');
   const motion = fs.readFileSync(path.join(UI_ROOT, 'styles', 'legend-motion.css'), 'utf8');
+  const shareSource = fs.readFileSync(path.join(UI_ROOT, 'share.js'), 'utf8');
+  const manifest = JSON.parse(fs.readFileSync(path.join(UI_ROOT, 'manifest.webmanifest'), 'utf8'));
 
   assert.match(html, /<title>취명선 전설의 만세력<\/title>/);
+  assert.match(
+    html,
+    /<h1 class="title"><span class="brand-main">취명선<\/span> <span class="title-sub">전설의 만세력<\/span><\/h1>/
+  );
+  assert.match(html, /id="aboutModalTitle">취명선 전설의 만세력<\/h3>/);
+  assert.match(html, /alt="취명선 전설의 만세력"/);
+  assert.equal((html.match(/rel="manifest"/g) || []).length, 1);
+  assert.doesNotMatch(html, /data:application\/json/);
+  assert.doesNotMatch(html, /취명선 만세력|취명선만세력|정재훈 만세력/);
+  assert.doesNotMatch(shareSource, /취명선 만세력|sineum-manse/);
+  assert.match(shareSource, /취명선 전설의 만세력/);
+  assert.match(shareSource, /jansang18\.github\.io\/legend-manse/);
+  assert.deepEqual(
+    { name: manifest.name, shortName: manifest.short_name },
+    { name: '취명선 전설의 만세력', shortName: '전설의 만세력' }
+  );
+  assert.match(manifest.description, /취명선 전설의 만세력/);
   for (const stylesheet of [
     'styles/legend-tokens.css',
     'styles/legend-layout.css',
@@ -42,6 +61,36 @@ function inspectLegendSourceContracts() {
     '--water'
   ]) {
     assert.match(tokens, new RegExp(token));
+  }
+  const tokenValue = name => {
+    const match = tokens.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'i'));
+    assert.ok(match, `${name} must be a six-digit hex color`);
+    return match[1];
+  };
+  const rgb = hex => [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16)
+  ];
+  const luminance = hex => {
+    const channels = rgb(hex).map(value => {
+      const normalized = value / 255;
+      return normalized <= 0.04045
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const contrast = (foreground, background) => {
+    const first = luminance(foreground);
+    const second = luminance(background);
+    return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+  };
+  for (const background of ['--paper', '--paper-bright']) {
+    assert.ok(
+      contrast(tokenValue('--ink-muted'), tokenValue(background)) >= 4.5,
+      `--ink-muted must reach 4.5:1 against ${background}`
+    );
   }
   assert.match(layout, /env\(safe-area-inset-top\)/);
   assert.match(layout, /env\(safe-area-inset-bottom\)/);
@@ -85,6 +134,8 @@ const widths = TEST_GROUP === 'result-width-brand' || TEST_GROUP === 'shell-widt
     ? [320, 768, 1440]
   : TEST_GROUP === 'legend-flow'
     ? [320, 390]
+  : TEST_GROUP === 'legend-accessibility'
+    ? [390, 1220]
   : TEST_GROUP === 'repository-root'
     ? [390]
   : TEST_GROUP ? [390] : [360, 390, 412, 768];
@@ -585,7 +636,7 @@ function inspectFinalSecuritySourceContracts() {
   );
   assert.match(indexHtml, /const ALLOWED_ENRICHMENT_HOSTS\s*=\s*new Set/);
   assert.match(indexHtml, /function fetchAllowedJson\(/);
-  assert.match(indexHtml, /취명선만세력_백업_/);
+  assert.match(indexHtml, /취명선_전설의_만세력_백업_/);
   assert.doesNotMatch(indexHtml, /신의음성만세력_백업_/);
   assert.match(stringsXml, /<string name="app_name">취명선 만세력<\/string>/);
   assert.match(stringsXml, /<string name="title_activity_main">취명선 만세력<\/string>/);
@@ -1194,6 +1245,115 @@ async function inspectLegendFlow(page, width) {
   }));
   assert.match(unknownTime.natal, /시각 미상/);
   assert.equal(unknownTime.hourlyCount, 12, `${width}px unknown natal time hourly choices`);
+}
+
+async function inspectLegendAccessibility(page, width) {
+  await page.evaluate(() => {
+    document.body.classList.remove('dark');
+    document.getElementById('inputName').value = '???';
+    document.getElementById('inBirth').value = '19921024';
+    document.getElementById('inTime').value = '0530';
+    document.getElementById('calcBtn').click();
+  });
+  await sleep(500);
+  await page.click('.tab[data-tab="legend"]');
+  await sleep(100);
+
+  const inspectTheme = async dark => page.evaluate(isDark => {
+    document.body.classList.toggle('dark', isDark);
+    const parse = value => {
+      if (/^#[0-9a-f]{6}$/i.test(value)) {
+        return [
+          Number.parseInt(value.slice(1, 3), 16),
+          Number.parseInt(value.slice(3, 5), 16),
+          Number.parseInt(value.slice(5, 7), 16)
+        ];
+      }
+      return (value.match(/[\d.]+/g) || []).map(Number);
+    };
+    const luminance = value => {
+      const [red, green, blue] = parse(value).slice(0, 3).map(channel => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045
+          ? normalized / 12.92
+          : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    };
+    const contrast = (foreground, background) => {
+      const first = luminance(foreground);
+      const second = luminance(background);
+      return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+    };
+    const rootStyle = getComputedStyle(document.documentElement);
+    const backgrounds = [
+      rootStyle.getPropertyValue('--paper').trim(),
+      rootStyle.getPropertyValue('--paper-bright').trim()
+    ];
+    const selectors = [
+      '.legend-layer-detail',
+      '.legend-hour-time',
+      '.legend-hour-sipsin',
+      '.legend-story-body',
+      '.legend-dialog-intro',
+      '.legend-evidence-part p'
+    ];
+    return {
+      heroTitle: document.querySelector('[data-legend-hero] h2')?.textContent,
+      contrast: selectors.map(selector => {
+        const color = getComputedStyle(document.querySelector(selector)).color;
+        return {
+          selector,
+          color,
+          ratios: backgrounds.map(background => contrast(color, background))
+        };
+      })
+    };
+  }, dark);
+
+  for (const dark of [false, true]) {
+    const state = await inspectTheme(dark);
+    assert.equal(state.heroTitle, '빛의 시대에 선 당신', `${width}px normalized hero name`);
+    for (const sample of state.contrast) {
+      for (const ratio of sample.ratios) {
+        assert.ok(
+          ratio >= 4.5,
+          `${width}px ${dark ? 'dark' : 'light'} ${sample.selector} contrast ${ratio}`
+        );
+      }
+    }
+  }
+
+  const client = await page.target().createCDPSession();
+  await client.send('Emulation.setEmulatedMedia', {
+    media: '',
+    features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }]
+  });
+  const reducedTransparency = await page.evaluate(() => {
+    const alpha = value => {
+      const values = value.match(/[\d.]+/g) || [];
+      return values.length < 4 ? 1 : Number(values[3]);
+    };
+    const selectors = [
+      '.legend-score',
+      '.legend-layer',
+      '.legend-story',
+      '.legend-evidence-dialog'
+    ];
+    return selectors.map(selector => {
+      const style = getComputedStyle(document.querySelector(selector));
+      return {
+        selector,
+        alpha: alpha(style.backgroundColor),
+        backdropFilter: style.backdropFilter || style.webkitBackdropFilter
+      };
+    });
+  });
+  for (const surface of reducedTransparency) {
+    assert.equal(surface.alpha, 1, `${width}px ${surface.selector} must be opaque`);
+  }
+  const dialog = reducedTransparency.find(surface => surface.selector === '.legend-evidence-dialog');
+  assert.equal(dialog.backdropFilter, 'none', `${width}px dialog blur must be removed`);
 }
 
 async function collectAppleInspection(page, selectors) {
@@ -1925,8 +2085,8 @@ async function inspectAppleSecondaryScreens(page, width) {
       `${width}px ${theme} share PNG still contains a dark/cosmic field`
     );
     assert.equal(state.shareState.image.legacyGoldSamples, 0, `${width}px ${theme} share PNG retains legacy gold pixels`);
-    assert.match(state.shareState.payload.filename, /취명선_만세력\.png$/, `${width}px ${theme} share filename branding`);
-    assert.match(state.shareState.payload.text, /취명선 만세력/, `${width}px ${theme} share text branding`);
+    assert.match(state.shareState.payload.filename, /취명선_전설의_만세력\.png$/, `${width}px ${theme} share filename branding`);
+    assert.match(state.shareState.payload.text, /취명선 전설의 만세력/, `${width}px ${theme} share text branding`);
     for (const control of state.shareState.buttons) {
       assert.ok(control.width >= 43.5 && control.height >= 43.5, `${width}px ${theme} share control is below 44x44px`);
     }
@@ -2208,6 +2368,12 @@ async function inspectWidth(browser, width) {
     return;
   }
 
+  if (TEST_GROUP === 'legend-accessibility') {
+    await inspectLegendAccessibility(page, width);
+    await page.close();
+    return;
+  }
+
   if (TEST_GROUP === 'frontend-quality') {
     await inspectFrontendQuality(page, width);
     await page.close();
@@ -2393,7 +2559,7 @@ async function inspectWidth(browser, width) {
 
       assert.deepEqual({ semantics, aboutEntry, aboutTrappedId, aboutExit, saveEntryId, saveForwardTrapId, saveBackwardTrapId, saveExit }, {
         semantics: {
-          about: { role: 'dialog', ariaModal: 'true', name: '취명선 만세력' },
+          about: { role: 'dialog', ariaModal: 'true', name: '취명선 전설의 만세력' },
           save: { role: 'dialog', ariaModal: 'true', name: '명반 저장' }
         },
         aboutEntry: { activeId: 'aboutClose', inside: true, appInert: true, bottomBarInert: true },
@@ -3017,7 +3183,7 @@ async function inspectWidth(browser, width) {
     assert.match(indexHtml, /<meta name="apple-mobile-web-app-title" content="전설의 만세력">/, 'Apple web app title must use the current product name');
     assert.deepEqual(
       { name: webManifest.name, shortName: webManifest.short_name },
-      { name: '취명선 만세력', shortName: '취명선 만세력' },
+      { name: '취명선 전설의 만세력', shortName: '전설의 만세력' },
       'PWA manifest names must use the current product name'
     );
   }

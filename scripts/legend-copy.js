@@ -50,7 +50,7 @@
     if (typeof value !== 'string') return fallback;
     const cleaned = value.replace(UNSAFE_TEXT, '').trim();
     const limited = Array.from(cleaned).slice(0, maxLength).join('');
-    return limited || fallback;
+    return limited && /[\p{L}\p{N}]/u.test(limited) ? limited : fallback;
   }
 
   function normalizeScore(value) {

@@ -3838,6 +3838,25 @@ const overlap = (a, b) =>
   Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)) > 0 &&
   Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) > 0;
 
+function assertNonZeroRect(rect, label) {
+  assert.ok(rect, `${label} rectangle is missing`);
+  assert.ok(rect.width > 0, `${label} width must be non-zero, got ${rect.width}px`);
+  assert.ok(rect.height > 0, `${label} height must be non-zero, got ${rect.height}px`);
+  return rect;
+}
+
+function assertRenderedControl(control, label) {
+  assert.ok(control?.exists, `${label} control is missing`);
+  assert.equal(control.rendered, true, `${label} must be rendered`);
+  assert.equal(control.inViewport, true, `${label} must be visible in the viewport`);
+  return assertNonZeroRect(control.rect, label);
+}
+
+function assertHiddenControl(control, label) {
+  assert.ok(control?.exists, `${label} control is missing`);
+  assert.equal(control.rendered, false, `${label} must be hidden at this viewport`);
+}
+
 async function inspectPalpumInkWash(page, viewport) {
   const label = `${viewport.name} ${viewport.width}x${viewport.height}`;
 
@@ -3963,26 +3982,46 @@ async function inspectNavigationNeverCovers(page, viewport) {
         height: bounds.height
       };
     };
-    const visibleRect = element => {
-      if (!element) return null;
+    const controlSnapshot = element => {
+      if (!element) return { exists: false, rendered: false, inViewport: false, rect: null };
       const style = getComputedStyle(element);
-      const bounds = element.getBoundingClientRect();
-      return style.display === 'none' || style.visibility === 'hidden' || bounds.width === 0 || bounds.height === 0
-        ? null
-        : rect(element);
+      const bounds = rect(element);
+      const rendered = style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        parseFloat(style.opacity) > 0 &&
+        bounds.width > 0 &&
+        bounds.height > 0;
+      return {
+        exists: true,
+        rendered,
+        inViewport: rendered &&
+          bounds.bottom > 0 &&
+          bounds.top < innerHeight &&
+          bounds.right > 0 &&
+          bounds.left < innerWidth,
+        rect: bounds
+      };
     };
     return {
       chartFirstRow: rect(document.querySelector('#view-result .pillars-4')),
-      topHeader: visibleRect(document.querySelector('.top-bar')),
-      tabs: visibleRect(document.querySelector('.tabs')),
-      chartNavigation: visibleRect(document.getElementById('legendSajuNav'))
+      topHeader: controlSnapshot(document.querySelector('.top-bar')),
+      tabs: controlSnapshot(document.querySelector('.tabs')),
+      chartNavigation: controlSnapshot(document.getElementById('legendSajuNav'))
     };
   });
 
-  assert.equal(overlap(topGeometry.chartFirstRow, topGeometry.topHeader), false, `${label} header covers natal chart`);
-  assert.equal(overlap(topGeometry.chartFirstRow, topGeometry.tabs), false, `${label} tabs cover natal chart`);
+  const chartFirstRow = assertNonZeroRect(topGeometry.chartFirstRow, `${label} natal chart first row`);
+  const topHeader = assertRenderedControl(topGeometry.topHeader, `${label} top header`);
+  const chartNavigation = assertRenderedControl(topGeometry.chartNavigation, `${label} chart navigation`);
+  assert.equal(overlap(chartFirstRow, topHeader), false, `${label} header covers natal chart`);
+  if (viewport.width >= 768) {
+    const tabs = assertRenderedControl(topGeometry.tabs, `${label} desktop tabs`);
+    assert.equal(overlap(chartFirstRow, tabs), false, `${label} tabs cover natal chart`);
+  } else {
+    assertHiddenControl(topGeometry.tabs, `${label} desktop tabs`);
+  }
   assert.equal(
-    overlap(topGeometry.chartFirstRow, topGeometry.chartNavigation),
+    overlap(chartFirstRow, chartNavigation),
     false,
     `${label} chart navigation covers natal chart`
   );
@@ -3999,13 +4038,25 @@ async function inspectNavigationNeverCovers(page, viewport) {
         height: bounds.height
       };
     };
-    const visibleRect = element => {
-      if (!element) return null;
+    const controlSnapshot = element => {
+      if (!element) return { exists: false, rendered: false, inViewport: false, rect: null };
       const style = getComputedStyle(element);
-      const bounds = element.getBoundingClientRect();
-      return style.display === 'none' || style.visibility === 'hidden' || bounds.width === 0 || bounds.height === 0
-        ? null
-        : rect(element);
+      const bounds = rect(element);
+      const rendered = style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        parseFloat(style.opacity) > 0 &&
+        bounds.width > 0 &&
+        bounds.height > 0;
+      return {
+        exists: true,
+        rendered,
+        inViewport: rendered &&
+          bounds.bottom > 0 &&
+          bounds.top < innerHeight &&
+          bounds.right > 0 &&
+          bounds.left < innerWidth,
+        rect: bounds
+      };
     };
     const daeun = document.getElementById('daeunScroll');
     const annual = document.getElementById('seunScroll');
@@ -4015,9 +4066,9 @@ async function inspectNavigationNeverCovers(page, viewport) {
     document.body.style.scrollBehavior = 'auto';
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
     return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => {
-      const mobileNav = visibleRect(document.getElementById('legendMobileNav'));
-      const actionBar = visibleRect(document.getElementById('bottomBar'));
-      const lastContent = document.getElementById('view-result');
+      const app = document.querySelector('.app');
+      const actionBar = document.getElementById('bottomBar');
+      const resultView = document.getElementById('view-result');
       resolve({
         counts: {
           daeun: daeun.querySelectorAll('.luck-item').length,
@@ -4025,9 +4076,14 @@ async function inspectNavigationNeverCovers(page, viewport) {
         },
         chartLastRow: rect(daeun.querySelector('.luck-item:last-child')),
         annualLastRow: rect(annual.querySelector('.luck-item:last-child')),
-        mobileNav,
-        actionBar,
-        paddingBottom: parseFloat(getComputedStyle(lastContent).paddingBottom),
+        mobileNav: controlSnapshot(document.getElementById('legendMobileNav')),
+        actionBar: controlSnapshot(actionBar),
+        app: rect(app),
+        resultView: rect(resultView),
+        appContainsActionBar: app.contains(actionBar),
+        actionBarClosestApp: actionBar.closest('.app') === app,
+        actionGap: actionBar.getBoundingClientRect().top - resultView.getBoundingClientRect().bottom,
+        paddingBottom: parseFloat(getComputedStyle(resultView).paddingBottom),
         scrollY,
         maxScroll: document.documentElement.scrollHeight - innerHeight
       });
@@ -4040,25 +4096,69 @@ async function inspectNavigationNeverCovers(page, viewport) {
     Math.abs(resultGeometry.scrollY - resultGeometry.maxScroll) <= 1,
     `${label} result did not reach the final chart row (${resultGeometry.scrollY}/${resultGeometry.maxScroll})`
   );
+  const daeunLastRow = assertNonZeroRect(resultGeometry.chartLastRow, `${label} final Daeun item`);
+  const annualLastRow = assertNonZeroRect(resultGeometry.annualLastRow, `${label} final annual item`);
+  const actionBar = assertRenderedControl(resultGeometry.actionBar, `${label} Result action bar`);
+  const app = assertNonZeroRect(resultGeometry.app, `${label} parchment app`);
+  assertNonZeroRect(resultGeometry.resultView, `${label} Result view`);
   assert.equal(
-    overlap(resultGeometry.chartLastRow, resultGeometry.mobileNav),
-    false,
-    `${label} mobile navigation covers the final Daeun item`
+    resultGeometry.appContainsActionBar,
+    true,
+    `${label} Result actions must be inside the parchment app`
   );
   assert.equal(
-    overlap(resultGeometry.annualLastRow, resultGeometry.actionBar),
+    resultGeometry.actionBarClosestApp,
+    true,
+    `${label} Result actions must resolve to the parchment app surface`
+  );
+  assert.ok(
+    actionBar.left >= app.left - 1 &&
+      actionBar.right <= app.right + 1 &&
+      actionBar.top >= app.top - 1 &&
+      actionBar.bottom <= app.bottom + 1,
+    `${label} Result action surface must be geometrically contained by the parchment app`
+  );
+  assert.ok(
+    Math.abs(resultGeometry.actionGap) <= 1,
+    `${label} Result action surface is detached from Result flow by ${resultGeometry.actionGap}px`
+  );
+
+  assert.equal(
+    overlap(daeunLastRow, actionBar),
+    false,
+    `${label} Result actions cover the final Daeun item`
+  );
+  assert.equal(
+    overlap(annualLastRow, actionBar),
     false,
     `${label} result actions cover the final annual item`
   );
-  assert.equal(
-    overlap(resultGeometry.annualLastRow, resultGeometry.mobileNav),
-    false,
-    `${label} mobile navigation covers the final annual item`
-  );
-  assert.ok(
-    resultGeometry.paddingBottom >= (resultGeometry.mobileNav?.height || 0) + 24,
-    `${label} result safe padding ${resultGeometry.paddingBottom}px is too small`
-  );
+
+  if (viewport.width < 768) {
+    const mobileNav = assertRenderedControl(resultGeometry.mobileNav, `${label} mobile navigation`);
+    assert.equal(
+      overlap(daeunLastRow, mobileNav),
+      false,
+      `${label} mobile navigation covers the final Daeun item`
+    );
+    assert.equal(
+      overlap(annualLastRow, mobileNav),
+      false,
+      `${label} mobile navigation covers the final annual item`
+    );
+    assert.equal(
+      overlap(actionBar, mobileNav),
+      false,
+      `${label} mobile navigation covers Result actions`
+    );
+    assert.ok(
+      resultGeometry.paddingBottom >= mobileNav.height + 24,
+      `${label} result safe padding ${resultGeometry.paddingBottom}px is too small`
+    );
+  } else {
+    assertHiddenControl(resultGeometry.mobileNav, `${label} mobile navigation`);
+    assert.ok(resultGeometry.paddingBottom >= 24, `${label} result safe padding must be at least 24px`);
+  }
 
   const hanjaSamples = await page.evaluate(() => {
     const canvas = getComputedStyle(document.querySelector('#view-result .oguk-card')).backgroundColor;
@@ -4092,32 +4192,83 @@ async function inspectNavigationNeverCovers(page, viewport) {
         height: bounds.height
       };
     };
-    const nav = document.getElementById('legendMobileNav');
-    const navStyle = getComputedStyle(nav);
-    const navRect = nav.getBoundingClientRect();
-    const mobileNav = navStyle.display === 'none' || navRect.height === 0 ? null : rect(nav);
+    const controlSnapshot = element => {
+      if (!element) return { exists: false, rendered: false, inViewport: false, rect: null };
+      const style = getComputedStyle(element);
+      const bounds = rect(element);
+      const rendered = style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        parseFloat(style.opacity) > 0 &&
+        bounds.width > 0 &&
+        bounds.height > 0;
+      return {
+        exists: true,
+        rendered,
+        inViewport: rendered &&
+          bounds.bottom > 0 &&
+          bounds.top < innerHeight &&
+          bounds.right > 0 &&
+          bounds.left < innerWidth,
+        rect: bounds
+      };
+    };
     const view = document.getElementById('view-fortune');
     return {
       palpumLastCard: rect(document.querySelector('.palpum-sources')),
       lastContent: rect(document.querySelector('.fortune-disclaimer')),
-      mobileNav,
+      topHeader: controlSnapshot(document.querySelector('.top-bar')),
+      tabs: controlSnapshot(document.querySelector('.tabs')),
+      mobileNav: controlSnapshot(document.getElementById('legendMobileNav')),
       paddingBottom: parseFloat(getComputedStyle(view).paddingBottom)
     };
   });
+  const palpumLastCard = assertNonZeroRect(fortuneGeometry.palpumLastCard, `${label} final Palpum card`);
+  const fortuneLastContent = assertNonZeroRect(
+    fortuneGeometry.lastContent,
+    `${label} Palpum disclaimer`
+  );
+  const fortuneHeader = assertRenderedControl(fortuneGeometry.topHeader, `${label} fortune header`);
+  assert.equal(overlap(palpumLastCard, fortuneHeader), false, `${label} header covers the final Palpum card`);
   assert.equal(
-    overlap(fortuneGeometry.palpumLastCard, fortuneGeometry.mobileNav),
+    overlap(fortuneLastContent, fortuneHeader),
     false,
-    `${label} mobile navigation covers the final Palpum card`
+    `${label} header covers the Palpum disclaimer`
   );
-  assert.equal(
-    overlap(fortuneGeometry.lastContent, fortuneGeometry.mobileNav),
-    false,
-    `${label} mobile navigation covers the Palpum disclaimer`
-  );
-  assert.ok(
-    fortuneGeometry.paddingBottom >= (fortuneGeometry.mobileNav?.height || 0) + 24,
-    `${label} fortune safe padding ${fortuneGeometry.paddingBottom}px is too small`
-  );
+
+  if (viewport.width >= 768) {
+    const fortuneTabs = assertRenderedControl(fortuneGeometry.tabs, `${label} fortune tabs`);
+    assert.equal(overlap(palpumLastCard, fortuneTabs), false, `${label} tabs cover the final Palpum card`);
+    assert.equal(
+      overlap(fortuneLastContent, fortuneTabs),
+      false,
+      `${label} tabs cover the Palpum disclaimer`
+    );
+    assertHiddenControl(fortuneGeometry.mobileNav, `${label} mobile navigation`);
+    assert.ok(
+      fortuneGeometry.paddingBottom >= 24,
+      `${label} fortune safe padding must be at least 24px`
+    );
+  } else {
+    assertHiddenControl(fortuneGeometry.tabs, `${label} fortune tabs`);
+    const fortuneMobileNav = assertRenderedControl(
+      fortuneGeometry.mobileNav,
+      `${label} fortune mobile navigation`
+    );
+    assert.equal(
+      overlap(palpumLastCard, fortuneMobileNav),
+      false,
+      `${label} mobile navigation covers the final Palpum card`
+    );
+    assert.equal(
+      overlap(fortuneLastContent, fortuneMobileNav),
+      false,
+      `${label} mobile navigation covers the Palpum disclaimer`
+    );
+    assert.ok(
+      fortuneGeometry.paddingBottom >= fortuneMobileNav.height + 24,
+      `${label} fortune safe padding ${fortuneGeometry.paddingBottom}px is too small`
+    );
+  }
 
   await activateDestination(page, 'calendar');
   await page.evaluate(() => {
@@ -4140,28 +4291,64 @@ async function inspectNavigationNeverCovers(page, viewport) {
         height: bounds.height
       };
     };
-    const nav = document.getElementById('legendMobileNav');
-    const navStyle = getComputedStyle(nav);
-    const navRect = nav.getBoundingClientRect();
-    const mobileNav = navStyle.display === 'none' || navRect.height === 0 ? null : rect(nav);
+    const controlSnapshot = element => {
+      if (!element) return { exists: false, rendered: false, inViewport: false, rect: null };
+      const style = getComputedStyle(element);
+      const bounds = rect(element);
+      const rendered = style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        parseFloat(style.opacity) > 0 &&
+        bounds.width > 0 &&
+        bounds.height > 0;
+      return {
+        exists: true,
+        rendered,
+        inViewport: rendered &&
+          bounds.bottom > 0 &&
+          bounds.top < innerHeight &&
+          bounds.right > 0 &&
+          bounds.left < innerWidth,
+        rect: bounds
+      };
+    };
     const detail = document.querySelector('#calDayDetail .day-detail');
     const view = document.getElementById('view-calendar');
     return {
       detail: detail ? rect(detail) : null,
-      mobileNav,
+      topHeader: controlSnapshot(document.querySelector('.top-bar')),
+      tabs: controlSnapshot(document.querySelector('.tabs')),
+      mobileNav: controlSnapshot(document.getElementById('legendMobileNav')),
       paddingBottom: parseFloat(getComputedStyle(view).paddingBottom)
     };
   });
-  assert.ok(calendarGeometry.detail, `${label} calendar detail did not render`);
-  assert.equal(
-    overlap(calendarGeometry.detail, calendarGeometry.mobileNav),
-    false,
-    `${label} mobile navigation covers calendar details`
-  );
-  assert.ok(
-    calendarGeometry.paddingBottom >= (calendarGeometry.mobileNav?.height || 0) + 24,
-    `${label} calendar safe padding ${calendarGeometry.paddingBottom}px is too small`
-  );
+  const calendarDetail = assertNonZeroRect(calendarGeometry.detail, `${label} calendar detail`);
+  const calendarHeader = assertRenderedControl(calendarGeometry.topHeader, `${label} calendar header`);
+  assert.equal(overlap(calendarDetail, calendarHeader), false, `${label} header covers calendar details`);
+
+  if (viewport.width >= 768) {
+    const calendarTabs = assertRenderedControl(calendarGeometry.tabs, `${label} calendar tabs`);
+    assert.equal(overlap(calendarDetail, calendarTabs), false, `${label} tabs cover calendar details`);
+    assertHiddenControl(calendarGeometry.mobileNav, `${label} mobile navigation`);
+    assert.ok(
+      calendarGeometry.paddingBottom >= 24,
+      `${label} calendar safe padding must be at least 24px`
+    );
+  } else {
+    assertHiddenControl(calendarGeometry.tabs, `${label} calendar tabs`);
+    const calendarMobileNav = assertRenderedControl(
+      calendarGeometry.mobileNav,
+      `${label} calendar mobile navigation`
+    );
+    assert.equal(
+      overlap(calendarDetail, calendarMobileNav),
+      false,
+      `${label} mobile navigation covers calendar details`
+    );
+    assert.ok(
+      calendarGeometry.paddingBottom >= calendarMobileNav.height + 24,
+      `${label} calendar safe padding ${calendarGeometry.paddingBottom}px is too small`
+    );
+  }
 
   await activateDestination(page, 'input');
   const inputSamples = await page.evaluate(() => {

@@ -2950,8 +2950,16 @@ body.dark .bottom-bar {
   right: auto !important;
   bottom: auto !important;
   left: auto !important;
+  width: 100% !important;
+  max-width: none !important;
   margin: 0 auto var(--legend-content-safe-bottom) !important;
-  border-radius: 1.15rem;
+  border: 0 !important;
+  border-top: 1px solid var(--legend-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   transform: none !important;
 }
 

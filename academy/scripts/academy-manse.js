@@ -10,6 +10,8 @@
     ['hour', 'hStem', 'hBranch']
   ];
 
+  root.ManseryeokAdapter = root.LegendGanji;
+
   function requireElement(id) {
     const element = document.getElementById(id);
     if (!element) throw new Error(`필수 화면 요소를 찾을 수 없습니다: ${id}`);
@@ -17,7 +19,7 @@
   }
 
   function adapter() {
-    const existing = root.LegendGanji;
+    const existing = root.ManseryeokAdapter;
     if (!existing || typeof existing.calculate !== 'function') {
       throw new Error('만세력 계산 도구를 불러오지 못했습니다. 페이지를 새로고침해 주세요.');
     }
@@ -116,11 +118,14 @@
 
     const calendar = form.elements.calendar;
     const leapField = requireElement('academyLeapField');
+    const leap = form.elements.leap;
     const time = form.elements.time;
     const unknown = form.elements.unknown;
 
     function syncCalendar() {
-      leapField.hidden = calendar.value !== 'lunar';
+      const isLunar = calendar.value === 'lunar';
+      leapField.hidden = !isLunar;
+      leap.disabled = !isLunar;
     }
 
     function syncUnknownTime() {

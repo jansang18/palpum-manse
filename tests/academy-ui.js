@@ -180,19 +180,83 @@ async function inspectAcademyManse(page) {
       ganji: node.querySelector('strong').textContent
     })),
     academyApi: typeof window.AcademyManse?.calculateFromForm,
-    adapterApi: typeof window.LegendGanji?.calculate
+    adapterApi: typeof window.ManseryeokAdapter?.calculate,
+    adapterAlias: window.ManseryeokAdapter === window.LegendGanji
   }));
 
+  const solarLunarControl = await page.evaluate(() => ({
+    hidden: document.querySelector('#academyLeapField').hidden,
+    disabled: document.querySelector('#academyLeap').disabled
+  }));
+  await page.select('#academyCalendar', 'lunar');
+  const lunarControl = await page.evaluate(() => ({
+    hidden: document.querySelector('#academyLeapField').hidden,
+    disabled: document.querySelector('#academyLeap').disabled
+  }));
+  await page.select('#academyLeap', 'leap');
+  await page.evaluate(() => {
+    const verifiedAdapter = window.LegendGanji;
+    window.__academyOriginalAdapter = window.ManseryeokAdapter;
+    window.__academyLeapSolar = null;
+    window.ManseryeokAdapter = Object.freeze({
+      ...verifiedAdapter,
+      calculate(input) {
+        const result = verifiedAdapter.calculate(input);
+        window.__academyLeapSolar = result.solar;
+        return result;
+      }
+    });
+    const form = document.querySelector('#academyManseForm');
+    form.elements.birth.value = '20200401';
+    form.elements.time.value = '0530';
+  });
+  await page.click('#academyCalculate');
+  const validLeap = await page.evaluate(() => ({
+    resultHidden: document.querySelector('#academyManseResult').hidden,
+    errorHidden: document.querySelector('#academyManseError').hidden,
+    summary: document.querySelector('#academyManseSummary').textContent,
+    solar: window.__academyLeapSolar
+      ? [window.__academyLeapSolar.y, window.__academyLeapSolar.m, window.__academyLeapSolar.d]
+      : null
+  }));
+  await page.evaluate(() => {
+    document.querySelector('#academyBirth').value = '20210401';
+  });
+  await page.click('#academyCalculate');
+  const impossibleLeap = await page.evaluate(() => ({
+    resultHidden: document.querySelector('#academyManseResult').hidden,
+    errorHidden: document.querySelector('#academyManseError').hidden,
+    error: document.querySelector('#academyManseError').textContent
+  }));
+  await page.evaluate(() => {
+    if (window.__academyOriginalAdapter === undefined) {
+      delete window.ManseryeokAdapter;
+    } else {
+      window.ManseryeokAdapter = window.__academyOriginalAdapter;
+    }
+    delete window.__academyOriginalAdapter;
+    delete window.__academyLeapSolar;
+  });
+
   const routing = await page.evaluate(() => {
-    const originalAdapter = window.LegendGanji;
+    const originalAdapter = window.ManseryeokAdapter;
+    const originalLegend = window.LegendGanji;
     const originalEngine = window.Manseryeok;
     let adapterCalls = 0;
+    let legendGlobalReads = 0;
     let rawEngineCalls = 0;
-    window.LegendGanji = Object.freeze({
+    const compatibilitySpy = Object.freeze({
       ...originalAdapter,
       calculate(input) {
         adapterCalls += 1;
         return originalAdapter.calculate(input);
+      }
+    });
+    window.ManseryeokAdapter = compatibilitySpy;
+    window.LegendGanji = new Proxy(originalLegend, {
+      get(target, property, receiver) {
+        legendGlobalReads += 1;
+        return Reflect.get(target, property, receiver);
       }
     });
     window.Manseryeok = new Proxy(originalEngine, {
@@ -202,17 +266,23 @@ async function inspectAcademyManse(page) {
       }
     });
     try {
+      const form = document.querySelector('#academyManseForm');
+      form.elements.calendar.value = 'solar';
+      form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
+      form.elements.birth.value = '19860219';
+      form.elements.time.value = '1430';
       window.AcademyManse.calculateFromForm();
-      return { adapterCalls, rawEngineCalls };
+      return { adapterCalls, legendGlobalReads, rawEngineCalls };
     } finally {
-      window.LegendGanji = originalAdapter;
+      window.ManseryeokAdapter = originalAdapter;
+      window.LegendGanji = originalLegend;
       window.Manseryeok = originalEngine;
     }
   });
 
   const invalidIndex = await page.evaluate(() => {
-    const originalAdapter = window.LegendGanji;
-    window.LegendGanji = Object.freeze({
+    const originalAdapter = window.ManseryeokAdapter;
+    window.ManseryeokAdapter = Object.freeze({
       ...originalAdapter,
       calculate(input) {
         return { ...originalAdapter.calculate(input), yStem: 10 };
@@ -227,7 +297,7 @@ async function inspectAcademyManse(page) {
         pillars: [...document.querySelectorAll('[data-pillar-value]')].map(node => node.textContent)
       };
     } finally {
-      window.LegendGanji = originalAdapter;
+      window.ManseryeokAdapter = originalAdapter;
     }
   });
 
@@ -258,12 +328,6 @@ async function inspectAcademyManse(page) {
       calendar: 'lunar',
       leap: 'normal'
     });
-    const impossibleLeap = submit({
-      birth: '20210401',
-      time: '1200',
-      calendar: 'lunar',
-      leap: 'leap'
-    });
     const unknownAmbiguity = submit({
       birth: '20240204',
       time: '',
@@ -274,7 +338,6 @@ async function inspectAcademyManse(page) {
       invalidDate,
       invalidTime,
       normalLunar,
-      impossibleLeap,
       unknownAmbiguity
     };
   });
@@ -360,6 +423,10 @@ async function inspectAcademyManse(page) {
 
   return {
     basic,
+    solarLunarControl,
+    lunarControl,
+    validLeap,
+    impossibleLeap,
     routing,
     invalidIndex,
     calendarCases,
@@ -418,8 +485,27 @@ async function main() {
       ]);
       assert.equal(result.basic.academyApi, 'function');
       assert.equal(result.basic.adapterApi, 'function');
+      assert.equal(result.basic.adapterAlias, true);
+      assert.deepEqual(result.solarLunarControl, {
+        hidden: true,
+        disabled: true
+      });
+      assert.deepEqual(result.lunarControl, {
+        hidden: false,
+        disabled: false
+      });
+      assert.deepEqual(result.validLeap, {
+        resultHidden: false,
+        errorHidden: true,
+        summary: '음력 윤달 · 시간 입력',
+        solar: [2020, 5, 23]
+      });
+      assert.equal(result.impossibleLeap.resultHidden, true);
+      assert.equal(result.impossibleLeap.errorHidden, false);
+      assert.match(result.impossibleLeap.error, /윤4월이 존재하지 않습니다/);
       assert.deepEqual(result.routing, {
         adapterCalls: 1,
+        legendGlobalReads: 0,
         rawEngineCalls: 0
       });
       assert.equal(result.invalidIndex.resultHidden, true);
@@ -433,8 +519,6 @@ async function main() {
       assert.equal(result.calendarCases.normalLunar.resultHidden, false);
       assert.equal(result.calendarCases.normalLunar.errorHidden, true);
       assert.equal(result.calendarCases.normalLunar.summary, '음력 평달 · 시간 입력');
-      assert.equal(result.calendarCases.impossibleLeap.resultHidden, true);
-      assert.match(result.calendarCases.impossibleLeap.error, /윤4월이 존재하지 않습니다/);
       assert.equal(result.calendarCases.unknownAmbiguity.resultHidden, true);
       assert.match(result.calendarCases.unknownAmbiguity.error, /태어난 시간을 알아야/);
       assert.deepEqual(result.unknown, {

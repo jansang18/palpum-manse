@@ -132,6 +132,8 @@ test('academy loads a working basic Manseryeok after the verified browser adapte
   const academyIndex = html.indexOf('scripts/academy-manse.js');
   assert.ok(adapterIndex >= 0 && academyIndex > adapterIndex);
   assert.match(manse, /root\.AcademyManse\s*=/);
+  assert.match(manse, /root\.ManseryeokAdapter\s*=\s*root\.LegendGanji/);
+  assert.match(manse, /const existing = root\.ManseryeokAdapter/);
   assert.equal(accessesRawManseryeok(manse), false);
   for (const forbidden of [
     'root.Manseryeok.calculate()',

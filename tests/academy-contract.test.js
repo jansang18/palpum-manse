@@ -76,7 +76,7 @@ test('academy includes four curriculum tracks and safely disclosed mockup dialog
   for (const title of [
     '명리의 기초',
     '사주 원국 읽기',
-    '대운·세운의 흐름',
+    '대운·세운·월운',
     '삼원구운과 시대 해석'
   ]) {
     assert.match(html, new RegExp(title));

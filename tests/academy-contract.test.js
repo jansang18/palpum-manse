@@ -10,6 +10,10 @@ const navigation = fs.readFileSync(
   path.join(__dirname, '..', 'academy', 'scripts', 'academy-nav.js'),
   'utf8'
 );
+const mockups = fs.readFileSync(
+  path.join(__dirname, '..', 'academy', 'scripts', 'academy-mockups.js'),
+  'utf8'
+);
 
 test('academy exposes every approved section and mockup disclosure', () => {
   for (const id of [
@@ -89,8 +93,10 @@ test('academy includes four curriculum tracks and safely disclosed mockup dialog
   assert.match(html, /실제 결제가 발생하지 않습니다/);
   assert.match(html, /작성 내용은 저장되지 않습니다/);
   assert.match(html, /scripts\/academy-mockups\.js/);
+  assert.match(mockups, /window\.AcademyMockups\s*=/);
   assert.match(
-    fs.readFileSync(path.join(__dirname, '..', 'academy', 'scripts', 'academy-mockups.js'), 'utf8'),
-    /window\.AcademyMockups\s*=/
+    mockups,
+    /flow:\s*\{[\s\S]*?title:\s*'대운·세운·월운'/,
+    'course dialog data must use the approved third-course title'
   );
 });

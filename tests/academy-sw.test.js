@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const serviceWorker = fs.readFileSync(path.join(__dirname, '..', 'academy', 'sw.js'), 'utf8');
 const scope = 'https://example.test/palpum-manse/academy/';
-const academyCacheName = 'chwimyeongseon-academy-v3-20260728-seasonal-hero';
+const academyCacheName = 'chwimyeongseon-academy-v4-20260728-apple-interactions';
 
 function response(body, init = {}) {
   const status = init.status ?? 200;

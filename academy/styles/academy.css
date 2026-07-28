@@ -7,6 +7,7 @@
   --academy-muted: #5e6157;
   --academy-seal: #a44033;
   --academy-line: rgb(35 37 30 / 0.18);
+  --academy-spring: cubic-bezier(0.22, 0.88, 0.36, 1);
   --academy-display: "Iowan Old Style", "AppleMyungjo", "Nanum Myeongjo", "Noto Serif KR", Batang, serif;
   --academy-ui: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
 }
@@ -35,6 +36,8 @@ body {
     radial-gradient(circle at 8% 0%, rgb(255 255 255 / 0.72), transparent 25rem),
     linear-gradient(125deg, var(--academy-paper), var(--academy-paper-deep));
   font-family: var(--academy-ui);
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
   overflow-x: hidden;
 }
 
@@ -89,9 +92,21 @@ a { color: inherit; }
   gap: 1.5rem;
   min-height: var(--academy-masthead-height);
   padding: 0.75rem clamp(1.25rem, 5vw, 6rem);
-  border-bottom: 1px solid var(--academy-line);
-  background: rgb(244 239 227 / 0.94);
-  backdrop-filter: blur(14px);
+  border-bottom: 0;
+  background: rgb(244 239 227 / 0.78);
+  box-shadow: 0 0.75rem 2.5rem rgb(35 37 30 / 0.055);
+  backdrop-filter: blur(1.5rem) saturate(145%);
+}
+
+.academy-masthead::after {
+  position: absolute;
+  right: 0;
+  bottom: -0.65rem;
+  left: 0;
+  height: 0.65rem;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(rgb(244 239 227 / 0.26), transparent);
 }
 
 .academy-brand {
@@ -128,11 +143,16 @@ a { color: inherit; }
   align-items: center;
   justify-content: center;
   padding: 0.55rem 0.25rem;
+  border-radius: 0.8rem;
   text-decoration: none;
+  transition: color 160ms ease, background 160ms ease, transform 100ms ease-out;
 }
 
 .academy-navigation a:focus-visible,
-.academy-navigation a:hover { color: var(--academy-seal); }
+.academy-navigation a:hover {
+  color: var(--academy-seal);
+  background: rgb(255 253 247 / 0.5);
+}
 
 .academy-section {
   position: relative;
@@ -158,6 +178,7 @@ a { color: inherit; }
   --scroll-depth: 0;
   min-height: calc(100svh - var(--academy-masthead-height));
   isolation: isolate;
+  touch-action: pan-y;
   background:
     radial-gradient(circle at 77% 24%, rgb(255 250 235 / 0.72), transparent 22rem),
     linear-gradient(112deg, #f7f2e7 0 47%, #e7dfcd 100%);
@@ -172,10 +193,13 @@ a { color: inherit; }
 }
 
 .academy-season-stage {
+  --season-drag-x: 0px;
   position: absolute;
   z-index: 1;
   inset: 0;
   overflow: hidden;
+  touch-action: pan-y;
+  user-select: none;
 }
 
 .academy-season-stage::after {
@@ -197,6 +221,19 @@ a { color: inherit; }
 
 .academy-season-viewport {
   overflow: hidden;
+  transform: translate3d(var(--season-drag-x), 0, 0);
+  transition:
+    filter 520ms ease,
+    opacity 520ms ease,
+    transform 420ms var(--academy-spring);
+  will-change: transform;
+}
+
+.academy-season-stage.is-dragging {
+  cursor: grabbing;
+}
+
+.academy-season-stage.is-dragging .academy-season-viewport {
   transition: filter 520ms ease, opacity 520ms ease;
 }
 
@@ -254,9 +291,11 @@ a { color: inherit; }
   border: 1px solid rgb(35 37 30 / 0.16);
   border-radius: 999px;
   color: var(--academy-ink);
-  background: rgb(247 242 231 / 0.84);
-  box-shadow: 0 0.8rem 2.5rem rgb(35 37 30 / 0.08);
-  backdrop-filter: blur(0.65rem);
+  background: rgb(247 242 231 / 0.72);
+  box-shadow:
+    inset 0 1px rgb(255 255 255 / 0.58),
+    0 0.8rem 2.5rem rgb(35 37 30 / 0.1);
+  backdrop-filter: blur(1.25rem) saturate(145%);
 }
 
 .academy-season-controls button {
@@ -272,6 +311,7 @@ a { color: inherit; }
   background: transparent;
   font: 800 1.1rem/1 var(--academy-ui);
   cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, transform 100ms ease-out;
 }
 
 .academy-season-controls button:hover,
@@ -397,17 +437,41 @@ h2 { font-size: clamp(2.5rem, 5vw, 5rem); }
 }
 
 .academy-button {
-  display: inline-block;
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
   padding: 1rem 1.35rem;
   border: 1px solid var(--academy-seal);
+  border-radius: 0.85rem;
   color: #fff;
   background: var(--academy-seal);
+  box-shadow: 0 0.5rem 1.4rem rgb(164 64 51 / 0.16);
   font-weight: 800;
   text-decoration: none;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease,
+    transform 100ms ease-out;
 }
 
 .academy-button:focus-visible,
 .academy-button:hover { color: var(--academy-seal); background: transparent; }
+
+:where(
+  .academy-button,
+  .academy-navigation a,
+  .academy-season-controls button,
+  .academy-text-action,
+  .academy-board-row,
+  .academy-board-categories button,
+  .academy-pillar-card,
+  .academy-dialog-close
+):active {
+  transform: scale(0.97);
+  transition-duration: 70ms;
+}
 
 .academy-button-ghost {
   color: var(--academy-seal);
@@ -659,16 +723,16 @@ html.academy-motion-ready [data-reveal].is-revealed {
 .academy-plan-card .academy-button { width: 100%; text-align: center; }
 .academy-payment-disclosure { max-width: 54rem; }
 
-.academy-dialog { width: min(calc(100% - 2rem), 42rem); max-height: min(90svh, 50rem); padding: 0; border: 1px solid rgb(35 37 30 / 0.28); color: var(--academy-ink); background: var(--academy-paper); box-shadow: 0 1.5rem 5rem rgb(35 37 30 / 0.26); overflow-y: auto; }
-.academy-dialog::backdrop { background: rgb(35 37 30 / 0.5); backdrop-filter: blur(0.25rem); }
-.academy-dialog-paper { position: relative; padding: clamp(1.5rem, 4vw, 2.5rem); background: linear-gradient(135deg, rgb(255 253 247 / 0.98), rgb(236 228 210 / 0.96)); }
+.academy-dialog { width: min(calc(100% - 2rem), 42rem); max-height: min(90svh, 50rem); padding: 0; border: 1px solid rgb(35 37 30 / 0.2); border-radius: 1.5rem; color: var(--academy-ink); background: rgb(244 239 227 / 0.88); box-shadow: 0 1.5rem 5rem rgb(35 37 30 / 0.26); overflow-y: auto; backdrop-filter: blur(1.5rem) saturate(135%); }
+.academy-dialog::backdrop { background: rgb(35 37 30 / 0.42); backdrop-filter: blur(0.5rem) saturate(80%); }
+.academy-dialog-paper { position: relative; padding: clamp(1.5rem, 4vw, 2.5rem); background: linear-gradient(135deg, rgb(255 253 247 / 0.94), rgb(236 228 210 / 0.9)); }
 .academy-dialog[open] .academy-dialog-paper {
   animation: academy-dialog-open 340ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
   transform-origin: center top;
 }
 .academy-dialog-paper h2 { font-size: clamp(2rem, 7vw, 3rem); }
 .academy-dialog-paper > p:not(.academy-kicker):not(.academy-dialog-note) { margin: 1rem 0 0; color: var(--academy-muted); line-height: 1.7; }
-.academy-dialog-close { position: absolute; top: 0.8rem; right: 0.8rem; display: grid; width: 2.75rem; aspect-ratio: 1; border: 1px solid var(--academy-line); border-radius: 50%; place-items: center; color: var(--academy-ink); background: rgb(255 253 247 / 0.8); font-size: 1.35rem; cursor: pointer; }
+.academy-dialog-close { position: absolute; top: 0.8rem; right: 0.8rem; display: grid; width: 2.75rem; aspect-ratio: 1; border: 1px solid var(--academy-line); border-radius: 50%; place-items: center; color: var(--academy-ink); background: rgb(255 253 247 / 0.76); font-size: 1.35rem; cursor: pointer; transition: color 160ms ease, border-color 160ms ease, background 160ms ease, transform 100ms ease-out; backdrop-filter: blur(0.8rem); }
 .academy-dialog-close:hover, .academy-dialog-close:focus-visible { border-color: var(--academy-seal); color: var(--academy-seal); }
 .academy-dialog-note { margin: 1.25rem 0; padding: 0.9rem 1rem; border-left: 3px solid var(--academy-seal); color: #5d574a; background: rgb(164 64 51 / 0.08); font-size: 0.84rem; line-height: 1.6; }
 .academy-dialog-subtitle { margin: 1.25rem 0 0.6rem; font-family: var(--academy-display); font-size: 1.15rem; }
@@ -712,12 +776,15 @@ html.academy-motion-ready [data-reveal].is-revealed {
 .academy-pillar-concepts dt { color: var(--academy-seal); font-family: var(--academy-display); font-weight: 700; }
 .academy-pillar-concepts dd { margin: 0.4rem 0 0; color: var(--academy-muted); font-size: 0.78rem; line-height: 1.6; }
 .academy-field { display: grid; gap: 0.45rem; margin-top: 1rem; color: var(--academy-ink); font-size: 0.82rem; font-weight: 800; }
-.academy-field input, .academy-field textarea, .academy-field select { width: 100%; min-height: 3rem; padding: 0.85rem 0.9rem; border: 1px solid var(--academy-line); border-radius: 0; color: var(--academy-ink); background: rgb(255 253 247 / 0.78); font: inherit; font-weight: 400; resize: vertical; }
+.academy-field input, .academy-field textarea, .academy-field select { width: 100%; min-height: 3rem; padding: 0.85rem 0.9rem; border: 1px solid var(--academy-line); border-radius: 0.75rem; color: var(--academy-ink); background: rgb(255 253 247 / 0.78); font: inherit; font-weight: 400; resize: vertical; transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
 .academy-field input:focus-visible,
 .academy-field textarea:focus-visible,
 .academy-field select:focus-visible {
   outline: 3px solid var(--academy-seal);
   outline-offset: 3px;
+  border-color: var(--academy-seal);
+  background: rgb(255 253 247 / 0.96);
+  box-shadow: 0 0.5rem 1.4rem rgb(35 37 30 / 0.06);
 }
 
 .academy-manse-layout {
@@ -733,6 +800,7 @@ html.academy-motion-ready [data-reveal].is-revealed {
   min-width: 0;
   padding: clamp(1.25rem, 3vw, 2rem);
   border: 1px solid var(--academy-line);
+  border-radius: 1.25rem;
   background:
     linear-gradient(140deg, rgb(255 253 247 / 0.92), rgb(237 229 211 / 0.78)),
     repeating-linear-gradient(0deg, transparent, transparent 1.8rem, rgb(35 37 30 / 0.02) 1.86rem);
@@ -992,7 +1060,28 @@ html.academy-motion-ready [data-reveal].is-revealed {
   .academy-board-search { width: 100%; }
   .academy-board-row { grid-template-columns: 3.3rem minmax(0, 1fr); gap: 0.55rem; }
   .academy-board-meta { grid-column: 2; text-align: left; }
-  .academy-dialog { width: min(calc(100% - 1.25rem), 35rem); }
+  .academy-dialog {
+    inset: auto 0 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(88svh, 50rem);
+    margin: 0;
+    border-width: 1px 0 0;
+    border-radius: 1.5rem 1.5rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .academy-dialog-paper { padding-top: 2.2rem; }
+  .academy-dialog-paper::before {
+    position: absolute;
+    top: 0.65rem;
+    left: 50%;
+    width: 2.25rem;
+    height: 0.28rem;
+    border-radius: 999px;
+    content: "";
+    background: rgb(35 37 30 / 0.22);
+    transform: translateX(-50%);
+  }
   .academy-pillar-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .academy-provenance dl, .academy-pillar-concepts { grid-template-columns: 1fr; }
   .academy-manse-form-heading,
@@ -1074,26 +1163,31 @@ html.academy-motion-ready [data-reveal].is-revealed {
 }
 
 @media (max-width: 767px) {
-  :root { --academy-masthead-height: 9.75rem; }
+  :root { --academy-masthead-height: 7.6rem; }
   .academy-masthead { align-items: flex-start; flex-direction: column; gap: 0.25rem; padding: 0.5rem 1rem; }
   .academy-brand { min-height: 2.75rem; }
   .academy-brand img { width: 2rem; height: 2rem; }
   .academy-navigation {
-    display: grid;
+    display: flex;
     width: 100%;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: flex-start;
     gap: 0.25rem;
-    overflow: visible;
-    padding: 0;
-    white-space: normal;
+    overflow-x: auto;
+    padding: 0 0 0.3rem;
+    scroll-padding-inline: 0.25rem;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    white-space: nowrap;
   }
+  .academy-navigation::-webkit-scrollbar { display: none; }
   .academy-navigation a {
-    width: 100%;
-    min-width: 0;
+    width: auto;
+    min-width: max-content;
     min-height: 2.75rem;
-    padding: 0.35rem 0.2rem;
-    font-size: 0.72rem;
+    padding: 0.35rem 0.8rem;
+    font-size: 0.76rem;
     line-height: 1.2;
+    scroll-snap-align: start;
     text-align: center;
   }
   .academy-section { min-height: 70vh; }
@@ -1170,8 +1264,26 @@ html.academy-motion-ready [data-reveal].is-revealed {
 @media (prefers-reduced-transparency: reduce) {
   .academy-masthead,
   .academy-button-ghost,
-  .academy-season-controls {
+  .academy-season-controls,
+  .academy-dialog,
+  .academy-dialog-close {
     background: var(--academy-paper) !important;
     backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root { --academy-line: rgb(35 37 30 / 0.52); }
+  .academy-masthead,
+  .academy-season-controls,
+  .academy-dialog {
+    border-color: var(--academy-ink);
+    background: var(--academy-paper);
+    backdrop-filter: none;
+  }
+  .academy-navigation a:hover,
+  .academy-navigation a:focus-visible {
+    color: #fff;
+    background: var(--academy-ink);
   }
 }

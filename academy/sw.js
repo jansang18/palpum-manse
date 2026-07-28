@@ -1,4 +1,4 @@
-const VERSION = 'v3-20260728-seasonal-hero';
+const VERSION = 'v4-20260728-apple-interactions';
 const CACHE_PREFIX = 'chwimyeongseon-academy-';
 const CACHE = CACHE_PREFIX + VERSION;
 const SCOPE_URL = new URL(self.registration.scope);

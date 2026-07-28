@@ -223,11 +223,9 @@ async function inspectLayout(page, viewport) {
           && navViewportRect.bottom <= window.innerHeight
         ),
         horizontallyScrollable: navViewport.scrollWidth > navViewport.clientWidth,
+        destinationCount: navLinks.length,
         visibleDestinations: navLinks.filter(node => isContained(node.getBoundingClientRect())).length,
-        columns: getComputedStyle(navViewport).gridTemplateColumns
-          .split(' ')
-          .filter(Boolean)
-          .length
+        scrollSnapType: getComputedStyle(navViewport).scrollSnapType
       },
       scrollGuide: {
         rect: rect('.academy-scroll-guide'),
@@ -1402,11 +1400,12 @@ async function main() {
       if (viewport.width < 768) {
         assert.equal(
           result.navViewport.horizontallyScrollable,
-          false,
-          `${viewport.name}: compact navigation exposes every destination without scrolling`
+          true,
+          `${viewport.name}: compact navigation scrolls in one restrained row`
         );
-        assert.equal(result.navViewport.visibleDestinations, 6, `${viewport.name}: all destinations visible`);
-        assert.equal(result.navViewport.columns, 3, `${viewport.name}: navigation uses a three-column grid`);
+        assert.equal(result.navViewport.destinationCount, 6, `${viewport.name}: all destinations remain available`);
+        assert.ok(result.navViewport.visibleDestinations >= 2, `${viewport.name}: navigation keeps nearby destinations visible`);
+        assert.match(result.navViewport.scrollSnapType, /^x/, `${viewport.name}: navigation uses horizontal scroll snapping`);
       }
       assert.equal(result.scrollGuide.visible, true, `${viewport.name}: scroll guide remains visible`);
       assert.ok(result.scrollGuide.rect.width >= 44, `${viewport.name}: scroll guide has a 44px target`);

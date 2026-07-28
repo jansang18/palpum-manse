@@ -215,3 +215,25 @@ test('reduced transparency receives an opaque paper fallback', () => {
   assert.match(css, /@media \(prefers-reduced-transparency:\s*reduce\)/);
   assert.match(css, /backdrop-filter:\s*none\s*!important/);
 });
+
+test('Apple-style interaction layer keeps controls direct, fluid, and interruptible', () => {
+  assert.match(css, /touch-action:\s*pan-y/);
+  assert.match(css, /\.academy-season-stage\.is-dragging\s+\.academy-season-viewport/);
+  assert.match(css, /--academy-spring:\s*cubic-bezier/);
+  assert.match(css, /:active[\s\S]*transform:\s*scale\(0\.97\)/);
+  assert.match(motion, /setPointerCapture/);
+  assert.match(motion, /pointerdown/);
+  assert.match(motion, /pointermove/);
+  assert.match(motion, /pointerup/);
+  assert.match(motion, /projectedDistance/);
+  assert.match(motion, /releaseSeasonDrag/);
+  assert.match(motion, /hero\.addEventListener\('pointerdown', beginSeasonDrag\)/);
+  assert.match(motion, /closest\('a, button, input, select, textarea, summary'/);
+});
+
+test('Apple-style compact navigation and mobile sheets preserve 44px targets', () => {
+  assert.match(css, /\.academy-navigation\s+a\s*\{[\s\S]*min-height:\s*2\.75rem/);
+  assert.match(css, /@media \(max-width:\s*767px\)[\s\S]*scroll-snap-type:\s*x\s+proximity/);
+  assert.match(css, /@media \(max-width:\s*767px\)[\s\S]*\.academy-dialog\s*\{[\s\S]*inset:\s*auto\s+0\s+0/);
+  assert.match(css, /@media \(prefers-contrast:\s*more\)/);
+});

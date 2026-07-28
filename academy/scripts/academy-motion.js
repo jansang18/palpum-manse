@@ -25,8 +25,10 @@
   var seasonTimer = null;
   var slideshowHovered = false;
   var slideshowFocused = false;
+  var slideshowDragging = false;
   var slideshowUserPaused = false;
   var slideshowUserPlaying = false;
+  var seasonDrag = null;
   var SEASON_DELAY = 8200;
 
   function clearSlideshowTimer() {
@@ -80,6 +82,7 @@
     return reduced
       || document.hidden
       || (!slideshowUserPlaying && (slideshowHovered || slideshowFocused))
+      || slideshowDragging
       || slideshowUserPaused
       || manseFocused
       || manseResultOpen;
@@ -139,6 +142,74 @@
     syncSlideshow();
   }
 
+  function setSeasonDragOffset(value) {
+    if (!seasonStage) return;
+    seasonStage.style.setProperty('--season-drag-x', value.toFixed(2) + 'px');
+  }
+
+  function resistSeasonDrag(distance) {
+    var limit = Math.min(window.innerWidth * 0.16, 72);
+    var magnitude = Math.abs(distance);
+    if (magnitude <= limit) return distance;
+    var overflow = magnitude - limit;
+    return Math.sign(distance) * (limit + overflow * 0.18);
+  }
+
+  function beginSeasonDrag(event) {
+    if (reduced || !seasonStage || !hero || event.button > 0) return;
+    if (event.target.closest('a, button, input, select, textarea, summary')) return;
+
+    seasonDrag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      lastX: event.clientX,
+      lastTime: event.timeStamp,
+      velocity: 0,
+      moved: false
+    };
+    slideshowDragging = true;
+    hero.setPointerCapture(event.pointerId);
+    syncSlideshow();
+  }
+
+  function moveSeasonDrag(event) {
+    if (!seasonDrag || event.pointerId !== seasonDrag.pointerId) return;
+    var distance = event.clientX - seasonDrag.startX;
+    var elapsed = Math.max(event.timeStamp - seasonDrag.lastTime, 1);
+    seasonDrag.velocity = (event.clientX - seasonDrag.lastX) / elapsed;
+    seasonDrag.lastX = event.clientX;
+    seasonDrag.lastTime = event.timeStamp;
+
+    if (!seasonDrag.moved && Math.abs(distance) < 8) return;
+    seasonDrag.moved = true;
+    seasonStage.classList.add('is-dragging');
+    setSeasonDragOffset(resistSeasonDrag(distance));
+    if (event.cancelable) event.preventDefault();
+  }
+
+  function releaseSeasonDrag(event, cancelled) {
+    if (!seasonDrag || event.pointerId !== seasonDrag.pointerId) return;
+    var distance = event.clientX - seasonDrag.startX;
+    var projectedDistance = distance + seasonDrag.velocity * 180;
+    var threshold = Math.min(Math.max(seasonStage.clientWidth * 0.12, 48), 110);
+    var shouldAdvance = !cancelled
+      && seasonDrag.moved
+      && Math.abs(projectedDistance) >= threshold;
+
+    if (shouldAdvance) {
+      activateSeason(seasonIndex + (projectedDistance < 0 ? 1 : -1), true);
+    }
+
+    if (hero.hasPointerCapture(event.pointerId)) {
+      hero.releasePointerCapture(event.pointerId);
+    }
+    seasonStage.classList.remove('is-dragging');
+    setSeasonDragOffset(0);
+    seasonDrag = null;
+    slideshowDragging = false;
+    syncSlideshow();
+  }
+
   function initSlideshow() {
     seasonStage = document.getElementById('academySeasonStage');
     if (!seasonStage) return;
@@ -161,6 +232,14 @@
     seasonStage.addEventListener('mouseleave', handleSlideshowHover);
     seasonStage.addEventListener('focusin', handleSlideshowFocus);
     seasonStage.addEventListener('focusout', handleSlideshowFocus);
+    hero.addEventListener('pointerdown', beginSeasonDrag);
+    hero.addEventListener('pointermove', moveSeasonDrag, { passive: false });
+    hero.addEventListener('pointerup', function (event) {
+      releaseSeasonDrag(event, false);
+    });
+    hero.addEventListener('pointercancel', function (event) {
+      releaseSeasonDrag(event, true);
+    });
     activateSeason(0, false);
   }
 

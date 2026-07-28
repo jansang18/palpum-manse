@@ -19,12 +19,14 @@
   var seasonScenes = [];
   var seasonControls = [];
   var seasonStatus = null;
+  var seasonAnnouncement = null;
   var seasonToggle = null;
   var seasonIndex = 0;
   var seasonTimer = null;
   var slideshowHovered = false;
   var slideshowFocused = false;
   var slideshowUserPaused = false;
+  var slideshowUserPlaying = false;
   var SEASON_DELAY = 8200;
 
   function clearSlideshowTimer() {
@@ -33,7 +35,21 @@
     seasonTimer = null;
   }
 
-  function activateSeason(nextIndex) {
+  function seasonDescription() {
+    if (!seasonScenes.length) return '';
+    return seasonScenes[seasonIndex].dataset.season
+      + ' 수묵 장면 · ' + (seasonIndex + 1) + ' / ' + seasonScenes.length;
+  }
+
+  function announceSeason(message) {
+    if (!seasonAnnouncement) return;
+    seasonAnnouncement.textContent = '';
+    window.requestAnimationFrame(function () {
+      seasonAnnouncement.textContent = message;
+    });
+  }
+
+  function activateSeason(nextIndex, announce) {
     if (!seasonScenes.length || !seasonStage) return;
     seasonIndex = (nextIndex + seasonScenes.length) % seasonScenes.length;
 
@@ -44,28 +60,26 @@
     });
 
     seasonStage.dataset.seasonIndex = String(seasonIndex);
-    if (seasonStatus) {
-      seasonStatus.textContent = seasonScenes[seasonIndex].dataset.season
-        + ' 수묵 장면 · ' + (seasonIndex + 1) + ' / ' + seasonScenes.length;
-    }
+    if (seasonStatus) seasonStatus.textContent = seasonDescription();
+    if (announce) announceSeason(seasonDescription());
   }
 
   function updateSeasonToggle() {
     if (!seasonToggle) return;
-    seasonToggle.setAttribute('aria-pressed', slideshowUserPaused ? 'true' : 'false');
+    var paused = slideshowShouldPause();
+    seasonToggle.setAttribute('aria-pressed', paused ? 'true' : 'false');
     seasonToggle.setAttribute(
       'aria-label',
-      slideshowUserPaused ? '계절 장면 재생' : '계절 장면 일시정지'
+      paused ? '계절 장면 재생' : '계절 장면 일시정지'
     );
     var icon = seasonToggle.querySelector('[data-season-toggle-icon]');
-    if (icon) icon.textContent = slideshowUserPaused ? '▶' : 'Ⅱ';
+    if (icon) icon.textContent = paused ? '▶' : 'Ⅱ';
   }
 
   function slideshowShouldPause() {
     return reduced
       || document.hidden
-      || slideshowHovered
-      || slideshowFocused
+      || (!slideshowUserPlaying && (slideshowHovered || slideshowFocused))
       || slideshowUserPaused
       || manseFocused
       || manseResultOpen;
@@ -79,7 +93,7 @@
     });
 
     if (reduced) {
-      activateSeason(0);
+      activateSeason(0, false);
       seasonStage.dataset.state = 'reduced';
       updateSeasonToggle();
       return;
@@ -91,24 +105,27 @@
     if (paused) return;
 
     seasonTimer = window.setTimeout(function () {
-      activateSeason(seasonIndex + 1);
+      activateSeason(seasonIndex + 1, false);
       syncSlideshow();
     }, SEASON_DELAY);
   }
 
   function handleSeasonPrevious() {
-    activateSeason(seasonIndex - 1);
+    activateSeason(seasonIndex - 1, true);
     syncSlideshow();
   }
 
   function handleSeasonNext() {
-    activateSeason(seasonIndex + 1);
+    activateSeason(seasonIndex + 1, true);
     syncSlideshow();
   }
 
   function handleSeasonToggle() {
-    slideshowUserPaused = !slideshowUserPaused;
+    var wasPaused = slideshowShouldPause();
+    slideshowUserPaused = !wasPaused;
+    slideshowUserPlaying = wasPaused;
     syncSlideshow();
+    announceSeason(wasPaused ? '계절 장면 자동 재생을 시작했습니다.' : '계절 장면 자동 재생을 멈췄습니다.');
   }
 
   function handleSlideshowHover(event) {
@@ -132,6 +149,7 @@
       document.querySelectorAll('.academy-season-controls button')
     );
     seasonStatus = document.getElementById('academySeasonStatus');
+    seasonAnnouncement = document.getElementById('academySeasonAnnouncement');
     seasonToggle = document.getElementById('academySeasonToggle');
 
     var previous = document.getElementById('academySeasonPrevious');
@@ -143,7 +161,7 @@
     seasonStage.addEventListener('mouseleave', handleSlideshowHover);
     seasonStage.addEventListener('focusin', handleSlideshowFocus);
     seasonStage.addEventListener('focusout', handleSlideshowFocus);
-    activateSeason(0);
+    activateSeason(0, false);
   }
 
   function countTarget(node) {

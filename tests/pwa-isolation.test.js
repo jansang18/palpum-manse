@@ -17,8 +17,8 @@ const deploymentGuide = fs.readFileSync('웹배포_안내.md', 'utf8');
 const legendView = fs.readFileSync('scripts/legend-view.js', 'utf8');
 const legendNav = fs.readFileSync('scripts/legend-nav.js', 'utf8');
 
-test('ships a fresh Palpum cache for the uniform upper-bar release', () => {
-  assert.match(serviceWorker, /const VERSION = 'v13-20260728-uniform-upper-bar';/);
+test('ships a fresh Palpum cache for Academy route isolation', () => {
+  assert.match(serviceWorker, /const VERSION = 'v14-20260728-academy-route-isolation';/);
 });
 
 const runtimeAssets = [
@@ -52,11 +52,13 @@ function escaped(path) {
   return new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 }
 
-function response(label) {
+function response(label, { status = 200 } = {}) {
   return {
     label,
+    status,
+    ok: status >= 200 && status < 300,
     clone() {
-      return response(label);
+      return response(label, { status });
     }
   };
 }
@@ -213,7 +215,7 @@ test('routes successful calculation to this-year Palpum fortune', () => {
 });
 
 test('keeps the current-era legend and isolated Palpum PWA identity available', () => {
-  assert.match(serviceWorker, /const VERSION = 'v13-20260728-uniform-upper-bar'/);
+  assert.match(serviceWorker, /const VERSION = 'v14-20260728-academy-route-isolation'/);
   assert.match(serviceWorker, /const CACHE_PREFIX = 'palpum-manse-'/);
   assert.match(legendView, /id\s*=\s*['"]legendLanding['"]/);
   assert.match(legendView, /id\s*=\s*['"]legendStartButton['"]/);
@@ -295,10 +297,17 @@ test('fetch handles only same-origin Palpum paths and keeps network-first code f
     mode: 'same-origin',
     destination: 'script'
   });
+  const academyDocument = await harness.dispatchFetch({
+    method: 'GET',
+    url: 'https://jansang18.github.io/palpum-manse/academy/',
+    mode: 'navigate',
+    destination: 'document'
+  });
   await Promise.resolve();
 
   assert.equal(crossOrigin.intercepted, false);
   assert.equal(legendPath.intercepted, false);
+  assert.equal(academyDocument.intercepted, false);
   assert.equal(palpumCode.intercepted, true);
   assert.equal(palpumCode.value.label, 'network-code');
   assert.equal(harness.fetchCalls.length, 1);
@@ -306,6 +315,30 @@ test('fetch handles only same-origin Palpum paths and keeps network-first code f
   assert.equal(
     harness.cacheEntries.get('https://jansang18.github.io/palpum-manse/scripts/legend-palpum.js').label,
     'network-code'
+  );
+});
+
+test('Palpum runtime never caches unsuccessful network responses', async () => {
+  const network = response('server-error', { status: 500 });
+  const harness = createServiceWorkerHarness({
+    fetch: () => Promise.resolve(network)
+  });
+  await harness.dispatchLifecycle('install');
+
+  const result = await harness.dispatchFetch({
+    method: 'GET',
+    url: 'https://jansang18.github.io/palpum-manse/styles/missing.css',
+    mode: 'same-origin',
+    destination: 'style'
+  });
+  await Promise.resolve();
+
+  assert.equal(result.intercepted, true);
+  assert.equal(result.value.status, 500);
+  assert.equal(
+    harness.events.some(event => event.type === 'put'),
+    false,
+    'unsuccessful responses must not enter the Palpum cache'
   );
 });
 

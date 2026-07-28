@@ -281,6 +281,26 @@ test('academy never caches unsuccessful document, code, or asset responses', asy
       }
     },
     {
+      name: '500 code',
+      network: response('code error', { status: 500 }),
+      request: {
+        url: `${scope}scripts/broken.js`,
+        method: 'GET',
+        mode: 'cors',
+        destination: 'script'
+      }
+    },
+    {
+      name: '404 asset',
+      network: response('missing asset', { status: 404 }),
+      request: {
+        url: `${scope}assets/missing.webp`,
+        method: 'GET',
+        mode: 'cors',
+        destination: 'image'
+      }
+    },
+    {
       name: '500 asset',
       network: response('asset error', { status: 500 }),
       request: {

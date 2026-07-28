@@ -87,8 +87,13 @@ test('hero uses four academy-owned seasonal scenes and no nine-period orbit', ()
   );
   assert.match(
     html,
-    /id="academySeasonStatus"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/
+    /id="academySeasonStatus">봄 수묵 장면 · 1 \/ 4/
   );
+  assert.match(
+    html,
+    /id="academySeasonAnnouncement"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/
+  );
+  assert.doesNotMatch(html, /id="academySeasonStatus"[^>]*(?:role="status"|aria-live=)/);
   assert.match(html, /id="academySeasonPrevious"[^>]*aria-label="이전 계절 장면"/);
   assert.match(html, /id="academySeasonNext"[^>]*aria-label="다음 계절 장면"/);
   assert.match(

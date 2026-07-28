@@ -255,6 +255,8 @@ async function inspectLayout(page, viewport) {
         })),
         statusRole: document.querySelector('#academySeasonStatus').getAttribute('role'),
         statusLive: document.querySelector('#academySeasonStatus').getAttribute('aria-live'),
+        announcementRole: document.querySelector('#academySeasonAnnouncement').getAttribute('role'),
+        announcementLive: document.querySelector('#academySeasonAnnouncement').getAttribute('aria-live'),
         orbitCount: document.querySelectorAll(
           '.academy-orbit, .academy-orbit-node, .academy-orbit-core'
         ).length
@@ -339,7 +341,7 @@ async function inspectMotionLifecycle(page) {
   await page.setViewport({ width: 1280, height: 720 });
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
   await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
-  const states = await page.evaluate(() => {
+  const states = await page.evaluate(async () => {
     let hidden = false;
     Object.defineProperty(document, 'hidden', {
       configurable: true,
@@ -384,15 +386,20 @@ async function inspectMotionLifecycle(page) {
     const unhovered = engagement();
     document.querySelector('#academySeasonNext').focus();
     const slideshowFocused = engagement();
+    const focusedToggleLabel = document.querySelector('#academySeasonToggle').getAttribute('aria-label');
     document.querySelector('.academy-brand').focus();
     const slideshowUnfocused = engagement();
     const initialIndex = stage.dataset.seasonIndex;
     document.querySelector('#academySeasonNext').click();
+    await new Promise(window.requestAnimationFrame);
     const nextIndex = stage.dataset.seasonIndex;
     const nextStatus = document.querySelector('#academySeasonStatus').textContent.trim();
+    const manualAnnouncement = document.querySelector('#academySeasonAnnouncement').textContent.trim();
     document.querySelector('#academySeasonToggle').click();
+    await new Promise(window.requestAnimationFrame);
     const userPaused = engagement();
     const togglePressed = document.querySelector('#academySeasonToggle').getAttribute('aria-pressed');
+    const pauseAnnouncement = document.querySelector('#academySeasonAnnouncement').textContent.trim();
     document.querySelector('#academySeasonToggle').click();
     const userResumed = engagement();
     return {
@@ -407,11 +414,14 @@ async function inspectMotionLifecycle(page) {
       unhovered,
       slideshowFocused,
       slideshowUnfocused,
+      focusedToggleLabel,
       initialIndex,
       nextIndex,
       nextStatus,
+      manualAnnouncement,
       userPaused,
       togglePressed,
+      pauseAnnouncement,
       userResumed
     };
   });
@@ -422,18 +432,35 @@ async function inspectMotionLifecycle(page) {
 async function inspectAutomaticSeasonCycle(page) {
   await page.setViewport({ width: 1280, height: 720 });
   await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  const seasonSpeedScript = await page.evaluateOnNewDocument(() => {
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    window.setTimeout = function (handler, delay, ...args) {
+      return nativeSetTimeout(handler, delay === 8200 ? 80 : delay, ...args);
+    };
+    window.__academySeasonHistory = [];
+    document.addEventListener('DOMContentLoaded', () => {
+      const stage = document.querySelector('[data-season-slideshow]');
+      if (!stage) return;
+      window.__academySeasonHistory.push(stage.dataset.seasonIndex);
+      new MutationObserver(() => {
+        window.__academySeasonHistory.push(stage.dataset.seasonIndex);
+      }).observe(stage, { attributes: true, attributeFilter: ['data-season-index'] });
+    }, { once: true });
+  });
   await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
   await page.waitForFunction(
-    () => document.querySelector('[data-season-slideshow]').dataset.seasonIndex === '1',
-    { timeout: 10000 }
+    () => window.__academySeasonHistory.join(',').includes('0,1,2,3,0'),
+    { timeout: 3000 }
   );
 
-  return page.evaluate(() => ({
-    index: document.querySelector('[data-season-slideshow]').dataset.seasonIndex,
+  const result = await page.evaluate(() => ({
+    history: window.__academySeasonHistory.slice(0, 5),
     state: document.querySelector('[data-season-slideshow]').dataset.state,
     activeScenes: document.querySelectorAll('.academy-season-scene.is-active').length,
-    status: document.querySelector('#academySeasonStatus').textContent.trim()
+    announcement: document.querySelector('#academySeasonAnnouncement').textContent.trim()
   }));
+  await page.removeScriptToEvaluateOnNewDocument(seasonSpeedScript.identifier);
+  return result;
 }
 
 async function inspectMockupDialogs(page) {
@@ -1336,8 +1363,10 @@ async function main() {
       assert.equal(result.seasonalHero.activeScenes, 1, `${viewport.name}: one seasonal scene`);
       assert.equal(result.seasonalHero.loaded, true, `${viewport.name}: seasonal images loaded`);
       assert.equal(result.seasonalHero.orbitCount, 0, `${viewport.name}: no nine-period orbit`);
-      assert.equal(result.seasonalHero.statusRole, 'status', `${viewport.name}: status role`);
-      assert.equal(result.seasonalHero.statusLive, 'polite', `${viewport.name}: polite status`);
+      assert.equal(result.seasonalHero.statusRole, null, `${viewport.name}: automatic scene label is silent`);
+      assert.equal(result.seasonalHero.statusLive, null, `${viewport.name}: automatic scene label has no live region`);
+      assert.equal(result.seasonalHero.announcementRole, 'status', `${viewport.name}: manual control status role`);
+      assert.equal(result.seasonalHero.announcementLive, 'polite', `${viewport.name}: manual control polite status`);
       assert.equal(result.seasonalHero.controls.length, 3, `${viewport.name}: restrained controls`);
       assert.ok(
         result.seasonalHero.controls.every(control => (
@@ -1598,19 +1627,22 @@ async function main() {
     assert.equal(lifecycle.unhovered.slideshow, 'running');
     assert.equal(lifecycle.slideshowFocused.slideshow, 'paused');
     assert.equal(lifecycle.slideshowUnfocused.slideshow, 'running');
+    assert.equal(lifecycle.focusedToggleLabel, '계절 장면 재생');
     assert.equal(lifecycle.initialIndex, '0');
     assert.equal(lifecycle.nextIndex, '1');
     assert.match(lifecycle.nextStatus, /여름.*2\s*\/\s*4/);
+    assert.match(lifecycle.manualAnnouncement, /여름.*2\s*\/\s*4/);
     assert.equal(lifecycle.userPaused.slideshow, 'paused');
     assert.equal(lifecycle.togglePressed, 'true');
+    assert.equal(lifecycle.pauseAnnouncement, '계절 장면 자동 재생을 멈췄습니다.');
     assert.equal(lifecycle.userResumed.slideshow, 'running');
 
     const automaticSeason = await inspectAutomaticSeasonCycle(page);
     assert.deepEqual(automaticSeason, {
-      index: '1',
+      history: ['0', '1', '2', '3', '0'],
       state: 'running',
       activeScenes: 1,
-      status: '여름 수묵 장면 · 2 / 4'
+      announcement: ''
     });
 
     const reduced = await inspectReducedMotion(page);

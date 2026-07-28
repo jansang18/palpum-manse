@@ -36,18 +36,73 @@
   <main id="academyMain" tabindex="-1">
     <section id="academyHome" class="academy-section academy-home" aria-labelledby="academyHomeTitle">
       <div class="academy-home-art" aria-hidden="true">
-        <img src="../assets/legend-landscape.webp" alt="">
+        <div class="academy-mountain academy-mountain-far" data-parallax-layer>
+          <img src="../assets/legend-landscape.webp" alt="">
+        </div>
+        <div class="academy-mountain academy-mountain-mid" data-parallax-layer>
+          <img src="../assets/legend-landscape.webp" alt="">
+        </div>
+        <div class="academy-mountain academy-mountain-near" data-parallax-layer>
+          <img src="../assets/legend-landscape.webp" alt="">
+        </div>
+        <div class="academy-mist academy-mist-high"></div>
+        <div class="academy-mist academy-mist-low"></div>
+        <span class="academy-vermillion-sun"></span>
       </div>
-      <div class="academy-content academy-home-copy">
-        <p class="academy-kicker">CHWIMYEONGSEON ACADEMY</p>
-        <h1 id="academyHomeTitle">취명선 명리학당</h1>
-        <p>태어난 시간을 읽는 법부터 운의 흐름을 해석하는 법까지, 천천히 익히는 명리 공부.</p>
-        <a class="academy-button" href="#academyCourses" data-academy-target="academyCourses">명리 공부 시작하기</a>
+
+      <div class="academy-content academy-home-layout">
+        <div class="academy-home-copy" data-reveal>
+          <p class="academy-kicker">CHWIMYEONGSEON · 命理書院</p>
+          <h1 id="academyHomeTitle">
+            <span class="academy-title-ink">취명선</span>
+            <span>명리학당</span>
+          </h1>
+          <p class="academy-home-lead">태어난 순간에 새겨진 네 기둥을 읽고, 시간에 따라 달라지는 운의 결을 천천히 익힙니다.</p>
+          <div class="academy-home-actions">
+            <a class="academy-button" href="#academyCourses" data-academy-target="academyCourses">명리 공부 시작하기</a>
+            <a class="academy-button academy-button-ghost" href="#academyManse" data-academy-target="academyManse">기본 만세력 살펴보기</a>
+          </div>
+          <dl class="academy-home-facts" aria-label="학당의 학습 범위">
+            <div>
+              <dt><strong data-count="180">180</strong>년</dt>
+              <dd>시대의 큰 순환</dd>
+            </div>
+            <div>
+              <dt>四柱</dt>
+              <dd>네 기둥의 기초</dd>
+            </div>
+            <div>
+              <dt>九運</dt>
+              <dd>지금 시대의 기운</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="academy-orbit-stage" aria-hidden="true">
+          <div class="academy-orbit" aria-hidden="true">
+            <div class="academy-orbit-ring">
+              <span class="academy-orbit-node">一</span>
+              <span class="academy-orbit-node">二</span>
+              <span class="academy-orbit-node">三</span>
+              <span class="academy-orbit-node">四</span>
+              <span class="academy-orbit-node">五</span>
+              <span class="academy-orbit-node">六</span>
+              <span class="academy-orbit-node">七</span>
+              <span class="academy-orbit-node">八</span>
+              <span class="academy-orbit-node academy-orbit-node-current">九</span>
+            </div>
+            <div class="academy-orbit-core">
+              <span>離</span>
+              <small>下元 九運</small>
+            </div>
+          </div>
+          <img class="academy-hero-seal" src="../assets/legend-seal.webp" width="112" height="112" alt="">
+        </div>
       </div>
     </section>
 
     <section id="academyCourses" class="academy-section" aria-labelledby="academyCoursesTitle">
-      <div class="academy-content">
+      <div class="academy-content" data-reveal>
         <p class="academy-kicker">CURRICULUM</p>
         <h2 id="academyCoursesTitle">명리 강의</h2>
         <p>명리의 기초와 원국 읽기를 교육 콘텐츠로 차례대로 안내합니다.</p>
@@ -55,7 +110,7 @@
     </section>
 
     <section id="academyManse" class="academy-section academy-section-paper" aria-labelledby="academyManseTitle">
-      <div class="academy-content">
+      <div class="academy-content" data-reveal>
         <p class="academy-kicker">LEARNING TOOL</p>
         <h2 id="academyManseTitle">기본 만세력</h2>
         <p>생년월일과 시간을 바탕으로 사주의 네 기둥을 학습용으로 살펴봅니다.</p>
@@ -63,7 +118,7 @@
     </section>
 
     <section id="academyCases" class="academy-section" aria-labelledby="academyCasesTitle">
-      <div class="academy-content">
+      <div class="academy-content" data-reveal>
         <p class="academy-kicker">STUDY NOTES</p>
         <h2 id="academyCasesTitle">풀이 사례</h2>
         <p>원국과 운의 흐름을 읽는 과정을 사례 중심으로 정리합니다.</p>
@@ -71,7 +126,7 @@
     </section>
 
     <section id="academyBoard" class="academy-section academy-section-paper" aria-labelledby="academyBoardTitle">
-      <div class="academy-content">
+      <div class="academy-content" data-reveal>
         <p class="academy-kicker">COMMUNITY</p>
         <h2 id="academyBoardTitle">질문 게시판</h2>
         <p>학습 중 생기는 질문과 풀이의 관점을 함께 나누는 공간입니다.</p>
@@ -79,7 +134,7 @@
     </section>
 
     <section id="academyPlans" class="academy-section" aria-labelledby="academyPlansTitle">
-      <div class="academy-content">
+      <div class="academy-content" data-reveal>
         <p class="academy-kicker">CLASS PLAN</p>
         <h2 id="academyPlansTitle">강의 구매</h2>
         <p>현재는 시연 화면이며 결제가 발생하지 않습니다.</p>

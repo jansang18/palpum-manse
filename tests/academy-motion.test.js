@@ -107,8 +107,8 @@ test('hero exposes the approved cinematic hooks without polluting accessible con
   assert.match(html, /기본 만세력 살펴보기/);
 });
 
-test('only academy modules implemented by the current task are requested', () => {
-  assert.doesNotMatch(html, /academy-manse\.js/);
+test('academy requests only modules that are now implemented', () => {
+  assert.match(html, /academy-manse\.js/);
   assert.match(html, /academy-mockups\.js/);
 });
 

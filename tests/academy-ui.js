@@ -165,6 +165,114 @@ async function inspectMockupDialogs(page) {
   return { course, board, payment, boardNotice, paymentNotice };
 }
 
+async function inspectAcademyManse(page) {
+  await page.setViewport({ width: 1280, height: 720 });
+  await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
+  await page.type('#academyBirth', '19860219');
+  await page.type('#academyTime', '1430');
+  await page.click('#academyCalculate');
+  await page.waitForSelector('#academyPillars:not([hidden])');
+
+  const basic = await page.evaluate(() => ({
+    pillars: [...document.querySelectorAll('[data-pillar]')].map(node => node.textContent.trim()),
+    luckCount: document.querySelector('#academyLuckFlow').children.length,
+    academyApi: typeof window.AcademyManse?.calculateFromForm,
+    adapterApi: typeof window.ManseryeokAdapter?.calculate,
+    directEngineCalls: window.ManseryeokAdapter === window.Manseryeok
+  }));
+
+  const leap = await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.calendar.value = 'lunar';
+    form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
+    form.elements.leap.value = 'leap';
+    form.elements.calendar.value = 'solar';
+    form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
+    form.elements.calendar.value = 'lunar';
+    form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
+    form.elements.birth.value = '20200401';
+    form.elements.time.value = '1200';
+    form.requestSubmit();
+    return {
+      leapVisible: !document.querySelector('#academyLeapField').hidden,
+      leapChoice: form.elements.leap.value,
+      summary: document.querySelector('#academyManseSummary').textContent,
+      errorHidden: document.querySelector('#academyManseError').hidden
+    };
+  });
+
+  const unknown = await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.calendar.value = 'solar';
+    form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
+    form.elements.birth.value = '19860219';
+    form.elements.unknown.checked = true;
+    form.elements.unknown.dispatchEvent(new Event('change', { bubbles: true }));
+    form.requestSubmit();
+    return {
+      timeDisabled: form.elements.time.disabled,
+      hour: document.querySelector('[data-pillar="hour"] [data-pillar-value]').textContent,
+      summary: document.querySelector('#academyManseSummary').textContent,
+      errorHidden: document.querySelector('#academyManseError').hidden
+    };
+  });
+
+  const safeText = await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.name.value = '<img src=x onerror="window.__academyXss=true">';
+    form.requestSubmit();
+    return {
+      summary: document.querySelector('#academyManseSummary').textContent,
+      imageCount: document.querySelectorAll('#academyManseSummary img').length,
+      executed: window.__academyXss === true
+    };
+  });
+
+  const validation = await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.unknown.checked = false;
+    form.elements.unknown.dispatchEvent(new Event('change', { bubbles: true }));
+    form.elements.birth.value = '198602';
+    form.elements.time.value = '1430';
+    window.AcademyManse.calculateFromForm();
+    return {
+      resultHidden: document.querySelector('#academyManseResult').hidden,
+      errorHidden: document.querySelector('#academyManseError').hidden,
+      error: document.querySelector('#academyManseError').textContent
+    };
+  });
+
+  const desktop = await page.evaluate(() => ({
+    formTitleHeight: document.querySelector('.academy-manse-form-heading h3')
+      .getBoundingClientRect()
+      .height
+  }));
+
+  await page.setViewport({ width: 360, height: 800 });
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.birth.value = '19860219';
+    form.elements.time.value = '1430';
+    form.requestSubmit();
+  });
+  const mobile = await page.evaluate(() => ({
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    pillarColumns: getComputedStyle(document.querySelector('#academyPillars')).gridTemplateColumns
+      .split(' ')
+      .filter(Boolean)
+      .length,
+    resultVisible: !document.querySelector('#academyManseResult').hidden
+  }));
+
+  const notes = await page.$$eval('.academy-learning-notes details', nodes => nodes.map(node => ({
+    label: node.querySelector('summary').textContent,
+    text: node.querySelector('p').textContent
+  })));
+
+  return { basic, leap, unknown, safeText, validation, desktop, mobile, notes };
+}
+
 async function main() {
   assert.ok(fs.existsSync(path.join(academyRoot, 'index.html')));
   const server = await startServer();
@@ -184,12 +292,59 @@ async function main() {
   page.on('pageerror', error => errors.push(error.message));
 
   try {
-    for (const missingPath of ['/academy/scripts/academy-manse.js', '/academy/assets/not-created.webp']) {
+    for (const missingPath of ['/academy/assets/not-created.webp']) {
       const response = await fetch(`${origin}${missingPath}`);
       assert.equal(response.status, 404, `${missingPath}: missing assets must return 404`);
     }
     const mockups = await fetch(`${origin}/academy/scripts/academy-mockups.js`);
     assert.equal(mockups.status, 200, 'academy mockup controller must load');
+    const manse = await fetch(`${origin}/academy/scripts/academy-manse.js`);
+    assert.equal(manse.status, 200, 'academy Manseryeok controller must load');
+
+    if (process.env.TEST_GROUP === 'academy-manse') {
+      const result = await inspectAcademyManse(page);
+      assert.equal(result.basic.pillars.length, 4);
+      assert.ok(result.basic.pillars.every(Boolean));
+      assert.ok(result.basic.luckCount > 1, 'luck flow renders calculated cycles');
+      assert.equal(result.basic.academyApi, 'function');
+      assert.equal(result.basic.adapterApi, 'function');
+      assert.equal(result.basic.directEngineCalls, false, 'academy uses the adapter, not the raw engine');
+      assert.deepEqual(result.leap, {
+        leapVisible: true,
+        leapChoice: 'leap',
+        summary: '음력 윤달 · 시간 입력',
+        errorHidden: true
+      });
+      assert.deepEqual(result.unknown, {
+        timeDisabled: true,
+        hour: '시간 미상',
+        summary: '양력 · 시간 미상',
+        errorHidden: true
+      });
+      assert.equal(result.safeText.imageCount, 0);
+      assert.equal(result.safeText.executed, false);
+      assert.match(result.safeText.summary, /<img src=x/);
+      assert.equal(result.validation.resultHidden, true);
+      assert.equal(result.validation.errorHidden, false);
+      assert.match(result.validation.error, /생년월일 8자리/);
+      assert.ok(result.desktop.formTitleHeight < 80, 'desktop form title must not wrap to three lines');
+      assert.deepEqual(result.mobile, {
+        overflow: 0,
+        pillarColumns: 2,
+        resultVisible: true
+      });
+      assert.equal(result.notes.length, 4);
+      assert.deepEqual(result.notes.map(note => note.label), [
+        '천간은 무엇인가요?',
+        '지지는 무엇인가요?',
+        '오행은 어떻게 보나요?',
+        '십성은 무엇인가요?'
+      ]);
+      assert.ok(result.notes.every(note => !/반드시|확정된 미래|운명이다/.test(note.text)));
+      assert.deepEqual(errors, [], `browser console errors:\n${errors.join('\n')}`);
+      console.log('Academy Manseryeok passed');
+      return;
+    }
 
     if (process.env.TEST_GROUP === 'academy-dialogs') {
       const dialogs = await inspectMockupDialogs(page);

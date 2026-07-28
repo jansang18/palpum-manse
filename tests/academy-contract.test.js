@@ -14,6 +14,10 @@ const mockups = fs.readFileSync(
   path.join(__dirname, '..', 'academy', 'scripts', 'academy-mockups.js'),
   'utf8'
 );
+const manse = fs.readFileSync(
+  path.join(__dirname, '..', 'academy', 'scripts', 'academy-manse.js'),
+  'utf8'
+);
 
 test('academy exposes every approved section and mockup disclosure', () => {
   for (const id of [
@@ -99,4 +103,25 @@ test('academy includes four curriculum tracks and safely disclosed mockup dialog
     /flow:\s*\{[\s\S]*?title:\s*'대운·세운·월운'/,
     'course dialog data must use the approved third-course title'
   );
+});
+
+test('academy loads a working basic Manseryeok after the verified browser adapter', () => {
+  for (const id of [
+    'academyManseForm',
+    'academyBirth',
+    'academyTime',
+    'academyUnknown',
+    'academyPillars',
+    'academyLuckFlow',
+    'academyManseError'
+  ]) {
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+
+  const adapterIndex = html.indexOf('../scripts/manseryeok-adapter.js');
+  const academyIndex = html.indexOf('scripts/academy-manse.js');
+  assert.ok(adapterIndex >= 0 && academyIndex > adapterIndex);
+  assert.match(manse, /root\.AcademyManse\s*=/);
+  assert.doesNotMatch(manse, /root\.Manseryeok\.calculate|root\.Manseryeok\?\.calculate/);
+  assert.doesNotMatch(html, /�|\?{2,}/);
 });

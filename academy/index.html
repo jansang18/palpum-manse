@@ -14,6 +14,7 @@
   <script src="scripts/academy-mockups.js" defer></script>
   <script src="../scripts/vendor/manseryeok.browser.js" defer></script>
   <script src="../scripts/manseryeok-adapter.js" defer></script>
+  <script src="scripts/academy-manse.js" defer></script>
 </head>
 <body>
   <a class="academy-skip-link" href="#academyMain">본문으로 건너뛰기</a>
@@ -148,6 +149,124 @@
         <p class="academy-kicker">LEARNING TOOL</p>
         <h2 id="academyManseTitle">기본 만세력</h2>
         <p>생년월일과 시간을 바탕으로 사주의 네 기둥을 학습용으로 살펴봅니다.</p>
+        <div class="academy-manse-layout">
+          <form id="academyManseForm" class="academy-manse-form">
+            <div class="academy-manse-form-heading">
+              <div>
+                <p class="academy-kicker">BIRTH RECORD</p>
+                <h3>태어난 순간 기록하기</h3>
+              </div>
+              <p>입력값은 저장하거나 전송하지 않으며, 이 브라우저 안에서만 계산합니다.</p>
+            </div>
+
+            <div class="academy-manse-fields">
+              <label class="academy-field">
+                이름 <span class="academy-field-optional">선택</span>
+                <input id="academyName" name="name" type="text" autocomplete="name" placeholder="이름을 입력하세요">
+              </label>
+              <label class="academy-field">
+                성별
+                <select id="academyGender" name="gender">
+                  <option value="M">남성</option>
+                  <option value="F">여성</option>
+                </select>
+              </label>
+              <label class="academy-field">
+                달력
+                <select id="academyCalendar" name="calendar">
+                  <option value="solar">양력</option>
+                  <option value="lunar">음력</option>
+                </select>
+              </label>
+              <label id="academyLeapField" class="academy-field" hidden>
+                음력 월 구분
+                <select id="academyLeap" name="leap">
+                  <option value="normal">평달</option>
+                  <option value="leap">윤달</option>
+                </select>
+              </label>
+              <label class="academy-field">
+                생년월일 <span class="academy-field-hint">YYYYMMDD</span>
+                <input id="academyBirth" name="birth" type="text" inputmode="numeric" maxlength="8" autocomplete="bday" placeholder="예: 19860219" required>
+              </label>
+              <label class="academy-field">
+                태어난 시간 <span class="academy-field-hint">HHMM</span>
+                <input id="academyTime" name="time" type="text" inputmode="numeric" maxlength="4" placeholder="예: 1430" required>
+              </label>
+            </div>
+
+            <label class="academy-check-field">
+              <input id="academyUnknown" name="unknown" type="checkbox">
+              <span>태어난 시간을 모릅니다</span>
+            </label>
+
+            <div class="academy-manse-submit">
+              <button id="academyCalculate" class="academy-button" type="submit">네 기둥 펼쳐보기</button>
+              <p id="academyManseError" class="academy-manse-error" role="alert" hidden></p>
+            </div>
+          </form>
+
+          <section id="academyManseResult" class="academy-manse-result" aria-labelledby="academyManseResultTitle" hidden>
+            <div class="academy-manse-result-heading">
+              <div>
+                <p class="academy-kicker">FOUR PILLARS</p>
+                <h3 id="academyManseResultTitle">네 기둥 학습표</h3>
+              </div>
+              <p id="academyManseSummary"></p>
+            </div>
+
+            <div id="academyPillars" class="academy-pillar-grid" aria-label="사주 네 기둥" hidden>
+              <article class="academy-pillar-card" data-pillar="year">
+                <span>년주</span>
+                <strong data-pillar-value></strong>
+                <small>태어난 해</small>
+              </article>
+              <article class="academy-pillar-card" data-pillar="month">
+                <span>월주</span>
+                <strong data-pillar-value></strong>
+                <small>태어난 달의 절기</small>
+              </article>
+              <article class="academy-pillar-card" data-pillar="day">
+                <span>일주</span>
+                <strong data-pillar-value></strong>
+                <small>태어난 날</small>
+              </article>
+              <article class="academy-pillar-card" data-pillar="hour">
+                <span>시주</span>
+                <strong data-pillar-value></strong>
+                <small>태어난 시간</small>
+              </article>
+            </div>
+
+            <div class="academy-luck-section">
+              <div>
+                <p class="academy-kicker">TEN-YEAR FLOW</p>
+                <h4>대운의 흐름</h4>
+              </div>
+              <p>대운은 십 년 단위 간지를 읽는 학습 자료이며, 사건을 단정하지 않습니다.</p>
+              <div id="academyLuckFlow" class="academy-luck-flow" aria-label="대운 흐름" tabindex="0" hidden></div>
+            </div>
+
+            <div class="academy-learning-notes" aria-label="명리 기초 학습 노트">
+              <details>
+                <summary>천간은 무엇인가요?</summary>
+                <p>천간은 갑부터 계까지 열 글자로, 드러나는 기운의 성질을 비교하는 기초 언어입니다.</p>
+              </details>
+              <details>
+                <summary>지지는 무엇인가요?</summary>
+                <p>지지는 자부터 해까지 열두 글자로, 계절과 시간의 흐름을 살피는 좌표입니다.</p>
+              </details>
+              <details>
+                <summary>오행은 어떻게 보나요?</summary>
+                <p>목·화·토·금·수의 분포와 관계를 살피되, 하나의 요소만으로 좋고 나쁨을 정하지 않습니다.</p>
+              </details>
+              <details>
+                <summary>십성은 무엇인가요?</summary>
+                <p>십성은 일간과 다른 글자의 관계를 부르는 학습 체계이며, 성격이나 미래를 확정하는 판정표가 아닙니다.</p>
+              </details>
+            </div>
+          </section>
+        </div>
       </div>
     </section>
 

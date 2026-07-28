@@ -130,6 +130,41 @@ async function inspectReducedMotion(page) {
   });
 }
 
+async function inspectMockupDialogs(page) {
+  await page.setViewport({ width: 1280, height: 720 });
+  await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
+
+  async function openAndClose(trigger, dialog) {
+    await page.evaluate(selector => document.querySelector(selector).scrollIntoView(), trigger);
+    await page.click(trigger);
+    await page.waitForSelector(`${dialog}[open]`);
+    const opened = await page.evaluate(selector => ({
+      open: document.querySelector(selector).open,
+      focused: document.activeElement.matches(`${selector} [data-dialog-close]`)
+    }), dialog);
+    await page.click(`${dialog} [data-dialog-close]`);
+    await page.waitForFunction(selector => !document.querySelector(selector).open, {}, dialog);
+    const restored = await page.evaluate(selector => document.activeElement.matches(selector), trigger);
+    return { opened, restored };
+  }
+
+  const course = await openAndClose('[data-course-id="foundation"]', '#courseDialog');
+  const board = await openAndClose('[data-board-action="write"]', '#boardDialog');
+  const payment = await openAndClose('[data-plan-id="full"]', '#paymentDialog');
+
+  await page.click('[data-board-action="write"]');
+  await page.click('#boardDialog button[type="submit"]');
+  const boardNotice = await page.$eval('#boardDialog .academy-dialog-note', node => node.textContent);
+  await page.keyboard.press('Escape');
+
+  await page.click('[data-plan-id="full"]');
+  await page.click('#paymentDialog button[type="submit"]');
+  const paymentNotice = await page.$eval('#paymentDialog .academy-dialog-note', node => node.textContent);
+  await page.keyboard.press('Escape');
+
+  return { course, board, payment, boardNotice, paymentNotice };
+}
+
 async function main() {
   assert.ok(fs.existsSync(path.join(academyRoot, 'index.html')));
   const server = await startServer();
@@ -149,13 +184,25 @@ async function main() {
   page.on('pageerror', error => errors.push(error.message));
 
   try {
-    for (const missingPath of [
-      '/academy/scripts/academy-manse.js',
-      '/academy/scripts/academy-mockups.js',
-      '/academy/assets/not-created.webp'
-    ]) {
+    for (const missingPath of ['/academy/scripts/academy-manse.js', '/academy/assets/not-created.webp']) {
       const response = await fetch(`${origin}${missingPath}`);
       assert.equal(response.status, 404, `${missingPath}: missing assets must return 404`);
+    }
+    const mockups = await fetch(`${origin}/academy/scripts/academy-mockups.js`);
+    assert.equal(mockups.status, 200, 'academy mockup controller must load');
+
+    if (process.env.TEST_GROUP === 'academy-dialogs') {
+      const dialogs = await inspectMockupDialogs(page);
+      for (const [name, result] of Object.entries({ course: dialogs.course, board: dialogs.board, payment: dialogs.payment })) {
+        assert.equal(result.opened.open, true, `${name}: dialog opens`);
+        assert.equal(result.opened.focused, true, `${name}: close button receives focus`);
+        assert.equal(result.restored, true, `${name}: trigger focus restores after close`);
+      }
+      assert.match(dialogs.boardNotice, /저장되지 않/);
+      assert.match(dialogs.paymentNotice, /실제 결제가 발생하지 않/);
+      assert.deepEqual(errors, [], `browser console errors:\n${errors.join('\n')}`);
+      console.log('Academy mockup dialogs passed');
+      return;
     }
 
     for (const viewport of viewports) {

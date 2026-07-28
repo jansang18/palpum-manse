@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles/academy.css">
   <script src="scripts/academy-nav.js" defer></script>
   <script src="scripts/academy-motion.js" defer></script>
+  <script src="scripts/academy-mockups.js" defer></script>
   <script src="../scripts/vendor/manseryeok.browser.js" defer></script>
   <script src="../scripts/manseryeok-adapter.js" defer></script>
 </head>
@@ -104,7 +105,41 @@
       <div class="academy-content" data-reveal>
         <p class="academy-kicker">CURRICULUM</p>
         <h2 id="academyCoursesTitle">명리 강의</h2>
-        <p>명리의 기초와 원국 읽기를 교육 콘텐츠로 차례대로 안내합니다.</p>
+        <p>기초 개념부터 시대의 흐름까지, 하나의 원국을 스스로 읽어내기 위한 네 개의 장을 차례로 엽니다.</p>
+        <div class="academy-course-grid" aria-label="명리 강의 과정">
+          <article class="academy-course-card">
+            <div class="academy-card-topline"><span>01</span><span>입문</span></div>
+            <p class="academy-card-hanja">命</p>
+            <h3>명리의 기초</h3>
+            <p>음양오행과 천간·지지의 언어를 일상적인 장면으로 차분히 번역합니다.</p>
+            <dl class="academy-card-meta"><div><dt>기간</dt><dd>4주</dd></div><div><dt>강의</dt><dd>12강</dd></div><div><dt>진도</dt><dd>32%</dd></div></dl>
+            <button class="academy-text-action" type="button" data-course-id="foundation">과정 살펴보기 <span aria-hidden="true">→</span></button>
+          </article>
+          <article class="academy-course-card academy-course-card-featured">
+            <div class="academy-card-topline"><span>02</span><span>핵심</span></div>
+            <p class="academy-card-hanja">柱</p>
+            <h3>사주 원국 읽기</h3>
+            <p>네 기둥의 관계를 한 장의 지도처럼 보고, 십성과 용신의 출발점을 잡습니다.</p>
+            <dl class="academy-card-meta"><div><dt>기간</dt><dd>6주</dd></div><div><dt>강의</dt><dd>18강</dd></div><div><dt>진도</dt><dd>18%</dd></div></dl>
+            <button class="academy-text-action" type="button" data-course-id="natal">과정 살펴보기 <span aria-hidden="true">→</span></button>
+          </article>
+          <article class="academy-course-card">
+            <div class="academy-card-topline"><span>03</span><span>심화</span></div>
+            <p class="academy-card-hanja">運</p>
+            <h3>대운·세운의 흐름</h3>
+            <p>십 년과 한 해가 만나는 지점을 통해 변화의 속도와 시기를 읽는 연습입니다.</p>
+            <dl class="academy-card-meta"><div><dt>기간</dt><dd>5주</dd></div><div><dt>강의</dt><dd>15강</dd></div><div><dt>진도</dt><dd>0%</dd></div></dl>
+            <button class="academy-text-action" type="button" data-course-id="flow">과정 살펴보기 <span aria-hidden="true">→</span></button>
+          </article>
+          <article class="academy-course-card">
+            <div class="academy-card-topline"><span>04</span><span>특강</span></div>
+            <p class="academy-card-hanja">時</p>
+            <h3>삼원구운과 시대 해석</h3>
+            <p>180년의 큰 순환 안에서 원국과 시대의 기운을 함께 바라보는 확장 수업입니다.</p>
+            <dl class="academy-card-meta"><div><dt>기간</dt><dd>3주</dd></div><div><dt>강의</dt><dd>9강</dd></div><div><dt>진도</dt><dd>0%</dd></div></dl>
+            <button class="academy-text-action" type="button" data-course-id="period">과정 살펴보기 <span aria-hidden="true">→</span></button>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -120,7 +155,12 @@
       <div class="academy-content" data-reveal>
         <p class="academy-kicker">STUDY NOTES</p>
         <h2 id="academyCasesTitle">풀이 사례</h2>
-        <p>원국과 운의 흐름을 읽는 과정을 사례 중심으로 정리합니다.</p>
+        <p>정답을 단정하기보다, 관찰한 근거를 어떻게 연결하는지 기록한 학습 노트입니다.</p>
+        <div class="academy-case-grid">
+          <article class="academy-case-card"><span class="academy-case-number">CASE 01</span><p class="academy-case-hanja">木</p><h3>나무가 많은 원국의 균형</h3><p>계절과 뿌리, 흐름을 먼저 살피며 강약을 한 문장으로 정리하는 법.</p><a href="#academyManse" data-academy-target="academyManse">원국 도구로 보기</a></article>
+          <article class="academy-case-card"><span class="academy-case-number">CASE 02</span><p class="academy-case-hanja">火</p><h3>일과 관계의 속도 조절</h3><p>세운의 자극이 강할 때, 선택보다 순서를 조정해 읽어보는 연습.</p><a href="#academyCourses" data-academy-target="academyCourses">관련 강의 보기</a></article>
+          <article class="academy-case-card"><span class="academy-case-number">CASE 03</span><p class="academy-case-hanja">九</p><h3>9운의 빛, 나의 자리</h3><p>하원 9운의 사회적 분위기와 개인의 원국을 겹쳐 보는 관점.</p><a href="#academyCourses" data-academy-target="academyCourses">시대 해석 수업</a></article>
+        </div>
       </div>
     </section>
 
@@ -128,7 +168,15 @@
       <div class="academy-content" data-reveal>
         <p class="academy-kicker">COMMUNITY</p>
         <h2 id="academyBoardTitle">질문 게시판</h2>
-        <p>학습 중 생기는 질문과 풀이의 관점을 함께 나누는 공간입니다.</p>
+        <div class="academy-board-heading"><p>학습 중 생기는 질문과 풀이의 관점을 함께 나누는 공간입니다.</p><button class="academy-button academy-button-small" type="button" data-board-action="write">질문 남기기</button></div>
+        <p class="academy-mockup-notice">교육용 목업입니다. 작성 내용은 저장되지 않습니다. 다른 사람에게 공개되지 않습니다.</p>
+        <div class="academy-board-list" role="list" aria-label="질문 게시판 예시">
+          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">원국</span><span class="academy-board-title">월지와 일간의 관계는 어떤 순서로 읽나요?</span><span class="academy-board-meta">소담 · 답변 4</span></button>
+          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">대운</span><span class="academy-board-title">교운기는 몇 년으로 보고 준비하면 좋을까요?</span><span class="academy-board-meta">윤슬 · 답변 7</span></button>
+          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">오행</span><span class="academy-board-title">토가 많을 때 무조건 답답하다고 해석해도 될까요?</span><span class="academy-board-meta">여울 · 답변 3</span></button>
+          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">9운</span><span class="academy-board-title">삼원구운은 개인 풀이에서 어디까지 적용하나요?</span><span class="academy-board-meta">산책자 · 답변 6</span></button>
+          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">학습</span><span class="academy-board-title">초보자가 첫 원국을 읽을 때 놓치기 쉬운 점</span><span class="academy-board-meta">초록 · 답변 9</span></button>
+        </div>
       </div>
     </section>
 
@@ -136,10 +184,46 @@
       <div class="academy-content" data-reveal>
         <p class="academy-kicker">CLASS PLAN</p>
         <h2 id="academyPlansTitle">강의 구매</h2>
-        <p>현재는 시연 화면이며 결제가 발생하지 않습니다.</p>
+        <p>수강 플랜의 구성과 흐름을 미리 보는 시연 화면입니다. 실제 결제가 발생하지 않습니다.</p>
+        <div class="academy-plan-grid">
+          <article class="academy-plan-card"><p class="academy-plan-label">FOUNDATION</p><h3>기초 수강권</h3><p class="academy-plan-price">39,000<span>원</span></p><ul><li>명리의 기초 12강</li><li>사주 원국 읽기 미리보기</li><li>학습 노트 4종</li></ul><button class="academy-button academy-button-ghost" type="button" data-plan-id="foundation">수강 플랜 보기</button></article>
+          <article class="academy-plan-card academy-plan-card-primary"><p class="academy-plan-label">FULL COURSE</p><h3>정규 과정 수강권</h3><p class="academy-plan-price">129,000<span>원</span></p><ul><li>4개 과정 전체 54강</li><li>사례 노트와 질문 게시판</li><li>시대 해석 특강 포함</li></ul><button class="academy-button" type="button" data-plan-id="full">수강 플랜 보기</button></article>
+        </div>
+        <p class="academy-payment-disclosure">모든 버튼은 결제 화면을 재현한 목업입니다. 실제 결제가 발생하지 않으며 결제 정보도 전송·저장되지 않습니다.</p>
       </div>
     </section>
   </main>
+
+  <dialog id="courseDialog" class="academy-dialog" aria-labelledby="courseDialogTitle">
+    <div class="academy-dialog-paper">
+      <button class="academy-dialog-close" type="button" data-dialog-close aria-label="강의 안내 닫기">×</button>
+      <p class="academy-kicker">COURSE PREVIEW</p><h2 id="courseDialogTitle">과정 안내</h2>
+      <p data-course-description>강의 정보를 불러오고 있습니다.</p>
+      <div class="academy-dialog-note">이 화면은 교육 홈페이지 목업입니다. 수강 신청이나 결제는 진행되지 않습니다.</div>
+    </div>
+  </dialog>
+  <dialog id="boardDialog" class="academy-dialog" aria-labelledby="boardDialogTitle">
+    <form class="academy-dialog-paper" method="dialog" data-board-form>
+      <button class="academy-dialog-close" type="button" data-dialog-close aria-label="게시판 목업 닫기">×</button>
+      <p class="academy-kicker">COMMUNITY MOCKUP</p><h2 id="boardDialogTitle">질문을 남겨보세요</h2>
+      <p data-board-description>게시글 예시를 확인하는 화면입니다.</p>
+      <label class="academy-field">제목<input name="title" type="text" placeholder="예: 대운의 흐름을 읽는 순서" autocomplete="off"></label>
+      <label class="academy-field">내용<textarea name="content" rows="4" placeholder="학습 중 궁금했던 점을 적어보세요."></textarea></label>
+      <p class="academy-dialog-note">교육용 목업입니다. 작성 내용은 저장되지 않습니다. 다른 사람에게 공개되지 않습니다.</p>
+      <button class="academy-button" type="submit">목업으로 작성해 보기</button>
+    </form>
+  </dialog>
+  <dialog id="paymentDialog" class="academy-dialog" aria-labelledby="paymentDialogTitle">
+    <form class="academy-dialog-paper" method="dialog" data-payment-form>
+      <button class="academy-dialog-close" type="button" data-dialog-close aria-label="결제 목업 닫기">×</button>
+      <p class="academy-kicker">PAYMENT MOCKUP</p><h2 id="paymentDialogTitle">수강 플랜 확인</h2>
+      <p data-payment-description>선택한 플랜을 확인합니다.</p>
+      <label class="academy-field">이름<input name="name" type="text" placeholder="수강생 이름" autocomplete="off"></label>
+      <label class="academy-field">이메일<input name="email" type="email" placeholder="you@example.com" autocomplete="off"></label>
+      <p class="academy-dialog-note">교육용 목업입니다. 실제 결제가 발생하지 않으며 결제 정보는 전송·저장되지 않습니다.</p>
+      <button class="academy-button" type="submit">결제 화면 미리보기</button>
+    </form>
+  </dialog>
 
   <footer class="academy-footer">
     <span>취명선 명리학당</span>

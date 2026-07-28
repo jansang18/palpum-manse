@@ -107,9 +107,9 @@ test('hero exposes the approved cinematic hooks without polluting accessible con
   assert.match(html, /기본 만세력 살펴보기/);
 });
 
-test('future academy modules are not requested before their tasks create them', () => {
+test('only academy modules implemented by the current task are requested', () => {
   assert.doesNotMatch(html, /academy-manse\.js/);
-  assert.doesNotMatch(html, /academy-mockups\.js/);
+  assert.match(html, /academy-mockups\.js/);
 });
 
 test('high-frequency parallax properties are scoped to the academy hero', () => {

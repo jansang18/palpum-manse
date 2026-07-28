@@ -23,7 +23,7 @@ test('academy exposes every approved section and mockup disclosure', () => {
     assert.match(html, new RegExp(`id="${id}"`));
   }
 
-  assert.match(html, /현재는 시연 화면이며 결제가 발생하지 않습니다/);
+  assert.match(html, /실제 결제가 발생하지 않습니다/);
   assert.match(html, /prefers-reduced-motion/);
 });
 
@@ -70,4 +70,27 @@ test('academy skip-link focus marker starts below the fixed masthead', () => {
   assert.match(css, /#academyMain:focus-visible::before\s*\{[^}]*position:\s*fixed/s);
   assert.match(css, /#academyMain:focus-visible::before\s*\{[^}]*top:\s*var\(--academy-masthead-height\)/s);
   assert.match(css, /#academyMain:focus-visible::before\s*\{[^}]*pointer-events:\s*none/s);
+});
+
+test('academy includes four curriculum tracks and safely disclosed mockup dialogs', () => {
+  for (const title of [
+    '명리의 기초',
+    '사주 원국 읽기',
+    '대운·세운의 흐름',
+    '삼원구운과 시대 해석'
+  ]) {
+    assert.match(html, new RegExp(title));
+  }
+
+  for (const dialogId of ['courseDialog', 'boardDialog', 'paymentDialog']) {
+    assert.match(html, new RegExp(`id="${dialogId}"`));
+  }
+
+  assert.match(html, /실제 결제가 발생하지 않습니다/);
+  assert.match(html, /작성 내용은 저장되지 않습니다/);
+  assert.match(html, /scripts\/academy-mockups\.js/);
+  assert.match(
+    fs.readFileSync(path.join(__dirname, '..', 'academy', 'scripts', 'academy-mockups.js'), 'utf8'),
+    /window\.AcademyMockups\s*=/
+  );
 });

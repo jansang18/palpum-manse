@@ -45,9 +45,13 @@ function startServer() {
   return new Promise(resolve => {
     const server = http.createServer((request, response) => {
       const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-      const relative = pathname === '/' || pathname === '/academy/' || pathname === '/academy'
+      const deploymentPrefix = '/palpum-manse/';
+      const academyPrefix = `${deploymentPrefix}academy/`;
+      const relative = pathname === academyPrefix || pathname === academyPrefix.slice(0, -1)
         ? 'academy/index.html'
-        : pathname.replace(/^\/+/, '');
+        : pathname.startsWith(deploymentPrefix)
+          ? pathname.slice(deploymentPrefix.length)
+          : '';
       const filePath = path.resolve(repoRoot, relative);
 
       if (!filePath.startsWith(repoRoot) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
@@ -72,6 +76,8 @@ async function inspectOfflineRelease(page) {
 
   const online = await page.evaluate(async () => {
     const registration = await navigator.serviceWorker.ready;
+    const manifestUrl = document.querySelector('link[rel="manifest"]').href;
+    const manifest = await fetch(manifestUrl).then(response => response.json());
     const cacheNames = await caches.keys();
     const academyCache = cacheNames.find(name => name.startsWith('chwimyeongseon-academy-'));
     const cache = await caches.open(academyCache);
@@ -80,6 +86,11 @@ async function inspectOfflineRelease(page) {
     return {
       scope: registration.scope,
       controller: navigator.serviceWorker.controller && navigator.serviceWorker.controller.scriptURL,
+      manifest: {
+        id: manifest.id,
+        startUrl: new URL(manifest.start_url, manifestUrl).pathname,
+        scope: new URL(manifest.scope, manifestUrl).pathname
+      },
       cacheNames,
       cachedPaths: requests.map(request => new URL(request.url).pathname).sort()
     };
@@ -831,7 +842,7 @@ async function main() {
   const page = await browser.newPage();
   const address = server.address();
   const origin = `http://127.0.0.1:${address.port}`;
-  page.testUrl = `${origin}/academy/`;
+  page.testUrl = `${origin}/palpum-manse/academy/`;
   const errors = [];
   page.on('console', message => {
     if (message.type() === 'error') errors.push(message.text());
@@ -839,13 +850,13 @@ async function main() {
   page.on('pageerror', error => errors.push(error.message));
 
   try {
-    for (const missingPath of ['/academy/assets/not-created.webp']) {
+    for (const missingPath of ['/palpum-manse/academy/assets/not-created.webp']) {
       const response = await fetch(`${origin}${missingPath}`);
       assert.equal(response.status, 404, `${missingPath}: missing assets must return 404`);
     }
-    const mockups = await fetch(`${origin}/academy/scripts/academy-mockups.js`);
+    const mockups = await fetch(`${origin}/palpum-manse/academy/scripts/academy-mockups.js`);
     assert.equal(mockups.status, 200, 'academy mockup controller must load');
-    const manse = await fetch(`${origin}/academy/scripts/academy-manse.js`);
+    const manse = await fetch(`${origin}/palpum-manse/academy/scripts/academy-manse.js`);
     assert.equal(manse.status, 200, 'academy Manseryeok controller must load');
 
     if (process.env.TEST_GROUP === 'academy-manse') {
@@ -1126,25 +1137,30 @@ async function main() {
     assert.equal(reduced.scrollDepth, '0');
 
     const release = await inspectOfflineRelease(page);
-    assert.match(release.online.scope, /\/academy\/$/, 'academy worker scope stays under academy');
-    assert.match(release.online.controller, /\/academy\/sw\.js$/, 'academy page is controlled by its own worker');
+    assert.match(release.online.scope, /\/palpum-manse\/academy\/$/, 'academy worker scope stays under academy');
+    assert.match(release.online.controller, /\/palpum-manse\/academy\/sw\.js$/, 'academy page is controlled by its own worker');
+    assert.deepEqual(release.online.manifest, {
+      id: '/palpum-manse/academy/',
+      startUrl: '/palpum-manse/academy/',
+      scope: '/palpum-manse/academy/'
+    }, 'academy manifest resolves inside the deployed Palpum prefix');
     assert.ok(
       release.online.cacheNames.every(name => !name.startsWith('palpum-manse-') && !name.startsWith('legend-manse-')),
       `academy release audit must not create sibling caches: ${JSON.stringify(release.online.cacheNames)}`
     );
     for (const asset of [
-      '/academy/',
-      '/academy/index.html',
-      '/academy/styles/academy.css',
-      '/academy/scripts/academy-nav.js',
-      '/academy/scripts/academy-motion.js',
-      '/academy/scripts/academy-mockups.js',
-      '/academy/scripts/academy-manse.js',
-      '/academy/manifest.webmanifest',
-      '/assets/legend-landscape.webp',
-      '/assets/legend-seal.webp',
-      '/scripts/vendor/manseryeok.browser.js',
-      '/scripts/manseryeok-adapter.js'
+      '/palpum-manse/academy/',
+      '/palpum-manse/academy/index.html',
+      '/palpum-manse/academy/styles/academy.css',
+      '/palpum-manse/academy/scripts/academy-nav.js',
+      '/palpum-manse/academy/scripts/academy-motion.js',
+      '/palpum-manse/academy/scripts/academy-mockups.js',
+      '/palpum-manse/academy/scripts/academy-manse.js',
+      '/palpum-manse/academy/manifest.webmanifest',
+      '/palpum-manse/assets/legend-landscape.webp',
+      '/palpum-manse/assets/legend-seal.webp',
+      '/palpum-manse/scripts/vendor/manseryeok.browser.js',
+      '/palpum-manse/scripts/manseryeok-adapter.js'
     ]) {
       assert.ok(
         release.online.cachedPaths.includes(asset),

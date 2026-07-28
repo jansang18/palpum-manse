@@ -39,8 +39,10 @@ test('academy service worker owns only academy scope, cache keys, and runtime as
   assert.match(html, /serviceWorker\.register\('\.\/sw\.js', \{ scope: '\.\/' \}\)/);
   assert.match(sw, /const CACHE_PREFIX = 'chwimyeongseon-academy-'/);
   assert.match(sw, /startsWith\(CACHE_PREFIX\)/);
+  assert.doesNotMatch(sw, /caches\.match\(/);
   assert.doesNotMatch(sw, /caches\.delete\([^)]*palpum-manse/);
   assert.doesNotMatch(sw, /caches\.delete\([^)]*legend-manse/);
+  assert.equal(manifest.id, '/palpum-manse/academy/');
   assert.equal(manifest.start_url, './');
   assert.equal(manifest.scope, './');
 

@@ -38,6 +38,21 @@ function belongsToAcademy(url) {
   );
 }
 
+function matchAcademyCache(request) {
+  return caches.open(CACHE)
+    .then((academyCache) => academyCache.match(request, { ignoreSearch: true }));
+}
+
+function writeAcademyCache(event, request, response) {
+  // Keep cache writes alive after the response returns, without allowing a
+  // transient storage failure to surface as an unhandled rejection.
+  event.waitUntil(
+    caches.open(CACHE)
+      .then((academyCache) => academyCache.put(request, response.clone()))
+      .catch(() => undefined)
+  );
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
@@ -70,21 +85,19 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(request, copy));
+          writeAcademyCache(event, request, response);
           return response;
         })
-        .catch(() => caches.match(request, { ignoreSearch: true })
-          .then((cached) => cached || caches.match('./index.html')))
+        .catch(() => matchAcademyCache(request)
+          .then((cached) => cached || matchAcademyCache('./index.html')))
     );
     return;
   }
 
   event.respondWith(
-    caches.match(request, { ignoreSearch: true })
+    matchAcademyCache(request)
       .then((cached) => cached || fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(request, copy));
+        writeAcademyCache(event, request, response);
         return response;
       }))
   );

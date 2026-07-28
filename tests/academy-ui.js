@@ -167,7 +167,7 @@ async function inspectLayout(page, viewport) {
         rect: toRect(node.getBoundingClientRect())
       }));
     const touchTargetFailures = [...document.querySelectorAll(
-      'a[href], button, input:not([type="hidden"]):not([type="checkbox"]), select, textarea, summary, .academy-check-field'
+      'a[href], button, input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), select, textarea, summary, .academy-check-field, .academy-payment-methods label'
     )]
       .filter(isRendered)
       .filter(node => {
@@ -186,10 +186,18 @@ async function inspectLayout(page, viewport) {
       }));
     const navViewport = document.querySelector('.academy-navigation');
     const navViewportRect = navViewport.getBoundingClientRect();
+    const navLinks = [...navViewport.querySelectorAll('a')];
     const navLabelOverflow = [...navViewport.querySelectorAll('a')]
       .filter(node => node.scrollWidth > node.clientWidth)
       .map(node => node.textContent.trim());
+    const titleUnderline = getComputedStyle(
+      document.querySelector('.academy-title-ink'),
+      '::after'
+    );
     const masthead = rect('.academy-masthead');
+    const seasonStage = document.querySelector('[data-season-slideshow]');
+    const seasonScenes = [...document.querySelectorAll('.academy-season-scene')];
+    const seasonControls = [...document.querySelectorAll('.academy-season-controls button')];
     const protectedSelectors = [
       '#academyHomeTitle',
       '.academy-home-actions',
@@ -214,10 +222,43 @@ async function inspectLayout(page, viewport) {
           && navViewportRect.top >= 0
           && navViewportRect.bottom <= window.innerHeight
         ),
-        horizontallyScrollable: navViewport.scrollWidth > navViewport.clientWidth
+        horizontallyScrollable: navViewport.scrollWidth > navViewport.clientWidth,
+        visibleDestinations: navLinks.filter(node => isContained(node.getBoundingClientRect())).length,
+        columns: getComputedStyle(navViewport).gridTemplateColumns
+          .split(' ')
+          .filter(Boolean)
+          .length
       },
-      orbit: rect('.academy-orbit'),
-      orbitNodes: document.querySelectorAll('.academy-orbit-node').length,
+      scrollGuide: {
+        rect: rect('.academy-scroll-guide'),
+        visible: isRendered(document.querySelector('.academy-scroll-guide'))
+      },
+      titleUnderline: {
+        content: titleUnderline.content,
+        height: Number.parseFloat(titleUnderline.height) || 0
+      },
+      sealAnimation: {
+        name: getComputedStyle(document.querySelector('.academy-hero-seal')).animationName,
+        iterations: getComputedStyle(document.querySelector('.academy-hero-seal')).animationIterationCount
+      },
+      seasonalHero: {
+        rect: toRect(seasonStage.getBoundingClientRect()),
+        sceneCount: seasonScenes.length,
+        activeScenes: seasonScenes.filter(node => node.classList.contains('is-active')).length,
+        loaded: seasonScenes.every(node => {
+          const image = node.querySelector('img');
+          return image && image.complete && image.naturalWidth > 0;
+        }),
+        controls: seasonControls.map(node => ({
+          rect: toRect(node.getBoundingClientRect()),
+          label: node.getAttribute('aria-label')
+        })),
+        statusRole: document.querySelector('#academySeasonStatus').getAttribute('role'),
+        statusLive: document.querySelector('#academySeasonStatus').getAttribute('aria-live'),
+        orbitCount: document.querySelectorAll(
+          '.academy-orbit, .academy-orbit-node, .academy-orbit-core'
+        ).length
+      },
       parallaxLayers: document.querySelectorAll('[data-parallax-layer]').length,
       mistBands: document.querySelectorAll('.academy-mist').length,
       horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -250,15 +291,25 @@ async function inspectReducedMotion(page) {
     };
     return {
       mist: computed('.academy-mist'),
-      orbit: computed('.academy-orbit-ring'),
+      season: computed('.academy-season-scene.is-active'),
+      seasonImage: computed('.academy-season-scene.is-active img'),
       parallax: computed('[data-parallax-layer]'),
       ink: computed('.academy-title-ink'),
+      seal: computed('.academy-hero-seal'),
+      guide: computed('.academy-scroll-guide'),
+      course: computed('.academy-course-card'),
+      pillar: computed('.academy-pillar-card'),
+      dialog: computed('.academy-dialog-paper'),
       reveal: computed('[data-reveal]'),
       count: document.querySelector('[data-count]').textContent,
       countComplete: document.querySelector('[data-count]').dataset.countComplete,
       pointerX: getComputedStyle(document.querySelector('#academyHome')).getPropertyValue('--pointer-x').trim(),
       pointerY: getComputedStyle(document.querySelector('#academyHome')).getPropertyValue('--pointer-y').trim(),
-      scrollDepth: getComputedStyle(document.querySelector('#academyHome')).getPropertyValue('--scroll-depth').trim()
+      scrollDepth: getComputedStyle(document.querySelector('#academyHome')).getPropertyValue('--scroll-depth').trim(),
+      seasonIndex: document.querySelector('[data-season-slideshow]').dataset.seasonIndex,
+      seasonState: document.querySelector('[data-season-slideshow]').dataset.state,
+      seasonControlsDisabled: [...document.querySelectorAll('.academy-season-controls button')]
+        .every(node => node.disabled)
     };
   });
 }
@@ -294,9 +345,11 @@ async function inspectMotionLifecycle(page) {
       configurable: true,
       get() { return hidden; }
     });
+    const stage = document.querySelector('[data-season-slideshow]');
     const snapshot = () => ({
       listeners: window.__academyMotionListeners(),
-      paused: document.body.classList.contains('is-motion-paused')
+      paused: document.body.classList.contains('is-motion-paused'),
+      slideshow: stage.dataset.state
     });
     const active = snapshot();
     hidden = true;
@@ -305,10 +358,82 @@ async function inspectMotionLifecycle(page) {
     hidden = false;
     document.dispatchEvent(new Event('visibilitychange'));
     const restored = snapshot();
-    return { active, background, restored };
+    const engagement = () => ({
+      engaged: document.body.classList.contains('is-manse-engaged'),
+      mist: getComputedStyle(document.querySelector('.academy-mist')).animationPlayState,
+      season: getComputedStyle(
+        document.querySelector('.academy-season-scene.is-active img')
+      ).animationPlayState,
+      slideshow: stage.dataset.state
+    });
+    document.querySelector('#academyBirth').focus();
+    const focused = engagement();
+    document.querySelector('.academy-brand').focus();
+    const unfocused = engagement();
+    document.dispatchEvent(new CustomEvent('academy:manse-result', {
+      detail: { open: true }
+    }));
+    const reading = engagement();
+    document.dispatchEvent(new CustomEvent('academy:manse-result', {
+      detail: { open: false }
+    }));
+    const settled = engagement();
+    stage.dispatchEvent(new Event('mouseenter'));
+    const hovered = engagement();
+    stage.dispatchEvent(new Event('mouseleave'));
+    const unhovered = engagement();
+    document.querySelector('#academySeasonNext').focus();
+    const slideshowFocused = engagement();
+    document.querySelector('.academy-brand').focus();
+    const slideshowUnfocused = engagement();
+    const initialIndex = stage.dataset.seasonIndex;
+    document.querySelector('#academySeasonNext').click();
+    const nextIndex = stage.dataset.seasonIndex;
+    const nextStatus = document.querySelector('#academySeasonStatus').textContent.trim();
+    document.querySelector('#academySeasonToggle').click();
+    const userPaused = engagement();
+    const togglePressed = document.querySelector('#academySeasonToggle').getAttribute('aria-pressed');
+    document.querySelector('#academySeasonToggle').click();
+    const userResumed = engagement();
+    return {
+      active,
+      background,
+      restored,
+      focused,
+      unfocused,
+      reading,
+      settled,
+      hovered,
+      unhovered,
+      slideshowFocused,
+      slideshowUnfocused,
+      initialIndex,
+      nextIndex,
+      nextStatus,
+      userPaused,
+      togglePressed,
+      userResumed
+    };
   });
 
   return states;
+}
+
+async function inspectAutomaticSeasonCycle(page) {
+  await page.setViewport({ width: 1280, height: 720 });
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(
+    () => document.querySelector('[data-season-slideshow]').dataset.seasonIndex === '1',
+    { timeout: 10000 }
+  );
+
+  return page.evaluate(() => ({
+    index: document.querySelector('[data-season-slideshow]').dataset.seasonIndex,
+    state: document.querySelector('[data-season-slideshow]').dataset.state,
+    activeScenes: document.querySelectorAll('.academy-season-scene.is-active').length,
+    status: document.querySelector('#academySeasonStatus').textContent.trim()
+  }));
 }
 
 async function inspectMockupDialogs(page) {
@@ -333,17 +458,97 @@ async function inspectMockupDialogs(page) {
   const board = await openAndClose('[data-board-action="write"]', '#boardDialog');
   const payment = await openAndClose('[data-plan-id="full"]', '#paymentDialog');
 
+  await page.click('[data-course-id="foundation"]');
+  const courseDetail = await page.evaluate(() => ({
+    curriculum: [...document.querySelectorAll('[data-course-curriculum] li')]
+      .map(node => node.textContent.trim()),
+    previewVisible: !document.querySelector('[data-course-preview]').hidden,
+    enrollText: document.querySelector('[data-course-enroll]').textContent.trim(),
+    paperAnimation: getComputedStyle(document.querySelector('#courseDialog .academy-dialog-paper'))
+      .animationName
+  }));
+  await page.waitForFunction(() => (
+    document.querySelector('#courseDialog .academy-dialog-paper')
+      .getAnimations()
+      .every(animation => animation.playState === 'finished')
+  ));
+  await page.click('[data-course-enroll]');
+  const courseNotice = await page.$eval('#courseDialog .academy-dialog-note', node => node.textContent);
+  await page.keyboard.press('Escape');
+
+  const boardTools = await page.evaluate(() => ({
+    categories: [...document.querySelectorAll('[data-board-categories] button')]
+      .map(node => node.textContent.trim()),
+    searchType: document.querySelector('#academyBoardSearch').type,
+    listItems: [...document.querySelectorAll('.academy-board-item')].map(item => ({
+      tag: item.tagName.toLowerCase(),
+      role: item.getAttribute('role'),
+      buttonTag: item.querySelector('.academy-board-row').tagName.toLowerCase(),
+      buttonRole: item.querySelector('.academy-board-row').getAttribute('role')
+    }))
+  }));
+  await page.click('[data-board-category="대운"]');
+  await page.type('#academyBoardSearch', '교운기');
+  const filteredBoard = await page.$$eval(
+    '.academy-board-item:not([hidden]) .academy-board-title',
+    nodes => nodes.map(node => node.textContent.trim())
+  );
+  await page.click('[data-board-category="전체"]');
+  await page.$eval('#academyBoardSearch', input => {
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.click('[data-board-action="read"]');
+  const boardRead = await page.evaluate(() => ({
+    title: document.querySelector('[data-board-read-title]').textContent.trim(),
+    readVisible: !document.querySelector('[data-board-read-view]').hidden,
+    writeHidden: document.querySelector('[data-board-write-view]').hidden,
+    detail: document.querySelector('[data-board-read-content]').textContent.trim()
+  }));
+  await page.keyboard.press('Escape');
+
   await page.click('[data-board-action="write"]');
+  const boardWrite = await page.evaluate(() => ({
+    readHidden: document.querySelector('[data-board-read-view]').hidden,
+    writeVisible: !document.querySelector('[data-board-write-view]').hidden
+  }));
   await page.click('#boardDialog button[type="submit"]');
   const boardNotice = await page.$eval('#boardDialog .academy-dialog-note', node => node.textContent);
   await page.keyboard.press('Escape');
 
   await page.click('[data-plan-id="full"]');
+  const paymentDetail = await page.evaluate(() => ({
+    methods: [...document.querySelectorAll('#paymentDialog input[name="method"]')]
+      .map(node => ({ value: node.value, type: node.type })),
+    personalInputs: document.querySelectorAll(
+      '#paymentDialog input[name="name"], #paymentDialog input[name="email"]'
+    ).length,
+    disclosure: document.querySelector('#paymentDialog [data-payment-disclosure]')
+      .textContent.trim()
+  }));
+  await page.waitForFunction(() => (
+    document.querySelector('#paymentDialog .academy-dialog-paper')
+      .getAnimations()
+      .every(animation => animation.playState === 'finished')
+  ));
   await page.click('#paymentDialog button[type="submit"]');
   const paymentNotice = await page.$eval('#paymentDialog .academy-dialog-note', node => node.textContent);
   await page.keyboard.press('Escape');
 
-  return { course, board, payment, boardNotice, paymentNotice };
+  return {
+    course,
+    board,
+    payment,
+    courseDetail,
+    courseNotice,
+    boardTools,
+    filteredBoard,
+    boardRead,
+    boardWrite,
+    boardNotice,
+    paymentDetail,
+    paymentNotice
+  };
 }
 
 async function inspectAccessibility(page) {
@@ -371,7 +576,7 @@ async function inspectAccessibility(page) {
       const node = document.activeElement;
       const computed = getComputedStyle(node);
       const ownRect = node.getBoundingClientRect();
-      const target = node.matches('input[type="checkbox"]')
+      const target = node.matches('input[type="checkbox"], input[type="radio"]')
         ? node.closest('label')
         : node;
       const targetRect = target.getBoundingClientRect();
@@ -424,12 +629,17 @@ async function inspectAccessibility(page) {
             && box.width > 0
             && box.height > 0;
         })
-        .map(node => ({
+        .map(node => {
+          const target = node.matches('input[type="radio"]') ? node.closest('label') : node;
+          return {
           element: node.id || node.getAttribute('aria-label') || node.name || node.textContent.trim(),
-          width: node.getBoundingClientRect().width,
-          height: node.getBoundingClientRect().height
-        }))
+          width: target.getBoundingClientRect().width,
+          height: target.getBoundingClientRect().height,
+          tabStop: !node.matches('input[type="radio"]') || node.checked
+          };
+        })
     );
+    const tabStopCount = controls.filter(control => control.tabStop).length;
 
     async function activeDialogStep() {
       return page.evaluate(selector => {
@@ -439,6 +649,10 @@ async function inspectAccessibility(page) {
           identity = 'close';
         } else if (active.matches('button[type="submit"]')) {
           identity = 'submit';
+        } else if (active.dataset.dialogAction) {
+          identity = active.dataset.dialogAction;
+        } else if (active.matches('input[type="radio"]')) {
+          identity = `input:${active.name}:${active.value}`;
         } else if (active.name) {
           identity = `${active.tagName.toLowerCase()}:${active.name}`;
         }
@@ -453,13 +667,13 @@ async function inspectAccessibility(page) {
     }
 
     const forwardCycle = [await activeDialogStep()];
-    for (let count = 0; count < controls.length; count += 1) {
+    for (let count = 0; count < tabStopCount; count += 1) {
       await page.keyboard.press('Tab');
       forwardCycle.push(await activeDialogStep());
     }
 
     const reverseCycle = [];
-    for (let count = 0; count < controls.length + 1; count += 1) {
+    for (let count = 0; count < tabStopCount + 1; count += 1) {
       await page.keyboard.down('Shift');
       await page.keyboard.press('Tab');
       await page.keyboard.up('Shift');
@@ -507,6 +721,15 @@ async function inspectAccessibility(page) {
   ]) {
     journey.form.push(await tabUntil(selector));
   }
+  await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.birth.value = '19860219';
+    form.elements.time.value = '1430';
+  });
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#academyPillars:not([hidden])');
+  journey.pillarButton = await tabUntil('[data-pillar="year"]');
+  dialogs.pillar = await dialogJourney('[data-pillar="year"]', '#pillarDialog');
   journey.boardTrigger = await tabUntil('[data-board-action="write"]');
   dialogs.board = await dialogJourney('[data-board-action="write"]', '#boardDialog');
   journey.paymentTrigger = await tabUntil('[data-plan-id="foundation"]');
@@ -560,10 +783,27 @@ async function inspectAccessibility(page) {
 async function inspectAcademyManse(page) {
   await page.setViewport({ width: 1280, height: 720 });
   await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
-  await page.type('#academyBirth', '19860219');
-  await page.type('#academyTime', '1430');
-  await page.click('#academyCalculate');
-  await page.waitForSelector('#academyPillars:not([hidden])');
+  await page.waitForFunction(() => (
+    typeof window.AcademyManse?.calculateFromForm === 'function'
+    && typeof window.ManseryeokAdapter?.calculate === 'function'
+  ));
+  await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.birth.value = '19860219';
+    form.elements.time.value = '1430';
+    const calculate = document.querySelector('#academyCalculate');
+    calculate.focus();
+    calculate.click();
+  });
+  await page.waitForFunction(() => (
+    !document.querySelector('#academyPillars').hidden
+    || !document.querySelector('#academyManseError').hidden
+  ));
+  const initialError = await page.$eval(
+    '#academyManseError',
+    node => ({ hidden: node.hidden, text: node.textContent.trim() })
+  );
+  assert.equal(initialError.hidden, true, `initial Manseryeok calculation failed: ${initialError.text}`);
 
   const basic = await page.evaluate(() => ({
     pillars: [...document.querySelectorAll('[data-pillar-value]')].map(node => node.textContent),
@@ -573,7 +813,72 @@ async function inspectAcademyManse(page) {
     })),
     academyApi: typeof window.AcademyManse?.calculateFromForm,
     adapterApi: typeof window.ManseryeokAdapter?.calculate,
-    adapterAlias: window.ManseryeokAdapter === window.LegendGanji
+    adapterAlias: window.ManseryeokAdapter === window.LegendGanji,
+    status: {
+      role: document.querySelector('#academyManseStatus').getAttribute('role'),
+      live: document.querySelector('#academyManseStatus').getAttribute('aria-live'),
+      atomic: document.querySelector('#academyManseStatus').getAttribute('aria-atomic'),
+      text: document.querySelector('#academyManseStatus').textContent.trim(),
+      focusedId: document.activeElement.id
+    },
+    provenance: Object.fromEntries(
+      [...document.querySelectorAll('[data-provenance]')]
+        .map(node => [node.dataset.provenance, node.textContent.trim()])
+    ),
+    historicalNoticeHidden: document.querySelector('#academyHistoricalNotice').hidden,
+    engaged: document.body.classList.contains('is-manse-engaged'),
+    pillarCards: [...document.querySelectorAll('.academy-pillar-card')].map(card => ({
+      tag: card.tagName.toLowerCase(),
+      element: card.dataset.element,
+      animation: getComputedStyle(card).animationName
+    }))
+  }));
+
+  await page.waitForFunction(() => (
+    document.querySelector('[data-pillar="year"]')
+      .getAnimations()
+      .every(animation => animation.playState === 'finished')
+  ));
+  await page.$eval(
+    '[data-pillar="year"]',
+    node => node.scrollIntoView({ block: 'center', behavior: 'auto' })
+  );
+  await page.$eval('[data-pillar="year"]', node => node.click());
+  const pillarLearning = await page.evaluate(() => ({
+    open: document.querySelector('#pillarDialog').open,
+    title: document.querySelector('#pillarDialogTitle').textContent.trim(),
+    concepts: [...document.querySelectorAll('[data-pillar-concept]')]
+      .map(node => node.dataset.pillarConcept),
+    value: document.querySelector('[data-pillar-dialog-value]').textContent.trim()
+  }));
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => (
+    !document.querySelector('#pillarDialog').open
+    && document.activeElement === document.querySelector('[data-pillar="year"]')
+  ));
+  const pillarFocusRestored = await page.$eval(
+    '[data-pillar="year"]',
+    node => document.activeElement === node
+  );
+
+  await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.calendar.value = 'solar';
+    form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
+    form.elements.birth.value = '19000101';
+    form.elements.time.value = '1200';
+    form.elements.unknown.checked = false;
+    form.elements.unknown.dispatchEvent(new Event('change', { bubbles: true }));
+    window.AcademyManse.calculateFromForm();
+  });
+  const historicalProvenance = await page.evaluate(() => ({
+    resultHidden: document.querySelector('#academyManseResult').hidden,
+    fields: Object.fromEntries(
+      [...document.querySelectorAll('[data-provenance]')]
+        .map(node => [node.dataset.provenance, node.textContent.trim()])
+    ),
+    noticeHidden: document.querySelector('#academyHistoricalNotice').hidden,
+    notice: document.querySelector('#academyHistoricalNotice').textContent.trim()
   }));
 
   const solarLunarControl = await page.evaluate(() => ({
@@ -815,6 +1120,9 @@ async function inspectAcademyManse(page) {
 
   return {
     basic,
+    pillarLearning,
+    pillarFocusRestored,
+    historicalProvenance,
     solarLunarControl,
     lunarControl,
     validLeap,
@@ -878,6 +1186,42 @@ async function main() {
       assert.equal(result.basic.academyApi, 'function');
       assert.equal(result.basic.adapterApi, 'function');
       assert.equal(result.basic.adapterAlias, true);
+      assert.deepEqual(result.basic.status, {
+        role: 'status',
+        live: 'polite',
+        atomic: 'true',
+        text: '계산이 완료되었습니다. 네 기둥 학습표가 열렸습니다.',
+        focusedId: 'academyCalculate'
+      });
+      assert.deepEqual(result.basic.provenance, {
+        mode: 'KASI 절기 기반 정밀 계산',
+        'time-standard': '한국 표준시 변천 반영',
+        'day-boundary': '자정(00:00) 기준',
+        basis: '연·월: 당시 민간시 절기 · 일·시: 입력 시계 시각'
+      });
+      assert.equal(result.basic.historicalNoticeHidden, true);
+      assert.equal(result.basic.engaged, true);
+      assert.ok(result.basic.pillarCards.every(card => card.tag === 'button'));
+      assert.ok(result.basic.pillarCards.every(card => card.element));
+      assert.ok(result.basic.pillarCards.every(card => card.animation === 'academy-pillar-drop'));
+      assert.deepEqual(result.pillarLearning, {
+        open: true,
+        title: '년주 병인 학습',
+        concepts: ['천간', '지지', '오행', '십성'],
+        value: '병인'
+      });
+      assert.equal(result.pillarFocusRestored, true);
+      assert.deepEqual(result.historicalProvenance, {
+        resultHidden: false,
+        fields: {
+          mode: 'KASI 절기 기반 근사 계산',
+          'time-standard': 'UTC+9(KST) 고정 근사',
+          'day-boundary': '자정(00:00) 기준',
+          basis: '연·월: UTC+9 고정 절기 · 일·시: 입력 시계 시각'
+        },
+        noticeHidden: false,
+        notice: '1908년 4월 1일 이전 기록은 당시 전국 표준시 자료가 없어 UTC+9(KST) 고정값으로 근사 계산합니다.'
+      });
       assert.deepEqual(result.solarLunarControl, {
         hidden: true,
         disabled: true
@@ -952,7 +1296,33 @@ async function main() {
         assert.equal(result.opened.focused, true, `${name}: close button receives focus`);
         assert.equal(result.restored, true, `${name}: trigger focus restores after close`);
       }
+      assert.equal(dialogs.courseDetail.curriculum.length, 3);
+      assert.equal(dialogs.courseDetail.previewVisible, true);
+      assert.equal(dialogs.courseDetail.enrollText, '수강 흐름 체험하기');
+      assert.equal(dialogs.courseDetail.paperAnimation, 'academy-dialog-open');
+      assert.match(dialogs.courseNotice, /신청하거나 저장하지 않습니다/);
+      assert.deepEqual(dialogs.boardTools.categories, ['전체', '원국', '대운', '오행', '9운', '학습']);
+      assert.equal(dialogs.boardTools.searchType, 'search');
+      assert.ok(dialogs.boardTools.listItems.every(item => (
+        item.tag === 'li'
+        && item.role === null
+        && item.buttonTag === 'button'
+        && item.buttonRole === null
+      )));
+      assert.deepEqual(dialogs.filteredBoard, ['교운기는 몇 년으로 보고 준비하면 좋을까요?']);
+      assert.equal(dialogs.boardRead.readVisible, true);
+      assert.equal(dialogs.boardRead.writeHidden, true);
+      assert.match(dialogs.boardRead.title, /월지와 일간/);
+      assert.match(dialogs.boardRead.detail, /월지의 계절/);
+      assert.deepEqual(dialogs.boardWrite, { readHidden: true, writeVisible: true });
       assert.match(dialogs.boardNotice, /저장되지 않/);
+      assert.equal(dialogs.paymentDetail.methods.length, 3);
+      assert.ok(dialogs.paymentDetail.methods.every(method => method.type === 'radio'));
+      assert.equal(dialogs.paymentDetail.personalInputs, 0);
+      assert.equal(
+        dialogs.paymentDetail.disclosure,
+        '현재는 시연 화면이며 결제가 발생하지 않습니다'
+      );
       assert.match(dialogs.paymentNotice, /실제 결제가 발생하지 않/);
       assert.deepEqual(errors, [], `browser console errors:\n${errors.join('\n')}`);
       console.log('Academy mockup dialogs passed');
@@ -962,10 +1332,29 @@ async function main() {
     for (const viewport of viewports) {
       const result = await inspectLayout(page, viewport);
       assert.equal(result.mastheadPosition, 'fixed', `${viewport.name}: masthead must stay fixed`);
-      assert.equal(result.orbitNodes, 9, `${viewport.name}: nine orbit nodes`);
-      assert.equal(result.parallaxLayers, 3, `${viewport.name}: three mountain layers`);
+      assert.equal(result.seasonalHero.sceneCount, 4, `${viewport.name}: four seasonal scenes`);
+      assert.equal(result.seasonalHero.activeScenes, 1, `${viewport.name}: one seasonal scene`);
+      assert.equal(result.seasonalHero.loaded, true, `${viewport.name}: seasonal images loaded`);
+      assert.equal(result.seasonalHero.orbitCount, 0, `${viewport.name}: no nine-period orbit`);
+      assert.equal(result.seasonalHero.statusRole, 'status', `${viewport.name}: status role`);
+      assert.equal(result.seasonalHero.statusLive, 'polite', `${viewport.name}: polite status`);
+      assert.equal(result.seasonalHero.controls.length, 3, `${viewport.name}: restrained controls`);
+      assert.ok(
+        result.seasonalHero.controls.every(control => (
+          control.rect.width >= 44
+          && control.rect.height >= 44
+          && control.label
+        )),
+        `${viewport.name}: slideshow controls are labelled 44px targets`
+      );
+      assert.equal(result.parallaxLayers, 4, `${viewport.name}: four seasonal drift layers`);
       assert.equal(result.mistBands, 2, `${viewport.name}: two mist bands`);
       assert.equal(result.titleText, '취명선 명리학당', `${viewport.name}: readable Korean title`);
+      assert.ok(
+        result.titleUnderline.content === 'none' || result.titleUnderline.content === 'normal',
+        `${viewport.name}: Chwimyeongseon title has no decorative underline`
+      );
+      assert.equal(result.titleUnderline.height, 0, `${viewport.name}: title underline has no height`);
       assert.ok(result.hero.top >= result.masthead.bottom - 1, `${viewport.name}: hero below masthead`);
       assert.ok(result.title.top >= result.masthead.bottom - 1, `${viewport.name}: title below masthead`);
       assert.equal(result.ctaRects.length, 2, `${viewport.name}: renders both hero CTAs`);
@@ -984,9 +1373,37 @@ async function main() {
       if (viewport.width < 768) {
         assert.equal(
           result.navViewport.horizontallyScrollable,
-          true,
-          `${viewport.name}: compact navigation preserves intentional internal scrolling`
+          false,
+          `${viewport.name}: compact navigation exposes every destination without scrolling`
         );
+        assert.equal(result.navViewport.visibleDestinations, 6, `${viewport.name}: all destinations visible`);
+        assert.equal(result.navViewport.columns, 3, `${viewport.name}: navigation uses a three-column grid`);
+      }
+      assert.equal(result.scrollGuide.visible, true, `${viewport.name}: scroll guide remains visible`);
+      assert.ok(result.scrollGuide.rect.width >= 44, `${viewport.name}: scroll guide has a 44px target`);
+      assert.ok(result.scrollGuide.rect.height >= 44, `${viewport.name}: scroll guide has a 44px target`);
+      assert.ok(
+        result.scrollGuide.rect.bottom <= viewport.height,
+        `${viewport.name}: scroll guide is fully visible in the first viewport`
+      );
+      const guideOverlapWidth = Math.max(
+        0,
+        Math.min(result.facts.right, result.scrollGuide.rect.right)
+          - Math.max(result.facts.left, result.scrollGuide.rect.left)
+      );
+      const guideOverlapHeight = Math.max(
+        0,
+        Math.min(result.facts.bottom, result.scrollGuide.rect.bottom)
+          - Math.max(result.facts.top, result.scrollGuide.rect.top)
+      );
+      assert.equal(
+        guideOverlapWidth * guideOverlapHeight,
+        0,
+        `${viewport.name}: facts and scroll guide do not overlap`
+      );
+      if (viewport.width >= 768) {
+        assert.equal(result.sealAnimation.name, 'academy-seal-stamp', `${viewport.name}: seal stamps once`);
+        assert.equal(result.sealAnimation.iterations, '1', `${viewport.name}: seal entrance is one-shot`);
       }
       assert.deepEqual(
         result.touchTargetFailures,
@@ -1004,10 +1421,22 @@ async function main() {
         `${viewport.name}: visible non-decorative elements stay within the viewport:\n${JSON.stringify(result.horizontalContainmentFailures, null, 2)}`
       );
       if (viewport.width >= 768) {
-        assert.ok(result.orbit.top >= result.masthead.bottom - 1, `${viewport.name}: orbit below masthead`);
-        assert.ok(result.orbit.right <= viewport.width + 1, `${viewport.name}: orbit right edge visible`);
-        assert.ok(result.orbit.bottom <= viewport.height + 1, `${viewport.name}: orbit bottom visible`);
-        assert.ok(result.orbit.left >= -1, `${viewport.name}: orbit left edge visible`);
+        assert.ok(
+          result.seasonalHero.rect.top >= result.masthead.bottom - 1,
+          `${viewport.name}: seasonal hero below masthead`
+        );
+        assert.ok(
+          result.seasonalHero.rect.right <= viewport.width + 1,
+          `${viewport.name}: seasonal hero right edge visible`
+        );
+        assert.ok(
+          result.seasonalHero.rect.bottom <= viewport.height + 1,
+          `${viewport.name}: seasonal hero bottom visible`
+        );
+        assert.ok(
+          result.seasonalHero.rect.left >= -1,
+          `${viewport.name}: seasonal hero left edge visible`
+        );
       }
       assert.equal(result.horizontalOverflow, 0, `${viewport.name}: no horizontal overflow`);
 
@@ -1029,6 +1458,7 @@ async function main() {
       accessibility.journey.heroCta,
       accessibility.journey.courseButton,
       ...accessibility.journey.form,
+      accessibility.journey.pillarButton,
       accessibility.journey.boardTrigger,
       accessibility.journey.paymentTrigger
     ];
@@ -1047,6 +1477,10 @@ async function main() {
     );
     const expectedDialogOrders = {
       course: {
+        forward: ['close', 'course-enroll', 'close'],
+        reverse: ['course-enroll', 'close', 'course-enroll']
+      },
+      pillar: {
         forward: ['close', 'close'],
         reverse: ['close', 'close']
       },
@@ -1055,8 +1489,18 @@ async function main() {
         reverse: ['submit', 'textarea:content', 'input:title', 'close', 'submit']
       },
       payment: {
-        forward: ['close', 'input:name', 'input:email', 'submit', 'close'],
-        reverse: ['submit', 'input:email', 'input:name', 'close', 'submit']
+        forward: [
+          'close',
+          'input:method:card',
+          'submit',
+          'close'
+        ],
+        reverse: [
+          'submit',
+          'input:method:card',
+          'close',
+          'submit'
+        ]
       }
     };
     for (const [name, dialog] of Object.entries(accessibility.dialogs)) {
@@ -1123,9 +1567,66 @@ async function main() {
     assert.equal(lifecycle.background.paused, true);
     assert.deepEqual(lifecycle.restored.listeners, { pointermove: 1, scroll: 1 });
     assert.equal(lifecycle.restored.paused, false);
+    assert.deepEqual(lifecycle.focused, {
+      engaged: true,
+      mist: 'paused',
+      season: 'paused',
+      slideshow: 'paused'
+    });
+    assert.deepEqual(lifecycle.unfocused, {
+      engaged: false,
+      mist: 'running',
+      season: 'running',
+      slideshow: 'running'
+    });
+    assert.deepEqual(lifecycle.reading, {
+      engaged: true,
+      mist: 'paused',
+      season: 'paused',
+      slideshow: 'paused'
+    });
+    assert.deepEqual(lifecycle.settled, {
+      engaged: false,
+      mist: 'running',
+      season: 'running',
+      slideshow: 'running'
+    });
+    assert.equal(lifecycle.active.slideshow, 'running');
+    assert.equal(lifecycle.background.slideshow, 'paused');
+    assert.equal(lifecycle.restored.slideshow, 'running');
+    assert.equal(lifecycle.hovered.slideshow, 'paused');
+    assert.equal(lifecycle.unhovered.slideshow, 'running');
+    assert.equal(lifecycle.slideshowFocused.slideshow, 'paused');
+    assert.equal(lifecycle.slideshowUnfocused.slideshow, 'running');
+    assert.equal(lifecycle.initialIndex, '0');
+    assert.equal(lifecycle.nextIndex, '1');
+    assert.match(lifecycle.nextStatus, /여름.*2\s*\/\s*4/);
+    assert.equal(lifecycle.userPaused.slideshow, 'paused');
+    assert.equal(lifecycle.togglePressed, 'true');
+    assert.equal(lifecycle.userResumed.slideshow, 'running');
+
+    const automaticSeason = await inspectAutomaticSeasonCycle(page);
+    assert.deepEqual(automaticSeason, {
+      index: '1',
+      state: 'running',
+      activeScenes: 1,
+      status: '여름 수묵 장면 · 2 / 4'
+    });
 
     const reduced = await inspectReducedMotion(page);
-    for (const key of ['mist', 'orbit', 'parallax', 'ink', 'reveal']) {
+    for (const key of [
+      'mist',
+      'season',
+      'seasonImage',
+      'parallax',
+      'ink',
+      'seal',
+      'guide',
+      'course',
+      'pillar',
+      'dialog',
+      'reveal'
+    ]) {
       assert.equal(reduced[key].animationName, 'none', `${key}: animation disabled`);
       assert.equal(reduced[key].transform, 'none', `${key}: transform disabled`);
     }
@@ -1135,6 +1636,9 @@ async function main() {
     assert.equal(reduced.pointerX, '0');
     assert.equal(reduced.pointerY, '0');
     assert.equal(reduced.scrollDepth, '0');
+    assert.equal(reduced.seasonIndex, '0', 'reduced motion keeps the first scene');
+    assert.equal(reduced.seasonState, 'reduced', 'reduced motion exposes a static state');
+    assert.equal(reduced.seasonControlsDisabled, true, 'reduced motion disables slideshow controls');
 
     const release = await inspectOfflineRelease(page);
     assert.match(release.online.scope, /\/palpum-manse\/academy\/$/, 'academy worker scope stays under academy');
@@ -1157,7 +1661,10 @@ async function main() {
       '/palpum-manse/academy/scripts/academy-mockups.js',
       '/palpum-manse/academy/scripts/academy-manse.js',
       '/palpum-manse/academy/manifest.webmanifest',
-      '/palpum-manse/assets/legend-landscape.webp',
+      '/palpum-manse/academy/assets/season-spring.jpg',
+      '/palpum-manse/academy/assets/season-summer.jpg',
+      '/palpum-manse/academy/assets/season-autumn.jpg',
+      '/palpum-manse/academy/assets/season-winter.jpg',
       '/palpum-manse/assets/legend-seal.webp',
       '/palpum-manse/scripts/vendor/manseryeok.browser.js',
       '/palpum-manse/scripts/manseryeok-adapter.js'

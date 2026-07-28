@@ -7,7 +7,9 @@
     "test:core": "node --test tests/*.test.js",
     "test:ui": "node tests/ui-regression.js",
     "test:academy-ui": "node tests/academy-ui.js",
-    "test": "npm run test:core && npm run test:ui && npm run test:academy-ui"
+    "test:academy-manse": "node -e \"process.env.TEST_GROUP='academy-manse'; require('./tests/academy-ui.js')\"",
+    "test:academy-dialogs": "node -e \"process.env.TEST_GROUP='academy-dialogs'; require('./tests/academy-ui.js')\"",
+    "test": "npm run test:core && npm run test:ui && npm run test:academy-ui && npm run test:academy-manse && npm run test:academy-dialogs"
   },
   "dependencies": {
     "manseryeok": "2.0.0"

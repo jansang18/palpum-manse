@@ -1,4 +1,4 @@
-const VERSION = 'v1-20260728';
+const VERSION = 'v3-20260728-seasonal-hero';
 const CACHE_PREFIX = 'chwimyeongseon-academy-';
 const CACHE = CACHE_PREFIX + VERSION;
 const SCOPE_URL = new URL(self.registration.scope);
@@ -11,8 +11,11 @@ const PRECACHE = [
   './scripts/academy-motion.js',
   './scripts/academy-mockups.js',
   './scripts/academy-manse.js',
+  './assets/season-spring.jpg',
+  './assets/season-summer.jpg',
+  './assets/season-autumn.jpg',
+  './assets/season-winter.jpg',
   './manifest.webmanifest',
-  '../assets/legend-landscape.webp',
   '../assets/legend-seal.webp',
   '../scripts/vendor/manseryeok.browser.js',
   '../scripts/manseryeok-adapter.js',
@@ -23,7 +26,6 @@ const PRECACHE = [
 // These shared files are used only by the Academy client. Root apps retain their
 // own worker and cache namespace even though the files live one directory above.
 const SHARED_RUNTIME_PATHS = new Set([
-  '../assets/legend-landscape.webp',
   '../assets/legend-seal.webp',
   '../scripts/vendor/manseryeok.browser.js',
   '../scripts/manseryeok-adapter.js',
@@ -54,6 +56,7 @@ function writeAcademyCache(event, request, responseCopy) {
 }
 
 function cloneAndWriteAcademyCache(event, request, response) {
+  if (!response.ok) return;
   let responseCopy;
   try {
     // Clone before any asynchronous cache operation can yield the response body.

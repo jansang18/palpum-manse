@@ -49,13 +49,52 @@ test('academy service worker owns only academy scope, cache keys, and runtime as
   for (const asset of [
     './', './index.html', './styles/academy.css', './scripts/academy-nav.js',
     './scripts/academy-motion.js', './scripts/academy-mockups.js',
-    './scripts/academy-manse.js', '../assets/legend-landscape.webp',
-    '../assets/legend-seal.webp', '../scripts/vendor/manseryeok.browser.js',
+    './scripts/academy-manse.js', './assets/season-spring.jpg',
+    './assets/season-summer.jpg', './assets/season-autumn.jpg',
+    './assets/season-winter.jpg', '../assets/legend-seal.webp',
+    '../scripts/vendor/manseryeok.browser.js',
     '../scripts/manseryeok-adapter.js', './manifest.webmanifest',
     '../icon-192.png', '../icon-512.png'
   ]) {
     assert.match(sw, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+});
+
+test('hero uses four academy-owned seasonal scenes and no nine-period orbit', () => {
+  const assets = [
+    'season-spring.jpg',
+    'season-summer.jpg',
+    'season-autumn.jpg',
+    'season-winter.jpg'
+  ];
+
+  assert.equal((html.match(/class="academy-season-scene/g) || []).length, 4);
+  assert.equal((html.match(/class="academy-season-scene is-active"/g) || []).length, 1);
+  assert.doesNotMatch(html, /academy-orbit|academy-orbit-node|academy-orbit-core/);
+  assert.doesNotMatch(css, /academy-orbit|academy-orbit-turn/);
+
+  for (const asset of assets) {
+    assert.match(html, new RegExp(`assets/${asset}`));
+    assert.ok(
+      fs.existsSync(path.join(__dirname, '..', 'academy', 'assets', asset)),
+      `${asset} must be copied into Academy-owned assets`
+    );
+  }
+
+  assert.match(
+    html,
+    /data-season-slideshow[^>]*role="region"[^>]*aria-label="사계절 수묵 장면"/
+  );
+  assert.match(
+    html,
+    /id="academySeasonStatus"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/
+  );
+  assert.match(html, /id="academySeasonPrevious"[^>]*aria-label="이전 계절 장면"/);
+  assert.match(html, /id="academySeasonNext"[^>]*aria-label="다음 계절 장면"/);
+  assert.match(
+    html,
+    /id="academySeasonToggle"[^>]*aria-label="계절 장면 일시정지"[^>]*aria-pressed="false"/
+  );
 });
 
 test('academy exposes every approved section and mockup disclosure', () => {
@@ -133,7 +172,7 @@ test('academy includes four curriculum tracks and safely disclosed mockup dialog
     assert.match(html, new RegExp(`id="${dialogId}"`));
   }
 
-  assert.match(html, /실제 결제가 발생하지 않습니다/);
+  assert.match(html, /현재는 시연 화면이며 결제가 발생하지 않습니다/);
   assert.match(html, /작성 내용은 저장되지 않습니다/);
   assert.match(html, /scripts\/academy-mockups\.js/);
   assert.match(mockups, /window\.AcademyMockups\s*=/);
@@ -142,6 +181,51 @@ test('academy includes four curriculum tracks and safely disclosed mockup dialog
     /flow:\s*\{[\s\S]*?title:\s*'대운·세운·월운'/,
     'course dialog data must use the approved third-course title'
   );
+});
+
+test('academy implements the complete nonpersistent learning mockups', () => {
+  assert.match(html, /data-course-curriculum/);
+  assert.match(html, /data-course-preview/);
+  assert.match(html, /data-course-enroll/);
+  assert.match(html, /data-board-categories/);
+  assert.match(html, /id="academyBoardSearch"[^>]*type="search"/);
+  assert.match(html, /data-board-read-view/);
+  assert.match(html, /data-board-write-view/);
+  assert.match(html, /name="method"[^>]*type="radio"/);
+  assert.doesNotMatch(html, /data-payment-form[\s\S]*name="(?:name|email)"/);
+  assert.match(html, /id="pillarDialog"/);
+  for (const concept of ['천간', '지지', '오행', '십성']) {
+    assert.match(html, new RegExp(`data-pillar-concept="${concept}"`));
+  }
+  assert.doesNotMatch(mockups, /\b(?:localStorage|sessionStorage|fetch|XMLHttpRequest)\b/);
+});
+
+test('board list semantics preserve native button roles', () => {
+  assert.match(html, /<ul class="academy-board-list"[^>]*>/);
+  assert.equal((html.match(/<li class="academy-board-item"/g) || []).length, 5);
+  assert.equal((html.match(/class="academy-board-row"[^>]*role=/g) || []).length, 0);
+  assert.equal((html.match(/class="academy-board-row"/g) || []).length, 5);
+});
+
+test('successful Manseryeok output has a concise status and calculation provenance', () => {
+  assert.match(
+    html,
+    /id="academyManseStatus"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/
+  );
+  for (const field of ['mode', 'time-standard', 'day-boundary', 'basis']) {
+    assert.match(html, new RegExp(`data-provenance="${field}"`));
+  }
+  assert.match(html, /id="academyHistoricalNotice"/);
+  assert.match(manse, /calculationMode/);
+  assert.match(manse, /timeStandard/);
+  assert.match(manse, /dayBoundary/);
+  assert.match(manse, /calculationBasis/);
+  assert.match(manse, /1908년 4월 1일 이전/);
+  assert.match(manse, /UTC\+9\(KST\)/);
+});
+
+test('hero emphasis does not use a red underline beneath Chwimyeongseon', () => {
+  assert.doesNotMatch(css, /\.academy-title-ink::after/);
 });
 
 test('academy loads a working basic Manseryeok after the verified browser adapter', () => {

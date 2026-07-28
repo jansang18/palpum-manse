@@ -6,13 +6,16 @@ const vm = require('node:vm');
 
 const serviceWorker = fs.readFileSync(path.join(__dirname, '..', 'academy', 'sw.js'), 'utf8');
 const scope = 'https://example.test/palpum-manse/academy/';
-const academyCacheName = 'chwimyeongseon-academy-v1-20260728';
+const academyCacheName = 'chwimyeongseon-academy-v3-20260728-seasonal-hero';
 
-function response(body) {
+function response(body, init = {}) {
+  const status = init.status ?? 200;
   return {
     body,
+    status,
+    ok: status >= 200 && status < 300,
     clone() {
-      return response(body);
+      return response(body, { status });
     }
   };
 }
@@ -23,6 +26,8 @@ function disturbableResponse(body) {
   return {
     value: {
       body,
+      status: 200,
+      ok: true,
       clone() {
         if (disturbed) throw new Error('response body is already disturbed');
         cloneCalls += 1;
@@ -241,6 +246,68 @@ test('academy runtime cache writes use fetch lifetime and do not fail the respon
   assert.equal(result.waitUntilCount, 1);
   await result.settle;
   assert.ok(runtime.events.some(event => event.type === 'put' && event.name === academyCacheName));
+});
+
+test('academy never caches unsuccessful document, code, or asset responses', async () => {
+  const scenarios = [
+    {
+      name: '404 document',
+      network: response('missing document', { status: 404 }),
+      request: {
+        url: `${scope}missing/`,
+        method: 'GET',
+        mode: 'navigate',
+        destination: 'document'
+      }
+    },
+    {
+      name: '500 document',
+      network: response('document error', { status: 500 }),
+      request: {
+        url: `${scope}broken/`,
+        method: 'GET',
+        mode: 'navigate',
+        destination: 'document'
+      }
+    },
+    {
+      name: '404 code',
+      network: response('missing code', { status: 404 }),
+      request: {
+        url: `${scope}scripts/missing.js`,
+        method: 'GET',
+        mode: 'cors',
+        destination: 'script'
+      }
+    },
+    {
+      name: '500 asset',
+      network: response('asset error', { status: 500 }),
+      request: {
+        url: `${scope}assets/broken.webp`,
+        method: 'GET',
+        mode: 'cors',
+        destination: 'image'
+      }
+    }
+  ];
+
+  for (const scenario of scenarios) {
+    const runtime = createWorkerRuntime({
+      fetch: () => Promise.resolve(scenario.network)
+    });
+    const result = await runtime.dispatchFetch(scenario.request);
+
+    assert.equal(result.intercepted, true, `${scenario.name}: request is handled`);
+    assert.equal(result.value, scenario.network, `${scenario.name}: network status is returned`);
+    await result.settle;
+    assert.equal(result.waitUntilCount, 0, `${scenario.name}: no cache write lifetime is added`);
+    assert.equal(
+      runtime.events.some(event => event.type === 'put'),
+      false,
+      `${scenario.name}: unsuccessful response is not cached`
+    );
+  }
 });
 
 test('academy clones network responses before delayed cache writes for documents and assets', async () => {

@@ -45,18 +45,46 @@
   <main id="academyMain" tabindex="-1">
     <section id="academyHome" class="academy-section academy-home" aria-labelledby="academyHomeTitle">
       <div class="academy-home-art" aria-hidden="true">
-        <div class="academy-mountain academy-mountain-far" data-parallax-layer>
-          <img src="../assets/legend-landscape.webp" alt="">
-        </div>
-        <div class="academy-mountain academy-mountain-mid" data-parallax-layer>
-          <img src="../assets/legend-landscape.webp" alt="">
-        </div>
-        <div class="academy-mountain academy-mountain-near" data-parallax-layer>
-          <img src="../assets/legend-landscape.webp" alt="">
-        </div>
         <div class="academy-mist academy-mist-high"></div>
         <div class="academy-mist academy-mist-low"></div>
-        <span class="academy-vermillion-sun"></span>
+      </div>
+
+      <div
+        id="academySeasonStage"
+        class="academy-season-stage"
+        data-season-slideshow
+        role="region"
+        aria-label="사계절 수묵 장면"
+        aria-roledescription="슬라이드 쇼"
+        data-season-index="0"
+        data-state="running"
+      >
+        <div class="academy-season-viewport" aria-hidden="true">
+          <figure class="academy-season-scene is-active" data-season="봄" aria-hidden="false">
+            <img src="assets/season-spring.jpg" alt="" width="1280" height="720" data-parallax-layer>
+          </figure>
+          <figure class="academy-season-scene" data-season="여름" aria-hidden="true">
+            <img src="assets/season-summer.jpg" alt="" width="1280" height="720" data-parallax-layer>
+          </figure>
+          <figure class="academy-season-scene" data-season="가을" aria-hidden="true">
+            <img src="assets/season-autumn.jpg" alt="" width="1280" height="720" data-parallax-layer>
+          </figure>
+          <figure class="academy-season-scene" data-season="겨울" aria-hidden="true">
+            <img src="assets/season-winter.jpg" alt="" width="1280" height="720" data-parallax-layer>
+          </figure>
+        </div>
+        <div class="academy-season-controls">
+          <button id="academySeasonPrevious" type="button" aria-label="이전 계절 장면">
+            <span aria-hidden="true">‹</span>
+          </button>
+          <p id="academySeasonStatus" role="status" aria-live="polite" aria-atomic="true">봄 수묵 장면 · 1 / 4</p>
+          <button id="academySeasonNext" type="button" aria-label="다음 계절 장면">
+            <span aria-hidden="true">›</span>
+          </button>
+          <button id="academySeasonToggle" type="button" aria-label="계절 장면 일시정지" aria-pressed="false">
+            <span aria-hidden="true" data-season-toggle-icon>Ⅱ</span>
+          </button>
+        </div>
       </div>
 
       <div class="academy-content academy-home-layout">
@@ -69,7 +97,7 @@
           <p class="academy-home-lead">태어난 순간에 새겨진 네 기둥을 읽고, 시간에 따라 달라지는 운의 결을 천천히 익힙니다.</p>
           <div class="academy-home-actions">
             <a class="academy-button" href="#academyCourses" data-academy-target="academyCourses">명리 공부 시작하기</a>
-            <a class="academy-button academy-button-ghost" href="#academyManse" data-academy-target="academyManse">기본 만세력 살펴보기</a>
+            <a class="academy-button academy-button-ghost" href="#academyManse" data-academy-target="academyManse">내 사주 펼쳐보기</a>
           </div>
           <dl class="academy-home-facts" aria-label="학당의 학습 범위">
             <div>
@@ -86,28 +114,13 @@
             </div>
           </dl>
         </div>
-
-        <div class="academy-orbit-stage" aria-hidden="true">
-          <div class="academy-orbit" aria-hidden="true">
-            <div class="academy-orbit-ring">
-              <span class="academy-orbit-node">一</span>
-              <span class="academy-orbit-node">二</span>
-              <span class="academy-orbit-node">三</span>
-              <span class="academy-orbit-node">四</span>
-              <span class="academy-orbit-node">五</span>
-              <span class="academy-orbit-node">六</span>
-              <span class="academy-orbit-node">七</span>
-              <span class="academy-orbit-node">八</span>
-              <span class="academy-orbit-node academy-orbit-node-current">九</span>
-            </div>
-            <div class="academy-orbit-core">
-              <span>離</span>
-              <small>下元 九運</small>
-            </div>
-          </div>
-          <img class="academy-hero-seal" src="../assets/legend-seal.webp" width="112" height="112" alt="">
-        </div>
+        <img class="academy-hero-seal" src="../assets/legend-seal.webp" width="112" height="112" alt="" data-seal-stamp>
       </div>
+      <a class="academy-scroll-guide" href="#academyCourses" data-academy-target="academyCourses">
+        <span>다음 장</span>
+        <strong>아래로 펼쳐보기</strong>
+        <i aria-hidden="true"></i>
+      </a>
     </section>
 
     <section id="academyCourses" class="academy-section" aria-labelledby="academyCoursesTitle">
@@ -211,6 +224,7 @@
             <div class="academy-manse-submit">
               <button id="academyCalculate" class="academy-button" type="submit">네 기둥 펼쳐보기</button>
               <p id="academyManseError" class="academy-manse-error" role="alert" hidden></p>
+              <p id="academyManseStatus" class="academy-visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
             </div>
           </form>
 
@@ -224,26 +238,26 @@
             </div>
 
             <div id="academyPillars" class="academy-pillar-grid" aria-label="사주 네 기둥" hidden>
-              <article class="academy-pillar-card" data-pillar="year">
+              <button class="academy-pillar-card" type="button" data-pillar="year" aria-haspopup="dialog" aria-label="년주 학습 설명 열기">
                 <span>년주</span>
                 <strong data-pillar-value></strong>
                 <small>태어난 해</small>
-              </article>
-              <article class="academy-pillar-card" data-pillar="month">
+              </button>
+              <button class="academy-pillar-card" type="button" data-pillar="month" aria-haspopup="dialog" aria-label="월주 학습 설명 열기">
                 <span>월주</span>
                 <strong data-pillar-value></strong>
                 <small>태어난 달의 절기</small>
-              </article>
-              <article class="academy-pillar-card" data-pillar="day">
+              </button>
+              <button class="academy-pillar-card" type="button" data-pillar="day" aria-haspopup="dialog" aria-label="일주 학습 설명 열기">
                 <span>일주</span>
                 <strong data-pillar-value></strong>
                 <small>태어난 날</small>
-              </article>
-              <article class="academy-pillar-card" data-pillar="hour">
+              </button>
+              <button class="academy-pillar-card" type="button" data-pillar="hour" aria-haspopup="dialog" aria-label="시주 학습 설명 열기">
                 <span>시주</span>
                 <strong data-pillar-value></strong>
                 <small>태어난 시간</small>
-              </article>
+              </button>
             </div>
 
             <div class="academy-luck-section">
@@ -254,6 +268,20 @@
               <p>대운은 십 년 단위 간지를 읽는 학습 자료이며, 사건을 단정하지 않습니다.</p>
               <div id="academyLuckFlow" class="academy-luck-flow" aria-label="대운 흐름" tabindex="0" hidden></div>
             </div>
+
+            <section id="academyProvenance" class="academy-provenance" aria-labelledby="academyProvenanceTitle">
+              <div>
+                <p class="academy-kicker">CALCULATION NOTE</p>
+                <h4 id="academyProvenanceTitle">계산 근거</h4>
+              </div>
+              <dl>
+                <div><dt>계산 방식</dt><dd data-provenance="mode"></dd></div>
+                <div><dt>시간 기준</dt><dd data-provenance="time-standard"></dd></div>
+                <div><dt>일 경계</dt><dd data-provenance="day-boundary"></dd></div>
+                <div><dt>적용 근거</dt><dd data-provenance="basis"></dd></div>
+              </dl>
+              <p id="academyHistoricalNotice" class="academy-historical-notice" hidden></p>
+            </section>
 
             <div class="academy-learning-notes" aria-label="명리 기초 학습 노트">
               <details>
@@ -297,13 +325,28 @@
         <h2 id="academyBoardTitle">질문 게시판</h2>
         <div class="academy-board-heading"><p>학습 중 생기는 질문과 풀이의 관점을 함께 나누는 공간입니다.</p><button class="academy-button academy-button-small" type="button" data-board-action="write">질문 남기기</button></div>
         <p class="academy-mockup-notice">교육용 목업입니다. 작성 내용은 저장되지 않습니다. 다른 사람에게 공개되지 않습니다.</p>
-        <div class="academy-board-list" role="list" aria-label="질문 게시판 예시">
-          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">원국</span><span class="academy-board-title">월지와 일간의 관계는 어떤 순서로 읽나요?</span><span class="academy-board-meta">소담 · 답변 4</span></button>
-          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">대운</span><span class="academy-board-title">교운기는 몇 년으로 보고 준비하면 좋을까요?</span><span class="academy-board-meta">윤슬 · 답변 7</span></button>
-          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">오행</span><span class="academy-board-title">토가 많을 때 무조건 답답하다고 해석해도 될까요?</span><span class="academy-board-meta">여울 · 답변 3</span></button>
-          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">9운</span><span class="academy-board-title">삼원구운은 개인 풀이에서 어디까지 적용하나요?</span><span class="academy-board-meta">산책자 · 답변 6</span></button>
-          <button type="button" class="academy-board-row" data-board-action="read" role="listitem"><span class="academy-board-tag">학습</span><span class="academy-board-title">초보자가 첫 원국을 읽을 때 놓치기 쉬운 점</span><span class="academy-board-meta">초록 · 답변 9</span></button>
+        <div class="academy-board-tools">
+          <div class="academy-board-categories" data-board-categories role="group" aria-label="게시판 카테고리">
+            <button type="button" data-board-category="전체" aria-pressed="true">전체</button>
+            <button type="button" data-board-category="원국" aria-pressed="false">원국</button>
+            <button type="button" data-board-category="대운" aria-pressed="false">대운</button>
+            <button type="button" data-board-category="오행" aria-pressed="false">오행</button>
+            <button type="button" data-board-category="9운" aria-pressed="false">9운</button>
+            <button type="button" data-board-category="학습" aria-pressed="false">학습</button>
+          </div>
+          <label class="academy-board-search" for="academyBoardSearch">
+            <span>질문 검색</span>
+            <input id="academyBoardSearch" type="search" placeholder="제목이나 분류를 검색하세요">
+          </label>
         </div>
+        <p id="academyBoardFilterStatus" class="academy-visually-hidden" role="status" aria-live="polite"></p>
+        <ul class="academy-board-list" aria-label="질문 게시판 예시">
+          <li class="academy-board-item" data-board-category-name="원국"><button type="button" class="academy-board-row" data-board-action="read" data-post-id="month-day"><span class="academy-board-tag">원국</span><span class="academy-board-title">월지와 일간의 관계는 어떤 순서로 읽나요?</span><span class="academy-board-meta">소담 · 답변 4</span></button></li>
+          <li class="academy-board-item" data-board-category-name="대운"><button type="button" class="academy-board-row" data-board-action="read" data-post-id="daeun"><span class="academy-board-tag">대운</span><span class="academy-board-title">교운기는 몇 년으로 보고 준비하면 좋을까요?</span><span class="academy-board-meta">윤슬 · 답변 7</span></button></li>
+          <li class="academy-board-item" data-board-category-name="오행"><button type="button" class="academy-board-row" data-board-action="read" data-post-id="elements"><span class="academy-board-tag">오행</span><span class="academy-board-title">토가 많을 때 무조건 답답하다고 해석해도 될까요?</span><span class="academy-board-meta">여울 · 답변 3</span></button></li>
+          <li class="academy-board-item" data-board-category-name="9운"><button type="button" class="academy-board-row" data-board-action="read" data-post-id="period"><span class="academy-board-tag">9운</span><span class="academy-board-title">삼원구운은 개인 풀이에서 어디까지 적용하나요?</span><span class="academy-board-meta">산책자 · 답변 6</span></button></li>
+          <li class="academy-board-item" data-board-category-name="학습"><button type="button" class="academy-board-row" data-board-action="read" data-post-id="beginner"><span class="academy-board-tag">학습</span><span class="academy-board-title">초보자가 첫 원국을 읽을 때 놓치기 쉬운 점</span><span class="academy-board-meta">초록 · 답변 9</span></button></li>
+        </ul>
       </div>
     </section>
 
@@ -326,18 +369,35 @@
       <button class="academy-dialog-close" type="button" data-dialog-close aria-label="강의 안내 닫기">×</button>
       <p class="academy-kicker">COURSE PREVIEW</p><h2 id="courseDialogTitle">과정 안내</h2>
       <p data-course-description>강의 정보를 불러오고 있습니다.</p>
+      <div class="academy-video-preview" data-course-preview role="img" aria-label="강의 미리보기 영상 프레임">
+        <span aria-hidden="true">▶</span>
+        <strong>미리보기 영상</strong>
+        <small>실제 영상은 재생되지 않는 교육용 프레임입니다.</small>
+      </div>
+      <h3 class="academy-dialog-subtitle">강의 목차</h3>
+      <ol class="academy-course-curriculum" data-course-curriculum></ol>
       <div class="academy-dialog-note">이 화면은 교육 홈페이지 목업입니다. 수강 신청이나 결제는 진행되지 않습니다.</div>
+      <button class="academy-button" type="button" data-course-enroll data-dialog-action="course-enroll">수강 흐름 체험하기</button>
     </div>
   </dialog>
   <dialog id="boardDialog" class="academy-dialog" aria-labelledby="boardDialogTitle">
     <form class="academy-dialog-paper" method="dialog" data-board-form>
       <button class="academy-dialog-close" type="button" data-dialog-close aria-label="게시판 목업 닫기">×</button>
       <p class="academy-kicker">COMMUNITY MOCKUP</p><h2 id="boardDialogTitle">질문을 남겨보세요</h2>
-      <p data-board-description>게시글 예시를 확인하는 화면입니다.</p>
-      <label class="academy-field">제목<input name="title" type="text" placeholder="예: 대운의 흐름을 읽는 순서" autocomplete="off"></label>
-      <label class="academy-field">내용<textarea name="content" rows="4" placeholder="학습 중 궁금했던 점을 적어보세요."></textarea></label>
-      <p class="academy-dialog-note">교육용 목업입니다. 작성 내용은 저장되지 않습니다. 다른 사람에게 공개되지 않습니다.</p>
-      <button class="academy-button" type="submit">목업으로 작성해 보기</button>
+      <section class="academy-board-read-view" data-board-read-view hidden>
+        <p data-board-description>게시글과 답변이 이어지는 모습을 보여주는 예시 화면입니다.</p>
+        <h3 data-board-read-title></h3>
+        <p data-board-read-content></p>
+        <blockquote data-board-read-answer></blockquote>
+        <p class="academy-dialog-note">읽기 전용 예시입니다. 댓글이나 조회 기록은 저장되지 않습니다.</p>
+      </section>
+      <section class="academy-board-write-view" data-board-write-view>
+        <p data-board-description>질문을 작성하는 흐름을 체험하는 목업입니다.</p>
+        <label class="academy-field">제목<input name="title" type="text" placeholder="예: 대운의 흐름을 읽는 순서" autocomplete="off"></label>
+        <label class="academy-field">내용<textarea name="content" rows="4" placeholder="학습 중 궁금했던 점을 적어보세요."></textarea></label>
+        <p class="academy-dialog-note">교육용 목업입니다. 작성 내용은 저장되지 않습니다. 다른 사람에게 공개되지 않습니다.</p>
+        <button class="academy-button" type="submit">목업으로 작성해 보기</button>
+      </section>
     </form>
   </dialog>
   <dialog id="paymentDialog" class="academy-dialog" aria-labelledby="paymentDialogTitle">
@@ -345,11 +405,31 @@
       <button class="academy-dialog-close" type="button" data-dialog-close aria-label="결제 목업 닫기">×</button>
       <p class="academy-kicker">PAYMENT MOCKUP</p><h2 id="paymentDialogTitle">수강 플랜 확인</h2>
       <p data-payment-description>선택한 플랜을 확인합니다.</p>
-      <label class="academy-field">이름<input name="name" type="text" placeholder="수강생 이름" autocomplete="off"></label>
-      <label class="academy-field">이메일<input name="email" type="email" placeholder="you@example.com" autocomplete="off"></label>
-      <p class="academy-dialog-note">교육용 목업입니다. 실제 결제가 발생하지 않으며 결제 정보는 전송·저장되지 않습니다.</p>
+      <fieldset class="academy-payment-methods">
+        <legend>결제 수단 예시</legend>
+        <label><input name="method" type="radio" value="card" checked><span>신용·체크카드</span></label>
+        <label><input name="method" type="radio" value="easy"><span>간편결제</span></label>
+        <label><input name="method" type="radio" value="transfer"><span>계좌이체</span></label>
+      </fieldset>
+      <p class="academy-payment-exact-disclosure" data-payment-disclosure>현재는 시연 화면이며 결제가 발생하지 않습니다</p>
+      <p class="academy-dialog-note">교육용 목업입니다. 결제 정보는 전송·저장되지 않습니다.</p>
       <button class="academy-button" type="submit">결제 화면 미리보기</button>
     </form>
+  </dialog>
+  <dialog id="pillarDialog" class="academy-dialog" aria-labelledby="pillarDialogTitle">
+    <div class="academy-dialog-paper">
+      <button class="academy-dialog-close" type="button" data-dialog-close aria-label="기둥 학습 설명 닫기">×</button>
+      <p class="academy-kicker">PILLAR NOTE</p>
+      <h2 id="pillarDialogTitle">기둥 학습</h2>
+      <p class="academy-pillar-dialog-value" data-pillar-dialog-value></p>
+      <dl class="academy-pillar-concepts">
+        <div data-pillar-concept="천간"><dt>천간</dt><dd>겉으로 드러나는 기운의 성질을 열 글자로 비교하는 기초 언어입니다.</dd></div>
+        <div data-pillar-concept="지지"><dt>지지</dt><dd>계절과 시간, 생활의 바탕을 열두 글자로 살피는 좌표입니다.</dd></div>
+        <div data-pillar-concept="오행"><dt>오행</dt><dd>목·화·토·금·수의 관계를 보되 한 요소만으로 좋고 나쁨을 정하지 않습니다.</dd></div>
+        <div data-pillar-concept="십성"><dt>십성</dt><dd>일간과 다른 글자의 관계를 학습하기 위한 이름이며 미래를 확정하는 판정이 아닙니다.</dd></div>
+      </dl>
+      <p class="academy-dialog-note">이 설명은 명식 구조를 읽는 교육 자료이며 운세를 단정하지 않습니다.</p>
+    </div>
   </dialog>
 
   <footer class="academy-footer">

@@ -8,6 +8,7 @@
   <meta name="motion-preference" content="prefers-reduced-motion">
   <title>취명선 명리학당</title>
   <link rel="icon" href="data:,">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles/academy.css">
   <script src="scripts/academy-nav.js" defer></script>
   <script src="scripts/academy-motion.js" defer></script>
@@ -15,6 +16,13 @@
   <script src="../scripts/vendor/manseryeok.browser.js" defer></script>
   <script src="../scripts/manseryeok-adapter.js" defer></script>
   <script src="scripts/academy-manse.js" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' });
+      });
+    }
+  </script>
 </head>
 <body>
   <a class="academy-skip-link" href="#academyMain">본문으로 건너뛰기</a>

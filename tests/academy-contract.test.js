@@ -18,6 +18,8 @@ const manse = fs.readFileSync(
   path.join(__dirname, '..', 'academy', 'scripts', 'academy-manse.js'),
   'utf8'
 );
+const manifestPath = path.join(__dirname, '..', 'academy', 'manifest.webmanifest');
+const serviceWorkerPath = path.join(__dirname, '..', 'academy', 'sw.js');
 const rawEngineAccessPatterns = [
   /\b(?:root|window|globalThis|self)\s*(?:\.|\?\.)\s*Manseryeok(?!Adapter)\b/,
   /\b(?:root|window|globalThis|self)\s*\[\s*['"]Manseryeok['"]\s*\]/,
@@ -28,6 +30,31 @@ const rawEngineAccessPatterns = [
 function accessesRawManseryeok(source) {
   return rawEngineAccessPatterns.some(pattern => pattern.test(source));
 }
+
+test('academy service worker owns only academy scope, cache keys, and runtime assets', () => {
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  const sw = fs.readFileSync(serviceWorkerPath, 'utf8');
+
+  assert.match(html, /rel="manifest" href="manifest\.webmanifest"/);
+  assert.match(html, /serviceWorker\.register\('\.\/sw\.js', \{ scope: '\.\/' \}\)/);
+  assert.match(sw, /const CACHE_PREFIX = 'chwimyeongseon-academy-'/);
+  assert.match(sw, /startsWith\(CACHE_PREFIX\)/);
+  assert.doesNotMatch(sw, /caches\.delete\([^)]*palpum-manse/);
+  assert.doesNotMatch(sw, /caches\.delete\([^)]*legend-manse/);
+  assert.equal(manifest.start_url, './');
+  assert.equal(manifest.scope, './');
+
+  for (const asset of [
+    './', './index.html', './styles/academy.css', './scripts/academy-nav.js',
+    './scripts/academy-motion.js', './scripts/academy-mockups.js',
+    './scripts/academy-manse.js', '../assets/legend-landscape.webp',
+    '../assets/legend-seal.webp', '../scripts/vendor/manseryeok.browser.js',
+    '../scripts/manseryeok-adapter.js', './manifest.webmanifest',
+    '../icon-192.png', '../icon-512.png'
+  ]) {
+    assert.match(sw, new RegExp(asset.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+});
 
 test('academy exposes every approved section and mockup disclosure', () => {
   for (const id of [

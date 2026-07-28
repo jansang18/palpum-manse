@@ -36,6 +36,7 @@ function contentType(filePath) {
     '.css': 'text/css; charset=utf-8',
     '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8',
+    '.webmanifest': 'application/manifest+json; charset=utf-8',
     '.webp': 'image/webp'
   }[path.extname(filePath)] || 'application/octet-stream';
 }
@@ -60,6 +61,40 @@ function startServer() {
     });
     server.listen(0, '127.0.0.1', () => resolve(server));
   });
+}
+
+async function inspectOfflineRelease(page) {
+  await page.setViewport({ width: 1280, height: 720 });
+  await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload({ waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+
+  const online = await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker.ready;
+    const cacheNames = await caches.keys();
+    const academyCache = cacheNames.find(name => name.startsWith('chwimyeongseon-academy-'));
+    const cache = await caches.open(academyCache);
+    const requests = await cache.keys();
+
+    return {
+      scope: registration.scope,
+      controller: navigator.serviceWorker.controller && navigator.serviceWorker.controller.scriptURL,
+      cacheNames,
+      cachedPaths: requests.map(request => new URL(request.url).pathname).sort()
+    };
+  });
+
+  await page.setOfflineMode(true);
+  try {
+    await page.goto(`${page.testUrl}?offline-release-audit=1`, { waitUntil: 'domcontentloaded' });
+    return {
+      online,
+      offlineTitle: await page.$eval('#academyHomeTitle', node => node.textContent.replace(/\s+/g, ' ').trim())
+    };
+  } finally {
+    await page.setOfflineMode(false);
+  }
 }
 
 async function inspectLayout(page, viewport) {
@@ -1089,6 +1124,34 @@ async function main() {
     assert.equal(reduced.pointerX, '0');
     assert.equal(reduced.pointerY, '0');
     assert.equal(reduced.scrollDepth, '0');
+
+    const release = await inspectOfflineRelease(page);
+    assert.match(release.online.scope, /\/academy\/$/, 'academy worker scope stays under academy');
+    assert.match(release.online.controller, /\/academy\/sw\.js$/, 'academy page is controlled by its own worker');
+    assert.ok(
+      release.online.cacheNames.every(name => !name.startsWith('palpum-manse-') && !name.startsWith('legend-manse-')),
+      `academy release audit must not create sibling caches: ${JSON.stringify(release.online.cacheNames)}`
+    );
+    for (const asset of [
+      '/academy/',
+      '/academy/index.html',
+      '/academy/styles/academy.css',
+      '/academy/scripts/academy-nav.js',
+      '/academy/scripts/academy-motion.js',
+      '/academy/scripts/academy-mockups.js',
+      '/academy/scripts/academy-manse.js',
+      '/academy/manifest.webmanifest',
+      '/assets/legend-landscape.webp',
+      '/assets/legend-seal.webp',
+      '/scripts/vendor/manseryeok.browser.js',
+      '/scripts/manseryeok-adapter.js'
+    ]) {
+      assert.ok(
+        release.online.cachedPaths.includes(asset),
+        `academy offline cache must include ${asset}: ${JSON.stringify(release.online.cachedPaths)}`
+      );
+    }
+    assert.equal(release.offlineTitle, '취명선 명리학당', 'academy home opens from cache while offline');
     assert.deepEqual(errors, [], `browser console errors:\n${errors.join('\n')}`);
 
     console.log(`Academy UI passed at ${viewports.map(item => `${item.width}x${item.height}`).join(', ')}`);

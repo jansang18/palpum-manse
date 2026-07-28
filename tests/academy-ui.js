@@ -69,18 +69,80 @@ async function inspectLayout(page, viewport) {
   await page.waitForSelector('[data-count-complete="true"]');
 
   return page.evaluate(() => {
+    const toRect = box => ({
+      top: box.top,
+      right: box.right,
+      bottom: box.bottom,
+      left: box.left,
+      width: box.width,
+      height: box.height
+    });
     const rect = selector => {
       const box = document.querySelector(selector).getBoundingClientRect();
-      return {
-        top: box.top,
-        right: box.right,
-        bottom: box.bottom,
-        left: box.left,
-        width: box.width,
-        height: box.height
-      };
+      return toRect(box);
     };
-    const style = selector => getComputedStyle(document.querySelector(selector));
+    const isRendered = node => {
+      const computed = getComputedStyle(node);
+      const box = node.getBoundingClientRect();
+      return computed.display !== 'none'
+        && computed.visibility !== 'hidden'
+        && box.width > 0
+        && box.height > 0;
+    };
+    const isContained = box => (
+      box.top >= 0
+      && box.left >= 0
+      && box.right <= window.innerWidth
+      && box.bottom <= window.innerHeight
+    );
+    const identify = node => (
+      node.id
+      || (typeof node.className === 'string' && node.className.trim())
+      || `${node.tagName.toLowerCase()}:${node.textContent.trim().slice(0, 24)}`
+    );
+    const intersectsViewport = box => (
+      box.right > 0
+      && box.left < window.innerWidth
+      && box.bottom > 0
+      && box.top < window.innerHeight
+    );
+    const horizontalContainmentFailures = [...document.querySelectorAll('body *')]
+      .filter(node => {
+        if (!isRendered(node)) return false;
+        if (node.closest('[aria-hidden="true"]')) return false;
+        const navigation = node.closest('.academy-navigation');
+        if (navigation && node !== navigation) return false;
+        const box = node.getBoundingClientRect();
+        if (!intersectsViewport(box) && box.bottom <= 0) return false;
+        return box.left < 0 || box.right > window.innerWidth;
+      })
+      .map(node => ({
+        element: identify(node),
+        rect: toRect(node.getBoundingClientRect())
+      }));
+    const touchTargetFailures = [...document.querySelectorAll(
+      'a[href], button, input:not([type="hidden"]):not([type="checkbox"]), select, textarea, summary, .academy-check-field'
+    )]
+      .filter(isRendered)
+      .filter(node => {
+        const box = node.getBoundingClientRect();
+        return box.width < 44 || box.height < 44;
+      })
+      .map(node => ({
+        element: identify(node),
+        rect: toRect(node.getBoundingClientRect())
+      }));
+    const ctaRects = [...document.querySelectorAll('.academy-home-actions a')]
+      .map(node => ({
+        element: identify(node),
+        rect: toRect(node.getBoundingClientRect()),
+        contained: isContained(node.getBoundingClientRect())
+      }));
+    const navViewport = document.querySelector('.academy-navigation');
+    const navViewportRect = navViewport.getBoundingClientRect();
+    const navLabelOverflow = [...navViewport.querySelectorAll('a')]
+      .filter(node => node.scrollWidth > node.clientWidth)
+      .map(node => node.textContent.trim());
     const masthead = rect('.academy-masthead');
     const protectedSelectors = [
       '#academyHomeTitle',
@@ -91,55 +153,33 @@ async function inspectLayout(page, viewport) {
       const box = rect(selector);
       return Math.max(largest, masthead.bottom - box.top);
     }, 0);
-    const interactiveSelectors = [
-      '.academy-brand',
-      '.academy-navigation a',
-      '.academy-home-actions a',
-      '.academy-text-action',
-      '.academy-case-card a',
-      '.academy-board-heading button',
-      '.academy-board-row',
-      '.academy-plan-card button',
-      '.academy-field input',
-      '.academy-field select',
-      '.academy-field textarea',
-      '.academy-manse-submit button',
-      '.academy-learning-notes summary'
-    ];
-    const touchTargetFailures = [...document.querySelectorAll(interactiveSelectors.join(','))]
-      .filter(node => {
-        const box = node.getBoundingClientRect();
-        const computed = getComputedStyle(node);
-        return computed.visibility !== 'hidden'
-          && computed.display !== 'none'
-          && box.width > 0
-          && box.height > 0
-          && (box.height < 43.5 || box.width < 43.5);
-      })
-      .map(node => ({
-        selector: node.id || node.className || node.tagName,
-        width: node.getBoundingClientRect().width,
-        height: node.getBoundingClientRect().height
-      }));
-    const navLabelOverflow = [...document.querySelectorAll('.academy-navigation a')]
-      .filter(node => node.scrollWidth > node.clientWidth + 1)
-      .map(node => node.textContent.trim());
     return {
       title: rect('#academyHomeTitle'),
       actions: rect('.academy-home-actions'),
+      ctaRects,
       facts: rect('.academy-home-facts'),
       hero: rect('#academyHome'),
       masthead,
+      navViewport: {
+        rect: toRect(navViewportRect),
+        contained: (
+          navViewportRect.left >= 0
+          && navViewportRect.right <= window.innerWidth
+          && navViewportRect.top >= 0
+          && navViewportRect.bottom <= window.innerHeight
+        ),
+        horizontallyScrollable: navViewport.scrollWidth > navViewport.clientWidth
+      },
       orbit: rect('.academy-orbit'),
       orbitNodes: document.querySelectorAll('.academy-orbit-node').length,
       parallaxLayers: document.querySelectorAll('[data-parallax-layer]').length,
       mistBands: document.querySelectorAll('.academy-mist').length,
       horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      heroCtasVisible: rect('.academy-home-actions').bottom <= window.innerHeight + 1,
       fixedOverlap: Math.max(0, fixedOverlap),
+      horizontalContainmentFailures,
       touchTargetFailures,
       navLabelOverflow,
-      mastheadPosition: style('.academy-masthead').position,
+      mastheadPosition: getComputedStyle(document.querySelector('.academy-masthead')).position,
       titleText: document.querySelector('#academyHomeTitle').textContent.replace(/\s+/g, ' ').trim()
     };
   });
@@ -280,59 +320,134 @@ async function inspectAccessibility(page) {
   await page.setViewport({ width: 360, height: 800 });
   await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
 
-  const focusStops = [];
-  for (let index = 0; index < 10; index += 1) {
-    await page.keyboard.press('Tab');
-    focusStops.push(await page.evaluate(() => {
+  async function focusSnapshot(expectedSelector) {
+    return page.evaluate(selector => {
       const node = document.activeElement;
       const computed = getComputedStyle(node);
+      const ownRect = node.getBoundingClientRect();
+      const target = node.matches('input[type="checkbox"]')
+        ? node.closest('label')
+        : node;
+      const targetRect = target.getBoundingClientRect();
       return {
+        expectedSelector: selector,
+        matches: node.matches(selector),
+        body: node === document.body,
         label: node.textContent.replace(/\s+/g, ' ').trim(),
+        id: node.id,
         focusVisible: node.matches(':focus-visible'),
         outlineStyle: computed.outlineStyle,
         outlineWidth: Number.parseFloat(computed.outlineWidth),
-        width: node.getBoundingClientRect().width,
-        height: node.getBoundingClientRect().height
+        ownRect: {
+          width: ownRect.width,
+          height: ownRect.height
+        },
+        targetRect: {
+          width: targetRect.width,
+          height: targetRect.height
+        }
       };
-    }));
+    }, expectedSelector);
   }
 
-  await page.evaluate(() => {
-    const trigger = document.querySelector('[data-board-action="write"]');
-    trigger.scrollIntoView({ behavior: 'auto', block: 'center' });
-    trigger.focus();
-  });
-  await page.keyboard.press('Enter');
-  await page.waitForSelector('#boardDialog[open]');
-  const dialogTouchTarget = await page.$eval(
-    '#boardDialog [data-dialog-close]',
-    node => {
-      const box = node.getBoundingClientRect();
-      return { width: box.width, height: box.height };
+  async function tabUntil(selector, maxTabs = 40) {
+    for (let count = 0; count < maxTabs; count += 1) {
+      await page.keyboard.press('Tab');
+      const snapshot = await focusSnapshot(selector);
+      if (snapshot.matches) return snapshot;
+      assert.notEqual(snapshot.body, true, `${selector}: focus reached body before target`);
     }
-  );
-  const dialogFocusCycle = [];
-  for (const backwards of [true, false, false, false]) {
-    if (backwards) await page.keyboard.down('Shift');
-    await page.keyboard.press('Tab');
-    if (backwards) await page.keyboard.up('Shift');
-    dialogFocusCycle.push(await page.evaluate(() => {
-      const dialog = document.querySelector('#boardDialog');
-      const active = document.activeElement;
-      return {
-        inside: dialog.contains(active),
-        focusVisible: active.matches(':focus-visible'),
-        boundary: active === document.body,
-        backgroundInteractive: !dialog.contains(active)
-          && active !== document.body
-          && active.matches('a, button, input, select, textarea, summary, [tabindex]')
-      };
-    }));
+    throw new Error(`${selector}: keyboard journey did not reach target`);
   }
-  await page.keyboard.press('Escape');
-  const restored = await page.evaluate(
-    () => document.activeElement.matches('[data-board-action="write"]')
+
+  async function dialogJourney(triggerSelector, dialogSelector) {
+    const triggerBeforeOpen = await focusSnapshot(triggerSelector);
+    assert.equal(triggerBeforeOpen.matches, true, `${triggerSelector}: exact trigger is focused`);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector(`${dialogSelector}[open]`);
+
+    const initial = await focusSnapshot(`${dialogSelector} [data-dialog-close]`);
+    const controls = await page.$$eval(
+      `${dialogSelector} button:not([disabled]), ${dialogSelector} input:not([disabled]), ${dialogSelector} textarea:not([disabled]), ${dialogSelector} select:not([disabled]), ${dialogSelector} a[href]`,
+      nodes => nodes
+        .filter(node => {
+          const computed = getComputedStyle(node);
+          const box = node.getBoundingClientRect();
+          return computed.display !== 'none'
+            && computed.visibility !== 'hidden'
+            && box.width > 0
+            && box.height > 0;
+        })
+        .map(node => ({
+          element: node.id || node.getAttribute('aria-label') || node.name || node.textContent.trim(),
+          width: node.getBoundingClientRect().width,
+          height: node.getBoundingClientRect().height
+        }))
+    );
+
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('Tab');
+    await page.keyboard.up('Shift');
+    const backwardBoundary = await page.evaluate(selector => ({
+      body: document.activeElement === document.body,
+      inside: document.querySelector(selector).contains(document.activeElement),
+      focusVisible: document.activeElement.matches(':focus-visible'),
+      outlineWidth: Number.parseFloat(getComputedStyle(document.activeElement).outlineWidth)
+    }), dialogSelector);
+
+    const forwardCycle = [];
+    for (let count = 0; count < controls.length + 1; count += 1) {
+      await page.keyboard.press('Tab');
+      forwardCycle.push(await page.evaluate(selector => ({
+        body: document.activeElement === document.body,
+        inside: document.querySelector(selector).contains(document.activeElement),
+        focusVisible: document.activeElement.matches(':focus-visible'),
+        outlineWidth: Number.parseFloat(getComputedStyle(document.activeElement).outlineWidth)
+      }), dialogSelector));
+    }
+
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(selector => !document.querySelector(selector).open, {}, dialogSelector);
+    const restored = await focusSnapshot(triggerSelector);
+    return {
+      triggerBeforeOpen,
+      initial,
+      controls,
+      backwardBoundary,
+      forwardCycle,
+      restored
+    };
+  }
+
+  const journey = {
+    skip: await tabUntil('.academy-skip-link'),
+    masthead: await tabUntil('.academy-brand'),
+    heroCta: await tabUntil('.academy-home-actions a:first-child'),
+    courseButton: await tabUntil('[data-course-id="foundation"]')
+  };
+  journey.courseTitle = await page.evaluate(
+    () => document.activeElement.closest('.academy-course-card').querySelector('h3').textContent.trim()
   );
+  const dialogs = {
+    course: await dialogJourney('[data-course-id="foundation"]', '#courseDialog')
+  };
+
+  journey.form = [];
+  for (const selector of [
+    '#academyName',
+    '#academyGender',
+    '#academyCalendar',
+    '#academyBirth',
+    '#academyTime',
+    '#academyUnknown',
+    '#academyCalculate'
+  ]) {
+    journey.form.push(await tabUntil(selector));
+  }
+  journey.boardTrigger = await tabUntil('[data-board-action="write"]');
+  dialogs.board = await dialogJourney('[data-board-action="write"]', '#boardDialog');
+  journey.paymentTrigger = await tabUntil('[data-plan-id="foundation"]');
+  dialogs.payment = await dialogJourney('[data-plan-id="foundation"]', '#paymentDialog');
 
   await page.evaluate(() => {
     const form = document.querySelector('#academyManseForm');
@@ -341,35 +456,41 @@ async function inspectAccessibility(page) {
     form.requestSubmit();
     document.documentElement.style.scrollBehavior = 'auto';
   });
-  const fixedCoverage = [];
-  for (const selector of ['#academyPillars', '#academyLuckFlow']) {
+  const fixedIntersections = [];
+  for (const selector of ['#academyManseResult', '#academyLuckFlow']) {
     await page.$eval(
       selector,
       node => node.scrollIntoView({ behavior: 'auto', block: 'start' })
     );
-    fixedCoverage.push(await page.$eval(selector, node => {
-      const fixed = [...document.querySelectorAll('body *')].filter(candidate => {
+    fixedIntersections.push(...await page.$eval(selector, node => {
+      const fixedOrSticky = [...document.querySelectorAll('*')].filter(candidate => {
         const computed = getComputedStyle(candidate);
         const box = candidate.getBoundingClientRect();
-        return computed.position === 'fixed' && box.width > 0 && box.height > 0;
+        return ['fixed', 'sticky'].includes(computed.position)
+          && computed.display !== 'none'
+          && computed.visibility !== 'hidden'
+          && box.width > 0
+          && box.height > 0;
       });
       const box = node.getBoundingClientRect();
-      return fixed.reduce((largest, fixedNode) => {
+      return fixedOrSticky.map(fixedNode => {
         const fixedBox = fixedNode.getBoundingClientRect();
         const width = Math.max(0, Math.min(box.right, fixedBox.right) - Math.max(box.left, fixedBox.left));
         const height = Math.max(0, Math.min(box.bottom, fixedBox.bottom) - Math.max(box.top, fixedBox.top));
-        return Math.max(largest, width * height);
-      }, 0);
+        return {
+          target: node.id || node.className,
+          overlay: fixedNode.id || fixedNode.className || fixedNode.tagName,
+          area: width * height
+        };
+      }).filter(result => result.area > 0);
     }));
   }
 
   return {
     compactColumns,
-    focusStops,
-    dialogTouchTarget,
-    dialogFocusCycle,
-    restored,
-    fixedCoverage: Math.max(...fixedCoverage)
+    journey,
+    dialogs,
+    fixedIntersections
   };
 }
 
@@ -784,10 +905,26 @@ async function main() {
       assert.equal(result.titleText, '취명선 명리학당', `${viewport.name}: readable Korean title`);
       assert.ok(result.hero.top >= result.masthead.bottom - 1, `${viewport.name}: hero below masthead`);
       assert.ok(result.title.top >= result.masthead.bottom - 1, `${viewport.name}: title below masthead`);
-      assert.equal(result.heroCtasVisible, true, `${viewport.name}: both CTAs visible`);
+      assert.equal(result.ctaRects.length, 2, `${viewport.name}: renders both hero CTAs`);
+      assert.ok(
+        result.ctaRects.every(cta => (
+          cta.rect.width > 0
+          && cta.rect.height > 0
+          && cta.contained
+        )),
+        `${viewport.name}: each hero CTA has size and full viewport containment:\n${JSON.stringify(result.ctaRects, null, 2)}`
+      );
       assert.ok(result.facts.top >= result.masthead.bottom - 1, `${viewport.name}: facts below masthead`);
       assert.ok(result.facts.bottom <= viewport.height + 1, `${viewport.name}: facts visible`);
       assert.equal(result.fixedOverlap, 0, `${viewport.name}: fixed masthead covers no hero content`);
+      assert.equal(result.navViewport.contained, true, `${viewport.name}: navigation viewport is contained`);
+      if (viewport.width < 768) {
+        assert.equal(
+          result.navViewport.horizontallyScrollable,
+          true,
+          `${viewport.name}: compact navigation preserves intentional internal scrolling`
+        );
+      }
       assert.deepEqual(
         result.touchTargetFailures,
         [],
@@ -798,13 +935,18 @@ async function main() {
         [],
         `${viewport.name}: navigation labels must not overlap their touch targets`
       );
+      assert.deepEqual(
+        result.horizontalContainmentFailures,
+        [],
+        `${viewport.name}: visible non-decorative elements stay within the viewport:\n${JSON.stringify(result.horizontalContainmentFailures, null, 2)}`
+      );
       if (viewport.width >= 768) {
         assert.ok(result.orbit.top >= result.masthead.bottom - 1, `${viewport.name}: orbit below masthead`);
         assert.ok(result.orbit.right <= viewport.width + 1, `${viewport.name}: orbit right edge visible`);
         assert.ok(result.orbit.bottom <= viewport.height + 1, `${viewport.name}: orbit bottom visible`);
         assert.ok(result.orbit.left >= -1, `${viewport.name}: orbit left edge visible`);
       }
-      assert.ok(result.horizontalOverflow <= 1, `${viewport.name}: no horizontal overflow`);
+      assert.equal(result.horizontalOverflow, 0, `${viewport.name}: no horizontal overflow`);
 
       await page.screenshot({
         path: path.join(os.tmpdir(), `academy-task2-${viewport.name}.png`),
@@ -818,31 +960,60 @@ async function main() {
       { courses: 1, cases: 1, plans: 1, fields: 1 },
       '767px layout uses one-column cards and Manseryeok fields'
     );
+    const journeyStops = [
+      accessibility.journey.skip,
+      accessibility.journey.masthead,
+      accessibility.journey.heroCta,
+      accessibility.journey.courseButton,
+      ...accessibility.journey.form,
+      accessibility.journey.boardTrigger,
+      accessibility.journey.paymentTrigger
+    ];
+    assert.equal(accessibility.journey.courseTitle, '명리의 기초');
     assert.ok(
-      accessibility.focusStops.every(stop => (
-        stop.focusVisible
+      journeyStops.every(stop => (
+        stop.matches
+        && !stop.body
+        && stop.focusVisible
         && stop.outlineStyle !== 'none'
-        && stop.outlineWidth >= 2
-        && stop.width >= 43.5
-        && stop.height >= 43.5
+        && stop.outlineWidth === 3
+        && stop.targetRect.width >= 44
+        && stop.targetRect.height >= 44
       )),
-      `keyboard focus stops must be visible 44px targets:\n${JSON.stringify(accessibility.focusStops, null, 2)}`
+      `keyboard journey requires exact targets, 3px focus, and 44px hit areas:\n${JSON.stringify(journeyStops, null, 2)}`
     );
-    assert.ok(accessibility.dialogTouchTarget.width >= 43.5);
-    assert.ok(accessibility.dialogTouchTarget.height >= 43.5);
-    assert.ok(
-      accessibility.dialogFocusCycle.every(stop => (
-        !stop.backgroundInteractive
-        && (stop.boundary || (stop.inside && stop.focusVisible))
-      )),
-      `dialog focus must remain visible and trapped:\n${JSON.stringify(accessibility.dialogFocusCycle, null, 2)}`
+    for (const [name, dialog] of Object.entries(accessibility.dialogs)) {
+      assert.equal(dialog.initial.matches, true, `${name}: close button receives initial focus`);
+      assert.equal(dialog.initial.body, false, `${name}: initial focus is never body`);
+      assert.equal(dialog.initial.focusVisible, true, `${name}: initial focus is visible`);
+      assert.equal(dialog.initial.outlineWidth, 3, `${name}: initial focus uses 3px outline`);
+      assert.ok(
+        dialog.controls.every(control => control.width >= 44 && control.height >= 44),
+        `${name}: every visible dialog control is at least 44px:\n${JSON.stringify(dialog.controls, null, 2)}`
+      );
+      assert.deepEqual(
+        dialog.backwardBoundary,
+        { body: false, inside: true, focusVisible: true, outlineWidth: 3 },
+        `${name}: reverse Tab stays visibly inside`
+      );
+      assert.ok(
+        dialog.forwardCycle.every(stop => (
+          !stop.body
+          && stop.inside
+          && stop.focusVisible
+          && stop.outlineWidth === 3
+        )),
+        `${name}: forward Tab never leaves dialog:\n${JSON.stringify(dialog.forwardCycle, null, 2)}`
+      );
+      assert.equal(dialog.restored.matches, true, `${name}: exact trigger focus restores`);
+      assert.equal(dialog.restored.body, false, `${name}: restored focus is never body`);
+      assert.equal(dialog.restored.outlineWidth, 3, `${name}: restored focus uses 3px outline`);
+    }
+    assert.deepEqual(
+      accessibility.fixedIntersections,
+      [],
+      `fixed or sticky UI must not intersect Manseryeok result or luck content:\n${JSON.stringify(accessibility.fixedIntersections, null, 2)}`
     );
-    assert.ok(
-      accessibility.dialogFocusCycle.some(stop => stop.inside && stop.focusVisible),
-      'dialog focus returns inside after a native focus-loop boundary'
-    );
-    assert.equal(accessibility.restored, true, 'dialog restores focus to its trigger');
-    assert.equal(accessibility.fixedCoverage, 0, 'fixed UI never covers Manseryeok or luck content');
 
     const lifecycle = await inspectMotionLifecycle(page);
     assert.deepEqual(lifecycle.active.listeners, { pointermove: 1, scroll: 1 });

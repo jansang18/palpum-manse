@@ -45,6 +45,38 @@
     if (trigger && document.contains(trigger)) trigger.focus();
   }
 
+  function focusableControls(dialog) {
+    return Array.from(dialog.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )).filter(function (node) {
+      var style = window.getComputedStyle(node);
+      var box = node.getBoundingClientRect();
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && box.width > 0
+        && box.height > 0;
+    });
+  }
+
+  function trapDialogFocus(dialog, event) {
+    if (event.key !== 'Tab') return;
+    var controls = focusableControls(dialog);
+    if (!controls.length) {
+      event.preventDefault();
+      return;
+    }
+
+    var first = controls[0];
+    var last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   function setText(parent, selector, value) {
     var node = parent.querySelector(selector);
     if (node) node.textContent = value;
@@ -81,6 +113,7 @@
   function bindDialog(dialog) {
     if (!dialog) return;
     dialog.addEventListener('close', function () { restoreTrigger(dialog); });
+    dialog.addEventListener('keydown', function (event) { trapDialogFocus(dialog, event); });
     dialog.addEventListener('click', function (event) {
       if (event.target === dialog) closeDialog(dialog);
     });

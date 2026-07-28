@@ -10,10 +10,6 @@
     ['hour', 'hStem', 'hBranch']
   ];
 
-  if (!root.ManseryeokAdapter && root.LegendGanji) {
-    root.ManseryeokAdapter = root.LegendGanji;
-  }
-
   function requireElement(id) {
     const element = document.getElementById(id);
     if (!element) throw new Error(`필수 화면 요소를 찾을 수 없습니다: ${id}`);
@@ -21,7 +17,7 @@
   }
 
   function adapter() {
-    const existing = root.ManseryeokAdapter;
+    const existing = root.LegendGanji;
     if (!existing || typeof existing.calculate !== 'function') {
       throw new Error('만세력 계산 도구를 불러오지 못했습니다. 페이지를 새로고침해 주세요.');
     }
@@ -49,15 +45,20 @@
     };
   }
 
-  function ganji(stem, branch) {
-    if (stem < 0 || branch < 0) return '시간 미상';
+  function ganji(stem, branch, allowUnknown) {
+    if (allowUnknown && stem === -1 && branch === -1) return '시간 미상';
+    if (!Number.isInteger(stem) || stem < 0 || stem >= STEMS.length ||
+        !Number.isInteger(branch) || branch < 0 || branch >= BRANCHES.length) {
+      throw new RangeError(`계산 결과의 간지 인덱스가 유효하지 않습니다: ${stem}/${branch}`);
+    }
     return `${STEMS[stem]}${BRANCHES[branch]}`;
   }
 
   function renderPillars(result) {
     for (const [name, stemKey, branchKey] of PILLARS) {
       const card = document.querySelector(`[data-pillar="${name}"]`);
-      card.querySelector('[data-pillar-value]').textContent = ganji(result[stemKey], result[branchKey]);
+      card.querySelector('[data-pillar-value]').textContent =
+        ganji(result[stemKey], result[branchKey], name === 'hour');
     }
     requireElement('academyPillars').hidden = false;
   }

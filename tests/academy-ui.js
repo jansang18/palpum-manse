@@ -174,30 +174,108 @@ async function inspectAcademyManse(page) {
   await page.waitForSelector('#academyPillars:not([hidden])');
 
   const basic = await page.evaluate(() => ({
-    pillars: [...document.querySelectorAll('[data-pillar]')].map(node => node.textContent.trim()),
-    luckCount: document.querySelector('#academyLuckFlow').children.length,
+    pillars: [...document.querySelectorAll('[data-pillar-value]')].map(node => node.textContent),
+    luck: [...document.querySelectorAll('#academyLuckFlow > div')].map(node => ({
+      age: node.querySelector('span').textContent,
+      ganji: node.querySelector('strong').textContent
+    })),
     academyApi: typeof window.AcademyManse?.calculateFromForm,
-    adapterApi: typeof window.ManseryeokAdapter?.calculate,
-    directEngineCalls: window.ManseryeokAdapter === window.Manseryeok
+    adapterApi: typeof window.LegendGanji?.calculate
   }));
 
-  const leap = await page.evaluate(() => {
+  const routing = await page.evaluate(() => {
+    const originalAdapter = window.LegendGanji;
+    const originalEngine = window.Manseryeok;
+    let adapterCalls = 0;
+    let rawEngineCalls = 0;
+    window.LegendGanji = Object.freeze({
+      ...originalAdapter,
+      calculate(input) {
+        adapterCalls += 1;
+        return originalAdapter.calculate(input);
+      }
+    });
+    window.Manseryeok = new Proxy(originalEngine, {
+      get(target, property, receiver) {
+        rawEngineCalls += 1;
+        return Reflect.get(target, property, receiver);
+      }
+    });
+    try {
+      window.AcademyManse.calculateFromForm();
+      return { adapterCalls, rawEngineCalls };
+    } finally {
+      window.LegendGanji = originalAdapter;
+      window.Manseryeok = originalEngine;
+    }
+  });
+
+  const invalidIndex = await page.evaluate(() => {
+    const originalAdapter = window.LegendGanji;
+    window.LegendGanji = Object.freeze({
+      ...originalAdapter,
+      calculate(input) {
+        return { ...originalAdapter.calculate(input), yStem: 10 };
+      }
+    });
+    try {
+      window.AcademyManse.calculateFromForm();
+      return {
+        resultHidden: document.querySelector('#academyManseResult').hidden,
+        errorHidden: document.querySelector('#academyManseError').hidden,
+        error: document.querySelector('#academyManseError').textContent,
+        pillars: [...document.querySelectorAll('[data-pillar-value]')].map(node => node.textContent)
+      };
+    } finally {
+      window.LegendGanji = originalAdapter;
+    }
+  });
+
+  const calendarCases = await page.evaluate(() => {
     const form = document.querySelector('#academyManseForm');
-    form.elements.calendar.value = 'lunar';
-    form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
-    form.elements.leap.value = 'leap';
-    form.elements.calendar.value = 'solar';
-    form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
-    form.elements.calendar.value = 'lunar';
-    form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
-    form.elements.birth.value = '20200401';
-    form.elements.time.value = '1200';
-    form.requestSubmit();
+    function submit({ birth, time, calendar = 'solar', leap = 'normal', unknown = false }) {
+      form.elements.calendar.value = calendar;
+      form.elements.calendar.dispatchEvent(new Event('change', { bubbles: true }));
+      form.elements.leap.value = leap;
+      form.elements.birth.value = birth;
+      form.elements.time.value = time;
+      form.elements.unknown.checked = unknown;
+      form.elements.unknown.dispatchEvent(new Event('change', { bubbles: true }));
+      window.AcademyManse.calculateFromForm();
+      return {
+        resultHidden: document.querySelector('#academyManseResult').hidden,
+        errorHidden: document.querySelector('#academyManseError').hidden,
+        error: document.querySelector('#academyManseError').textContent,
+        summary: document.querySelector('#academyManseSummary').textContent
+      };
+    }
+
+    const invalidDate = submit({ birth: '20240230', time: '1430' });
+    const invalidTime = submit({ birth: '20240220', time: '2460' });
+    const normalLunar = submit({
+      birth: '20200401',
+      time: '1200',
+      calendar: 'lunar',
+      leap: 'normal'
+    });
+    const impossibleLeap = submit({
+      birth: '20210401',
+      time: '1200',
+      calendar: 'lunar',
+      leap: 'leap'
+    });
+    const unknownAmbiguity = submit({
+      birth: '20240204',
+      time: '',
+      unknown: true
+    });
+
     return {
-      leapVisible: !document.querySelector('#academyLeapField').hidden,
-      leapChoice: form.elements.leap.value,
-      summary: document.querySelector('#academyManseSummary').textContent,
-      errorHidden: document.querySelector('#academyManseError').hidden
+      invalidDate,
+      invalidTime,
+      normalLunar,
+      impossibleLeap,
+      unknownAmbiguity
     };
   });
 
@@ -250,27 +328,48 @@ async function inspectAcademyManse(page) {
 
   await page.setViewport({ width: 360, height: 800 });
   await page.reload({ waitUntil: 'networkidle0' });
-  await page.evaluate(() => {
+  const mobile = await page.evaluate(() => {
     const form = document.querySelector('#academyManseForm');
     form.elements.birth.value = '19860219';
     form.elements.time.value = '1430';
     form.requestSubmit();
+    document.documentElement.style.scrollBehavior = 'auto';
+    document.querySelector('#academyManse').scrollIntoView({ behavior: 'auto' });
+    const masthead = document.querySelector('.academy-masthead').getBoundingClientRect();
+    const title = document.querySelector('#academyManseTitle').getBoundingClientRect();
+    const flow = document.querySelector('#academyLuckFlow');
+    const scrollable = flow.scrollWidth > flow.clientWidth + 1;
+    flow.scrollLeft = flow.scrollWidth;
+    return {
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      pillarColumns: getComputedStyle(document.querySelector('#academyPillars')).gridTemplateColumns
+        .split(' ')
+        .filter(Boolean)
+        .length,
+      resultVisible: !document.querySelector('#academyManseResult').hidden,
+      titleClearance: title.top - masthead.bottom,
+      luckScrollable: scrollable,
+      luckScrollLeft: flow.scrollLeft
+    };
   });
-  const mobile = await page.evaluate(() => ({
-    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    pillarColumns: getComputedStyle(document.querySelector('#academyPillars')).gridTemplateColumns
-      .split(' ')
-      .filter(Boolean)
-      .length,
-    resultVisible: !document.querySelector('#academyManseResult').hidden
-  }));
 
   const notes = await page.$$eval('.academy-learning-notes details', nodes => nodes.map(node => ({
     label: node.querySelector('summary').textContent,
     text: node.querySelector('p').textContent
   })));
 
-  return { basic, leap, unknown, safeText, validation, desktop, mobile, notes };
+  return {
+    basic,
+    routing,
+    invalidIndex,
+    calendarCases,
+    unknown,
+    safeText,
+    validation,
+    desktop,
+    mobile,
+    notes
+  };
 }
 
 async function main() {
@@ -303,18 +402,41 @@ async function main() {
 
     if (process.env.TEST_GROUP === 'academy-manse') {
       const result = await inspectAcademyManse(page);
-      assert.equal(result.basic.pillars.length, 4);
-      assert.ok(result.basic.pillars.every(Boolean));
-      assert.ok(result.basic.luckCount > 1, 'luck flow renders calculated cycles');
+      assert.deepEqual(result.basic.pillars, ['병인', '경인', '갑오', '신미']);
+      assert.deepEqual(result.basic.luck, [
+        { age: '태어난 때', ganji: '경인' },
+        { age: '5세', ganji: '신묘' },
+        { age: '15세', ganji: '임진' },
+        { age: '25세', ganji: '계사' },
+        { age: '35세', ganji: '갑오' },
+        { age: '45세', ganji: '을미' },
+        { age: '55세', ganji: '병신' },
+        { age: '65세', ganji: '정유' },
+        { age: '75세', ganji: '무술' },
+        { age: '85세', ganji: '기해' },
+        { age: '95세', ganji: '경자' }
+      ]);
       assert.equal(result.basic.academyApi, 'function');
       assert.equal(result.basic.adapterApi, 'function');
-      assert.equal(result.basic.directEngineCalls, false, 'academy uses the adapter, not the raw engine');
-      assert.deepEqual(result.leap, {
-        leapVisible: true,
-        leapChoice: 'leap',
-        summary: '음력 윤달 · 시간 입력',
-        errorHidden: true
+      assert.deepEqual(result.routing, {
+        adapterCalls: 1,
+        rawEngineCalls: 0
       });
+      assert.equal(result.invalidIndex.resultHidden, true);
+      assert.equal(result.invalidIndex.errorHidden, false);
+      assert.match(result.invalidIndex.error, /간지 인덱스/);
+      assert.ok(result.invalidIndex.pillars.every(value => !value.includes('undefined')));
+      assert.equal(result.calendarCases.invalidDate.resultHidden, true);
+      assert.match(result.calendarCases.invalidDate.error, /유효하지 않은 양력 날짜/);
+      assert.equal(result.calendarCases.invalidTime.resultHidden, true);
+      assert.match(result.calendarCases.invalidTime.error, /시\(hour\).*0~23/);
+      assert.equal(result.calendarCases.normalLunar.resultHidden, false);
+      assert.equal(result.calendarCases.normalLunar.errorHidden, true);
+      assert.equal(result.calendarCases.normalLunar.summary, '음력 평달 · 시간 입력');
+      assert.equal(result.calendarCases.impossibleLeap.resultHidden, true);
+      assert.match(result.calendarCases.impossibleLeap.error, /윤4월이 존재하지 않습니다/);
+      assert.equal(result.calendarCases.unknownAmbiguity.resultHidden, true);
+      assert.match(result.calendarCases.unknownAmbiguity.error, /태어난 시간을 알아야/);
       assert.deepEqual(result.unknown, {
         timeDisabled: true,
         hour: '시간 미상',
@@ -328,11 +450,12 @@ async function main() {
       assert.equal(result.validation.errorHidden, false);
       assert.match(result.validation.error, /생년월일 8자리/);
       assert.ok(result.desktop.formTitleHeight < 80, 'desktop form title must not wrap to three lines');
-      assert.deepEqual(result.mobile, {
-        overflow: 0,
-        pillarColumns: 2,
-        resultVisible: true
-      });
+      assert.equal(result.mobile.overflow, 0);
+      assert.equal(result.mobile.pillarColumns, 2);
+      assert.equal(result.mobile.resultVisible, true);
+      assert.ok(result.mobile.titleClearance >= -1, 'mobile Manseryeok title clears fixed masthead');
+      assert.equal(result.mobile.luckScrollable, true);
+      assert.ok(result.mobile.luckScrollLeft > 0, 'mobile luck row can scroll horizontally');
       assert.equal(result.notes.length, 4);
       assert.deepEqual(result.notes.map(note => note.label), [
         '천간은 무엇인가요?',

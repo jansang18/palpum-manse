@@ -18,6 +18,16 @@ const manse = fs.readFileSync(
   path.join(__dirname, '..', 'academy', 'scripts', 'academy-manse.js'),
   'utf8'
 );
+const rawEngineAccessPatterns = [
+  /\b(?:root|window|globalThis|self)\s*(?:\.|\?\.)\s*Manseryeok(?!Adapter)\b/,
+  /\b(?:root|window|globalThis|self)\s*\[\s*['"]Manseryeok['"]\s*\]/,
+  /(?:^|[^\w$.])Manseryeok\s*(?:\.|\?\.)\s*(?:calculate|calculateFourPillars)\b/m,
+  /(?:^|[^\w$.])Manseryeok\s*\[\s*['"](?:calculate|calculateFourPillars)['"]\s*\]/m
+];
+
+function accessesRawManseryeok(source) {
+  return rawEngineAccessPatterns.some(pattern => pattern.test(source));
+}
 
 test('academy exposes every approved section and mockup disclosure', () => {
   for (const id of [
@@ -122,6 +132,23 @@ test('academy loads a working basic Manseryeok after the verified browser adapte
   const academyIndex = html.indexOf('scripts/academy-manse.js');
   assert.ok(adapterIndex >= 0 && academyIndex > adapterIndex);
   assert.match(manse, /root\.AcademyManse\s*=/);
-  assert.doesNotMatch(manse, /root\.Manseryeok\.calculate|root\.Manseryeok\?\.calculate/);
+  assert.equal(accessesRawManseryeok(manse), false);
+  for (const forbidden of [
+    'root.Manseryeok.calculate()',
+    'window.Manseryeok.calculateFourPillars()',
+    'globalThis?.Manseryeok?.calculate()',
+    'self["Manseryeok"].calculateFourPillars()',
+    'Manseryeok.calculateFourPillars()',
+    'Manseryeok["calculateFourPillars"]()'
+  ]) {
+    assert.equal(accessesRawManseryeok(forbidden), true, forbidden);
+  }
+  for (const allowed of [
+    'root.LegendGanji.calculate(input)',
+    'window.ManseryeokAdapter.calculate(input)',
+    'const label = "Manseryeok";'
+  ]) {
+    assert.equal(accessesRawManseryeok(allowed), false, allowed);
+  }
   assert.doesNotMatch(html, /�|\?{2,}/);
 });

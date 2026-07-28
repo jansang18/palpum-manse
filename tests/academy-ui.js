@@ -385,25 +385,39 @@ async function inspectAccessibility(page) {
         }))
     );
 
-    await page.keyboard.down('Shift');
-    await page.keyboard.press('Tab');
-    await page.keyboard.up('Shift');
-    const backwardBoundary = await page.evaluate(selector => ({
-      body: document.activeElement === document.body,
-      inside: document.querySelector(selector).contains(document.activeElement),
-      focusVisible: document.activeElement.matches(':focus-visible'),
-      outlineWidth: Number.parseFloat(getComputedStyle(document.activeElement).outlineWidth)
-    }), dialogSelector);
+    async function activeDialogStep() {
+      return page.evaluate(selector => {
+        const active = document.activeElement;
+        let identity = active.tagName.toLowerCase();
+        if (active.hasAttribute('data-dialog-close')) {
+          identity = 'close';
+        } else if (active.matches('button[type="submit"]')) {
+          identity = 'submit';
+        } else if (active.name) {
+          identity = `${active.tagName.toLowerCase()}:${active.name}`;
+        }
+        return {
+          identity,
+          body: active === document.body,
+          inside: document.querySelector(selector).contains(active),
+          focusVisible: active.matches(':focus-visible'),
+          outlineWidth: Number.parseFloat(getComputedStyle(active).outlineWidth)
+        };
+      }, dialogSelector);
+    }
 
-    const forwardCycle = [];
-    for (let count = 0; count < controls.length + 1; count += 1) {
+    const forwardCycle = [await activeDialogStep()];
+    for (let count = 0; count < controls.length; count += 1) {
       await page.keyboard.press('Tab');
-      forwardCycle.push(await page.evaluate(selector => ({
-        body: document.activeElement === document.body,
-        inside: document.querySelector(selector).contains(document.activeElement),
-        focusVisible: document.activeElement.matches(':focus-visible'),
-        outlineWidth: Number.parseFloat(getComputedStyle(document.activeElement).outlineWidth)
-      }), dialogSelector));
+      forwardCycle.push(await activeDialogStep());
+    }
+
+    const reverseCycle = [];
+    for (let count = 0; count < controls.length + 1; count += 1) {
+      await page.keyboard.down('Shift');
+      await page.keyboard.press('Tab');
+      await page.keyboard.up('Shift');
+      reverseCycle.push(await activeDialogStep());
     }
 
     await page.keyboard.press('Escape');
@@ -413,8 +427,11 @@ async function inspectAccessibility(page) {
       triggerBeforeOpen,
       initial,
       controls,
-      backwardBoundary,
+      backwardBoundary: reverseCycle[0],
       forwardCycle,
+      forwardOrder: forwardCycle.map(step => step.identity),
+      reverseCycle,
+      reverseOrder: reverseCycle.map(step => step.identity),
       restored
     };
   }
@@ -982,7 +999,31 @@ async function main() {
       )),
       `keyboard journey requires exact targets, 3px focus, and 44px hit areas:\n${JSON.stringify(journeyStops, null, 2)}`
     );
+    const expectedDialogOrders = {
+      course: {
+        forward: ['close', 'close'],
+        reverse: ['close', 'close']
+      },
+      board: {
+        forward: ['close', 'input:title', 'textarea:content', 'submit', 'close'],
+        reverse: ['submit', 'textarea:content', 'input:title', 'close', 'submit']
+      },
+      payment: {
+        forward: ['close', 'input:name', 'input:email', 'submit', 'close'],
+        reverse: ['submit', 'input:email', 'input:name', 'close', 'submit']
+      }
+    };
     for (const [name, dialog] of Object.entries(accessibility.dialogs)) {
+      assert.deepEqual(
+        dialog.forwardOrder,
+        expectedDialogOrders[name].forward,
+        `${name}: forward Tab visits every control once, then wraps to first`
+      );
+      assert.deepEqual(
+        dialog.reverseOrder,
+        expectedDialogOrders[name].reverse,
+        `${name}: reverse Tab visits every control once, then wraps to last`
+      );
       assert.equal(dialog.initial.matches, true, `${name}: close button receives initial focus`);
       assert.equal(dialog.initial.body, false, `${name}: initial focus is never body`);
       assert.equal(dialog.initial.focusVisible, true, `${name}: initial focus is visible`);
@@ -993,7 +1034,13 @@ async function main() {
       );
       assert.deepEqual(
         dialog.backwardBoundary,
-        { body: false, inside: true, focusVisible: true, outlineWidth: 3 },
+        {
+          identity: expectedDialogOrders[name].reverse[0],
+          body: false,
+          inside: true,
+          focusVisible: true,
+          outlineWidth: 3
+        },
         `${name}: reverse Tab stays visibly inside`
       );
       assert.ok(
@@ -1004,6 +1051,15 @@ async function main() {
           && stop.outlineWidth === 3
         )),
         `${name}: forward Tab never leaves dialog:\n${JSON.stringify(dialog.forwardCycle, null, 2)}`
+      );
+      assert.ok(
+        dialog.reverseCycle.every(stop => (
+          !stop.body
+          && stop.inside
+          && stop.focusVisible
+          && stop.outlineWidth === 3
+        )),
+        `${name}: reverse Tab never leaves dialog:\n${JSON.stringify(dialog.reverseCycle, null, 2)}`
       );
       assert.equal(dialog.restored.matches, true, `${name}: exact trigger focus restores`);
       assert.equal(dialog.restored.body, false, `${name}: restored focus is never body`);

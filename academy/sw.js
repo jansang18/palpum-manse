@@ -43,14 +43,25 @@ function matchAcademyCache(request) {
     .then((academyCache) => academyCache.match(request, { ignoreSearch: true }));
 }
 
-function writeAcademyCache(event, request, response) {
+function writeAcademyCache(event, request, responseCopy) {
   // Keep cache writes alive after the response returns, without allowing a
   // transient storage failure to surface as an unhandled rejection.
   event.waitUntil(
     caches.open(CACHE)
-      .then((academyCache) => academyCache.put(request, response.clone()))
+      .then((academyCache) => academyCache.put(request, responseCopy))
       .catch(() => undefined)
   );
+}
+
+function cloneAndWriteAcademyCache(event, request, response) {
+  let responseCopy;
+  try {
+    // Clone before any asynchronous cache operation can yield the response body.
+    responseCopy = response.clone();
+  } catch {
+    return;
+  }
+  writeAcademyCache(event, request, responseCopy);
 }
 
 self.addEventListener('install', (event) => {
@@ -85,7 +96,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          writeAcademyCache(event, request, response);
+          cloneAndWriteAcademyCache(event, request, response);
           return response;
         })
         .catch(() => matchAcademyCache(request)
@@ -97,7 +108,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     matchAcademyCache(request)
       .then((cached) => cached || fetch(request).then((response) => {
-        writeAcademyCache(event, request, response);
+        cloneAndWriteAcademyCache(event, request, response);
         return response;
       }))
   );

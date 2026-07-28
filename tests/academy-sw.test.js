@@ -17,6 +17,33 @@ function response(body) {
   };
 }
 
+function disturbableResponse(body) {
+  let disturbed = false;
+  let cloneCalls = 0;
+  return {
+    value: {
+      body,
+      clone() {
+        if (disturbed) throw new Error('response body is already disturbed');
+        cloneCalls += 1;
+        return response(body);
+      }
+    },
+    disturb() {
+      disturbed = true;
+    },
+    cloneCalls: () => cloneCalls
+  };
+}
+
+function deferred() {
+  let resolve;
+  return {
+    promise: new Promise(next => { resolve = next; }),
+    resolve
+  };
+}
+
 function createWorkerRuntime(options = {}) {
   const handlers = new Map();
   const stores = new Map();
@@ -24,6 +51,7 @@ function createWorkerRuntime(options = {}) {
   const globalMatches = [];
   const events = [];
   let skipWaitingCalls = 0;
+  let openCount = 0;
 
   const requestUrl = request => new URL(
     typeof request === 'string' ? request : request.url,
@@ -57,7 +85,11 @@ function createWorkerRuntime(options = {}) {
   });
   const caches = {
     open(name) {
+      openCount += 1;
       events.push({ type: 'open', name });
+      if (options.deferOpenAt === openCount) {
+        return options.openGate.promise.then(() => cacheFor(name));
+      }
       return Promise.resolve(cacheFor(name));
     },
     keys() {
@@ -109,7 +141,7 @@ function createWorkerRuntime(options = {}) {
     await lifetime;
   }
 
-  async function dispatchFetch(request) {
+  async function dispatchFetch(request, afterResponse) {
     let responsePromise;
     const lifetimes = [];
     handlers.get('fetch')({
@@ -121,9 +153,11 @@ function createWorkerRuntime(options = {}) {
         lifetimes.push(Promise.resolve(promise));
       }
     });
+    const value = responsePromise && await responsePromise;
+    if (afterResponse) afterResponse(value);
     return {
       intercepted: Boolean(responsePromise),
-      value: responsePromise && await responsePromise,
+      value,
       settle: Promise.all(lifetimes),
       waitUntilCount: lifetimes.length
     };
@@ -207,4 +241,54 @@ test('academy runtime cache writes use fetch lifetime and do not fail the respon
   assert.equal(result.waitUntilCount, 1);
   await result.settle;
   assert.ok(runtime.events.some(event => event.type === 'put' && event.name === academyCacheName));
+});
+
+test('academy clones network responses before delayed cache writes for documents and assets', async () => {
+  const cases = [
+    {
+      name: 'document',
+      deferOpenAt: 1,
+      request: {
+        url: `${scope}?network-document=1`,
+        method: 'GET',
+        mode: 'navigate',
+        destination: 'document'
+      }
+    },
+    {
+      name: 'asset',
+      deferOpenAt: 2,
+      request: {
+        url: `${scope}styles/academy.css`,
+        method: 'GET',
+        mode: 'cors',
+        destination: 'style'
+      }
+    }
+  ];
+
+  for (const scenario of cases) {
+    const networkResponse = disturbableResponse(scenario.name);
+    const openGate = deferred();
+    const runtime = createWorkerRuntime({
+      deferOpenAt: scenario.deferOpenAt,
+      openGate,
+      fetch: () => Promise.resolve(networkResponse.value)
+    });
+
+    const result = await runtime.dispatchFetch(scenario.request, () => networkResponse.disturb());
+
+    assert.equal(result.value, networkResponse.value, `${scenario.name}: response returns immediately`);
+    assert.equal(
+      networkResponse.cloneCalls(),
+      1,
+      `${scenario.name}: response is cloned before delayed cache open and respondWith resolution`
+    );
+    openGate.resolve();
+    await result.settle;
+    assert.ok(
+      runtime.events.some(event => event.type === 'put' && event.name === academyCacheName),
+      `${scenario.name}: cloned response is written after the cache becomes available`
+    );
+  }
 });

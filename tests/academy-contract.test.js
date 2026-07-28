@@ -60,3 +60,8 @@ test('academy navigation initialization is idempotent', () => {
   assert.match(navigation, /if \(initialized\) return;/);
   assert.match(navigation, /initialized = true;/);
 });
+
+test('academy main keeps a visible focus treatment for skip-link users', () => {
+  assert.doesNotMatch(css, /#academyMain:focus\s*\{\s*outline:\s*none;/);
+  assert.match(css, /#academyMain:focus-visible\s*\{[^}]*outline:/s);
+});

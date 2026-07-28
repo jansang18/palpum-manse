@@ -9,7 +9,10 @@ const repoRoot = path.resolve(__dirname, '..');
 const academyRoot = path.join(repoRoot, 'academy');
 const viewports = [
   { name: 'full-hd', width: 1920, height: 1080 },
+  { name: 'desktop', width: 1440, height: 900 },
+  { name: 'laptop', width: 1366, height: 768 },
   { name: 'hd', width: 1280, height: 720 },
+  { name: 'tablet', width: 768, height: 1024 },
   { name: 'mobile', width: 360, height: 800 }
 ];
 
@@ -41,22 +44,12 @@ function startServer() {
   return new Promise(resolve => {
     const server = http.createServer((request, response) => {
       const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
-      if (pathname === '/favicon.ico') {
-        response.writeHead(204);
-        response.end();
-        return;
-      }
       const relative = pathname === '/' || pathname === '/academy/' || pathname === '/academy'
         ? 'academy/index.html'
         : pathname.replace(/^\/+/, '');
       const filePath = path.resolve(repoRoot, relative);
 
       if (!filePath.startsWith(repoRoot) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-        if (relative === 'academy/scripts/academy-manse.js' || relative === 'academy/scripts/academy-mockups.js') {
-          response.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8' });
-          response.end('');
-          return;
-        }
         response.writeHead(404);
         response.end('Not found');
         return;
@@ -91,8 +84,10 @@ async function inspectLayout(page, viewport) {
     return {
       title: rect('#academyHomeTitle'),
       actions: rect('.academy-home-actions'),
+      facts: rect('.academy-home-facts'),
       hero: rect('#academyHome'),
       masthead: rect('.academy-masthead'),
+      orbit: rect('.academy-orbit'),
       orbitNodes: document.querySelectorAll('.academy-orbit-node').length,
       parallaxLayers: document.querySelectorAll('[data-parallax-layer]').length,
       mistBands: document.querySelectorAll('.academy-mist').length,
@@ -128,9 +123,9 @@ async function inspectReducedMotion(page) {
       reveal: computed('[data-reveal]'),
       count: document.querySelector('[data-count]').textContent,
       countComplete: document.querySelector('[data-count]').dataset.countComplete,
-      pointerX: getComputedStyle(document.documentElement).getPropertyValue('--pointer-x').trim(),
-      pointerY: getComputedStyle(document.documentElement).getPropertyValue('--pointer-y').trim(),
-      scrollDepth: getComputedStyle(document.documentElement).getPropertyValue('--scroll-depth').trim()
+      pointerX: getComputedStyle(document.querySelector('#academyHome')).getPropertyValue('--pointer-x').trim(),
+      pointerY: getComputedStyle(document.querySelector('#academyHome')).getPropertyValue('--pointer-y').trim(),
+      scrollDepth: getComputedStyle(document.querySelector('#academyHome')).getPropertyValue('--scroll-depth').trim()
     };
   });
 }
@@ -145,7 +140,8 @@ async function main() {
   });
   const page = await browser.newPage();
   const address = server.address();
-  page.testUrl = `http://127.0.0.1:${address.port}/academy/`;
+  const origin = `http://127.0.0.1:${address.port}`;
+  page.testUrl = `${origin}/academy/`;
   const errors = [];
   page.on('console', message => {
     if (message.type() === 'error') errors.push(message.text());
@@ -153,6 +149,15 @@ async function main() {
   page.on('pageerror', error => errors.push(error.message));
 
   try {
+    for (const missingPath of [
+      '/academy/scripts/academy-manse.js',
+      '/academy/scripts/academy-mockups.js',
+      '/academy/assets/not-created.webp'
+    ]) {
+      const response = await fetch(`${origin}${missingPath}`);
+      assert.equal(response.status, 404, `${missingPath}: missing assets must return 404`);
+    }
+
     for (const viewport of viewports) {
       const result = await inspectLayout(page, viewport);
       assert.equal(result.mastheadPosition, 'fixed', `${viewport.name}: masthead must stay fixed`);
@@ -160,8 +165,17 @@ async function main() {
       assert.equal(result.parallaxLayers, 3, `${viewport.name}: three mountain layers`);
       assert.equal(result.mistBands, 2, `${viewport.name}: two mist bands`);
       assert.equal(result.titleText, '취명선 명리학당', `${viewport.name}: readable Korean title`);
+      assert.ok(result.hero.top >= result.masthead.bottom - 1, `${viewport.name}: hero below masthead`);
       assert.ok(result.title.top >= result.masthead.bottom - 1, `${viewport.name}: title below masthead`);
       assert.ok(result.actions.bottom <= viewport.height + 1, `${viewport.name}: both CTAs visible`);
+      assert.ok(result.facts.top >= result.masthead.bottom - 1, `${viewport.name}: facts below masthead`);
+      assert.ok(result.facts.bottom <= viewport.height + 1, `${viewport.name}: facts visible`);
+      if (viewport.width >= 768) {
+        assert.ok(result.orbit.top >= result.masthead.bottom - 1, `${viewport.name}: orbit below masthead`);
+        assert.ok(result.orbit.right <= viewport.width + 1, `${viewport.name}: orbit right edge visible`);
+        assert.ok(result.orbit.bottom <= viewport.height + 1, `${viewport.name}: orbit bottom visible`);
+        assert.ok(result.orbit.left >= -1, `${viewport.name}: orbit left edge visible`);
+      }
       assert.ok(result.horizontalOverflow <= 1, `${viewport.name}: no horizontal overflow`);
 
       await page.screenshot({
@@ -184,7 +198,7 @@ async function main() {
     assert.deepEqual(errors, [], `browser console errors:\n${errors.join('\n')}`);
 
     console.log(`Academy UI passed at ${viewports.map(item => `${item.width}x${item.height}`).join(', ')}`);
-    console.log(`Visual captures: ${path.join(os.tmpdir(), 'academy-task2-{full-hd,hd,mobile}.png')}`);
+    console.log(`Visual captures: ${path.join(os.tmpdir(), 'academy-task2-{full-hd,desktop,laptop,hd,tablet,mobile}.png')}`);
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

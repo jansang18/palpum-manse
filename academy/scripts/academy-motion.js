@@ -10,6 +10,7 @@
   var observer = null;
   var inputAttached = false;
   var root = document.documentElement;
+  var hero = null;
   var motionQuery = null;
 
   function countTarget(node) {
@@ -83,12 +84,13 @@
 
   function scheduleFrame() {
     if (framePending || reduced || document.hidden) return;
+    if (!hero) return;
     framePending = true;
     requestAnimationFrame(function () {
       framePending = false;
-      root.style.setProperty('--pointer-x', pointerX.toFixed(3));
-      root.style.setProperty('--pointer-y', pointerY.toFixed(3));
-      root.style.setProperty(
+      hero.style.setProperty('--pointer-x', pointerX.toFixed(3));
+      hero.style.setProperty('--pointer-y', pointerY.toFixed(3));
+      hero.style.setProperty(
         '--scroll-depth',
         Math.min(scrollY / Math.max(window.innerHeight, 1), 3).toFixed(3)
       );
@@ -133,20 +135,22 @@
     if (reduced) {
       detachInput();
       if (observer) observer.disconnect();
-      root.style.setProperty('--pointer-x', '0');
-      root.style.setProperty('--pointer-y', '0');
-      root.style.setProperty('--scroll-depth', '0');
+      hero.style.setProperty('--pointer-x', '0');
+      hero.style.setProperty('--pointer-y', '0');
+      hero.style.setProperty('--scroll-depth', '0');
       revealImmediately();
       return;
     }
 
     attachInput();
     observeReveals();
+    handleVisibility();
   }
 
   function init() {
     if (initialized) return;
     initialized = true;
+    hero = document.getElementById('academyHome');
     root.classList.add('academy-motion-ready');
     motionQuery = window.matchMedia
       ? window.matchMedia('(prefers-reduced-motion: reduce)')

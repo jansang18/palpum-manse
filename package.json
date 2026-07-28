@@ -6,7 +6,8 @@
     "build:vendor": "node scripts/build-vendor.mjs",
     "test:core": "node --test tests/*.test.js",
     "test:ui": "node tests/ui-regression.js",
-    "test": "npm run test:core && npm run test:ui"
+    "test:academy-ui": "node tests/academy-ui.js",
+    "test": "npm run test:core && npm run test:ui && npm run test:academy-ui"
   },
   "dependencies": {
     "manseryeok": "2.0.0"

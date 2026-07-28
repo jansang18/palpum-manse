@@ -9,9 +9,6 @@
   --academy-line: rgb(35 37 30 / 0.18);
   --academy-display: "Iowan Old Style", "AppleMyungjo", "Nanum Myeongjo", "Noto Serif KR", Batang, serif;
   --academy-ui: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-  --pointer-x: 0;
-  --pointer-y: 0;
-  --scroll-depth: 0;
 }
 
 * { box-sizing: border-box; }
@@ -132,6 +129,9 @@ a { color: inherit; }
 }
 
 .academy-home {
+  --pointer-x: 0;
+  --pointer-y: 0;
+  --scroll-depth: 0;
   min-height: calc(100svh - var(--academy-masthead-height));
   isolation: isolate;
   background:

@@ -81,17 +81,64 @@ async function inspectLayout(page, viewport) {
       };
     };
     const style = selector => getComputedStyle(document.querySelector(selector));
+    const masthead = rect('.academy-masthead');
+    const protectedSelectors = [
+      '#academyHomeTitle',
+      '.academy-home-actions',
+      '.academy-home-facts'
+    ];
+    const fixedOverlap = protectedSelectors.reduce((largest, selector) => {
+      const box = rect(selector);
+      return Math.max(largest, masthead.bottom - box.top);
+    }, 0);
+    const interactiveSelectors = [
+      '.academy-brand',
+      '.academy-navigation a',
+      '.academy-home-actions a',
+      '.academy-text-action',
+      '.academy-case-card a',
+      '.academy-board-heading button',
+      '.academy-board-row',
+      '.academy-plan-card button',
+      '.academy-field input',
+      '.academy-field select',
+      '.academy-field textarea',
+      '.academy-manse-submit button',
+      '.academy-learning-notes summary'
+    ];
+    const touchTargetFailures = [...document.querySelectorAll(interactiveSelectors.join(','))]
+      .filter(node => {
+        const box = node.getBoundingClientRect();
+        const computed = getComputedStyle(node);
+        return computed.visibility !== 'hidden'
+          && computed.display !== 'none'
+          && box.width > 0
+          && box.height > 0
+          && (box.height < 43.5 || box.width < 43.5);
+      })
+      .map(node => ({
+        selector: node.id || node.className || node.tagName,
+        width: node.getBoundingClientRect().width,
+        height: node.getBoundingClientRect().height
+      }));
+    const navLabelOverflow = [...document.querySelectorAll('.academy-navigation a')]
+      .filter(node => node.scrollWidth > node.clientWidth + 1)
+      .map(node => node.textContent.trim());
     return {
       title: rect('#academyHomeTitle'),
       actions: rect('.academy-home-actions'),
       facts: rect('.academy-home-facts'),
       hero: rect('#academyHome'),
-      masthead: rect('.academy-masthead'),
+      masthead,
       orbit: rect('.academy-orbit'),
       orbitNodes: document.querySelectorAll('.academy-orbit-node').length,
       parallaxLayers: document.querySelectorAll('[data-parallax-layer]').length,
       mistBands: document.querySelectorAll('.academy-mist').length,
       horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      heroCtasVisible: rect('.academy-home-actions').bottom <= window.innerHeight + 1,
+      fixedOverlap: Math.max(0, fixedOverlap),
+      touchTargetFailures,
+      navLabelOverflow,
       mastheadPosition: style('.academy-masthead').position,
       titleText: document.querySelector('#academyHomeTitle').textContent.replace(/\s+/g, ' ').trim()
     };
@@ -130,6 +177,54 @@ async function inspectReducedMotion(page) {
   });
 }
 
+async function inspectMotionLifecycle(page) {
+  await page.evaluateOnNewDocument(() => {
+    const trackedTypes = new Set(['pointermove', 'scroll']);
+    const listeners = new Map([...trackedTypes].map(type => [type, new Set()]));
+    const originalAdd = window.addEventListener.bind(window);
+    const originalRemove = window.removeEventListener.bind(window);
+
+    window.addEventListener = function (type, listener, options) {
+      if (trackedTypes.has(type)) listeners.get(type).add(listener);
+      return originalAdd(type, listener, options);
+    };
+    window.removeEventListener = function (type, listener, options) {
+      if (trackedTypes.has(type)) listeners.get(type).delete(listener);
+      return originalRemove(type, listener, options);
+    };
+    window.__academyMotionListeners = function () {
+      return Object.fromEntries(
+        [...listeners].map(([type, handlers]) => [type, handlers.size])
+      );
+    };
+  });
+
+  await page.setViewport({ width: 1280, height: 720 });
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+  await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
+  const states = await page.evaluate(() => {
+    let hidden = false;
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get() { return hidden; }
+    });
+    const snapshot = () => ({
+      listeners: window.__academyMotionListeners(),
+      paused: document.body.classList.contains('is-motion-paused')
+    });
+    const active = snapshot();
+    hidden = true;
+    document.dispatchEvent(new Event('visibilitychange'));
+    const background = snapshot();
+    hidden = false;
+    document.dispatchEvent(new Event('visibilitychange'));
+    const restored = snapshot();
+    return { active, background, restored };
+  });
+
+  return states;
+}
+
 async function inspectMockupDialogs(page) {
   await page.setViewport({ width: 1280, height: 720 });
   await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
@@ -163,6 +258,119 @@ async function inspectMockupDialogs(page) {
   await page.keyboard.press('Escape');
 
   return { course, board, payment, boardNotice, paymentNotice };
+}
+
+async function inspectAccessibility(page) {
+  await page.setViewport({ width: 767, height: 900 });
+  await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
+  const compactColumns = await page.evaluate(() => {
+    const columns = selector => getComputedStyle(document.querySelector(selector))
+      .gridTemplateColumns
+      .split(' ')
+      .filter(Boolean)
+      .length;
+    return {
+      courses: columns('.academy-course-grid'),
+      cases: columns('.academy-case-grid'),
+      plans: columns('.academy-plan-grid'),
+      fields: columns('.academy-manse-fields')
+    };
+  });
+
+  await page.setViewport({ width: 360, height: 800 });
+  await page.goto(page.testUrl, { waitUntil: 'networkidle0' });
+
+  const focusStops = [];
+  for (let index = 0; index < 10; index += 1) {
+    await page.keyboard.press('Tab');
+    focusStops.push(await page.evaluate(() => {
+      const node = document.activeElement;
+      const computed = getComputedStyle(node);
+      return {
+        label: node.textContent.replace(/\s+/g, ' ').trim(),
+        focusVisible: node.matches(':focus-visible'),
+        outlineStyle: computed.outlineStyle,
+        outlineWidth: Number.parseFloat(computed.outlineWidth),
+        width: node.getBoundingClientRect().width,
+        height: node.getBoundingClientRect().height
+      };
+    }));
+  }
+
+  await page.evaluate(() => {
+    const trigger = document.querySelector('[data-board-action="write"]');
+    trigger.scrollIntoView({ behavior: 'auto', block: 'center' });
+    trigger.focus();
+  });
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#boardDialog[open]');
+  const dialogTouchTarget = await page.$eval(
+    '#boardDialog [data-dialog-close]',
+    node => {
+      const box = node.getBoundingClientRect();
+      return { width: box.width, height: box.height };
+    }
+  );
+  const dialogFocusCycle = [];
+  for (const backwards of [true, false, false, false]) {
+    if (backwards) await page.keyboard.down('Shift');
+    await page.keyboard.press('Tab');
+    if (backwards) await page.keyboard.up('Shift');
+    dialogFocusCycle.push(await page.evaluate(() => {
+      const dialog = document.querySelector('#boardDialog');
+      const active = document.activeElement;
+      return {
+        inside: dialog.contains(active),
+        focusVisible: active.matches(':focus-visible'),
+        boundary: active === document.body,
+        backgroundInteractive: !dialog.contains(active)
+          && active !== document.body
+          && active.matches('a, button, input, select, textarea, summary, [tabindex]')
+      };
+    }));
+  }
+  await page.keyboard.press('Escape');
+  const restored = await page.evaluate(
+    () => document.activeElement.matches('[data-board-action="write"]')
+  );
+
+  await page.evaluate(() => {
+    const form = document.querySelector('#academyManseForm');
+    form.elements.birth.value = '19860219';
+    form.elements.time.value = '1430';
+    form.requestSubmit();
+    document.documentElement.style.scrollBehavior = 'auto';
+  });
+  const fixedCoverage = [];
+  for (const selector of ['#academyPillars', '#academyLuckFlow']) {
+    await page.$eval(
+      selector,
+      node => node.scrollIntoView({ behavior: 'auto', block: 'start' })
+    );
+    fixedCoverage.push(await page.$eval(selector, node => {
+      const fixed = [...document.querySelectorAll('body *')].filter(candidate => {
+        const computed = getComputedStyle(candidate);
+        const box = candidate.getBoundingClientRect();
+        return computed.position === 'fixed' && box.width > 0 && box.height > 0;
+      });
+      const box = node.getBoundingClientRect();
+      return fixed.reduce((largest, fixedNode) => {
+        const fixedBox = fixedNode.getBoundingClientRect();
+        const width = Math.max(0, Math.min(box.right, fixedBox.right) - Math.max(box.left, fixedBox.left));
+        const height = Math.max(0, Math.min(box.bottom, fixedBox.bottom) - Math.max(box.top, fixedBox.top));
+        return Math.max(largest, width * height);
+      }, 0);
+    }));
+  }
+
+  return {
+    compactColumns,
+    focusStops,
+    dialogTouchTarget,
+    dialogFocusCycle,
+    restored,
+    fixedCoverage: Math.max(...fixedCoverage)
+  };
 }
 
 async function inspectAcademyManse(page) {
@@ -576,9 +784,20 @@ async function main() {
       assert.equal(result.titleText, '취명선 명리학당', `${viewport.name}: readable Korean title`);
       assert.ok(result.hero.top >= result.masthead.bottom - 1, `${viewport.name}: hero below masthead`);
       assert.ok(result.title.top >= result.masthead.bottom - 1, `${viewport.name}: title below masthead`);
-      assert.ok(result.actions.bottom <= viewport.height + 1, `${viewport.name}: both CTAs visible`);
+      assert.equal(result.heroCtasVisible, true, `${viewport.name}: both CTAs visible`);
       assert.ok(result.facts.top >= result.masthead.bottom - 1, `${viewport.name}: facts below masthead`);
       assert.ok(result.facts.bottom <= viewport.height + 1, `${viewport.name}: facts visible`);
+      assert.equal(result.fixedOverlap, 0, `${viewport.name}: fixed masthead covers no hero content`);
+      assert.deepEqual(
+        result.touchTargetFailures,
+        [],
+        `${viewport.name}: interactive targets must be at least 44px`
+      );
+      assert.deepEqual(
+        result.navLabelOverflow,
+        [],
+        `${viewport.name}: navigation labels must not overlap their touch targets`
+      );
       if (viewport.width >= 768) {
         assert.ok(result.orbit.top >= result.masthead.bottom - 1, `${viewport.name}: orbit below masthead`);
         assert.ok(result.orbit.right <= viewport.width + 1, `${viewport.name}: orbit right edge visible`);
@@ -592,6 +811,45 @@ async function main() {
         fullPage: false
       });
     }
+
+    const accessibility = await inspectAccessibility(page);
+    assert.deepEqual(
+      accessibility.compactColumns,
+      { courses: 1, cases: 1, plans: 1, fields: 1 },
+      '767px layout uses one-column cards and Manseryeok fields'
+    );
+    assert.ok(
+      accessibility.focusStops.every(stop => (
+        stop.focusVisible
+        && stop.outlineStyle !== 'none'
+        && stop.outlineWidth >= 2
+        && stop.width >= 43.5
+        && stop.height >= 43.5
+      )),
+      `keyboard focus stops must be visible 44px targets:\n${JSON.stringify(accessibility.focusStops, null, 2)}`
+    );
+    assert.ok(accessibility.dialogTouchTarget.width >= 43.5);
+    assert.ok(accessibility.dialogTouchTarget.height >= 43.5);
+    assert.ok(
+      accessibility.dialogFocusCycle.every(stop => (
+        !stop.backgroundInteractive
+        && (stop.boundary || (stop.inside && stop.focusVisible))
+      )),
+      `dialog focus must remain visible and trapped:\n${JSON.stringify(accessibility.dialogFocusCycle, null, 2)}`
+    );
+    assert.ok(
+      accessibility.dialogFocusCycle.some(stop => stop.inside && stop.focusVisible),
+      'dialog focus returns inside after a native focus-loop boundary'
+    );
+    assert.equal(accessibility.restored, true, 'dialog restores focus to its trigger');
+    assert.equal(accessibility.fixedCoverage, 0, 'fixed UI never covers Manseryeok or luck content');
+
+    const lifecycle = await inspectMotionLifecycle(page);
+    assert.deepEqual(lifecycle.active.listeners, { pointermove: 1, scroll: 1 });
+    assert.deepEqual(lifecycle.background.listeners, { pointermove: 0, scroll: 0 });
+    assert.equal(lifecycle.background.paused, true);
+    assert.deepEqual(lifecycle.restored.listeners, { pointermove: 1, scroll: 1 });
+    assert.equal(lifecycle.restored.paused, false);
 
     const reduced = await inspectReducedMotion(page);
     for (const key of ['mist', 'orbit', 'parallax', 'ink', 'reveal']) {

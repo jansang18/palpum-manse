@@ -125,7 +125,12 @@
 
   function handleVisibility() {
     document.body.classList.toggle('is-motion-paused', document.hidden);
-    if (!document.hidden) scheduleFrame();
+    if (document.hidden) {
+      detachInput();
+      return;
+    }
+    if (!reduced) attachInput();
+    scheduleFrame();
   }
 
   function applyPreference(event) {

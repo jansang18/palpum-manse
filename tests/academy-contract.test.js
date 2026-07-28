@@ -65,3 +65,9 @@ test('academy main keeps a visible focus treatment for skip-link users', () => {
   assert.doesNotMatch(css, /#academyMain:focus\s*\{\s*outline:\s*none;/);
   assert.match(css, /#academyMain:focus-visible\s*\{[^}]*outline:/s);
 });
+
+test('academy skip-link focus marker starts below the fixed masthead', () => {
+  assert.match(css, /#academyMain:focus-visible::before\s*\{[^}]*position:\s*fixed/s);
+  assert.match(css, /#academyMain:focus-visible::before\s*\{[^}]*top:\s*var\(--academy-masthead-height\)/s);
+  assert.match(css, /#academyMain:focus-visible::before\s*\{[^}]*pointer-events:\s*none/s);
+});

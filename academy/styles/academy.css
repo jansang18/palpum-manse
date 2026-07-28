@@ -32,6 +32,18 @@ main { padding-top: var(--academy-masthead-height); }
   outline-offset: -3px;
 }
 
+#academyMain:focus-visible::before {
+  position: fixed;
+  z-index: 6;
+  top: var(--academy-masthead-height);
+  right: 0;
+  left: 0;
+  height: 3px;
+  content: "";
+  pointer-events: none;
+  background: var(--academy-seal);
+}
+
 a { color: inherit; }
 
 .academy-skip-link {
